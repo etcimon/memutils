@@ -9,7 +9,8 @@
 module memutils.pool;
 
 import memutils.allocators;
-
+import std.conv : emplace;
+import std.algorithm : min, max;
 final class PoolAllocator(Base : Allocator) : Allocator {
 	static struct Pool { Pool* next; void[] data; void[] remaining; }
 	static struct Destructor { Destructor* next; void function(void*) destructor; void* object; }
@@ -21,10 +22,10 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 		size_t m_poolSize;
 	}
 	
-	this(size_t pool_size, Allocator base)
+	this(size_t pool_size = 64*1024)
 	{
 		m_poolSize = pool_size;
-		m_baseAllocator = base;
+		m_baseAllocator = getAllocator!Base();
 	}
 	
 	@property size_t totalSize()

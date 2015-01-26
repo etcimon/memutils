@@ -15,8 +15,11 @@ import std.range;
 import std.algorithm : countUntil;
 import memutils.allocators;
 import memutils.refcounted;
+import memutils.vector;
+import memutils.constants;
+import memutils.alloc;
 
-alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, int Alloc = LocklessFreeList) = RefCounted!(RBTree!(T, less, Alloc));
+alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, int ALLOC = LocklessFreeList) = RefCounted!(RBTree!(T, less, ALLOC));
 
 /**
  * All inserts, removes, searches, and any function in general has complexity
@@ -36,10 +39,10 @@ alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, int Alloc
  * ignored on insertion.  If duplicates are allowed, then new elements are
  * inserted after all existing duplicate elements.
  */
-struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = LocklessFreeList)
+struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int ALLOC)
 	if(is(typeof(binaryFun!less(T.init, T.init))))
 {
-	@disable this(this)
+	@disable this(this);
 
 	enum NOGC = true;
 	
@@ -143,20 +146,24 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
 	private Node   _begin;
 	private size_t _length;
 	
-	private void _setup()
+	private void _defaultInitialize()
 	{
-		assert(!_end); //Make sure that _setup isn't run more than once.
-		_begin = _end = allocate();
+		static bool setup;
+		if (!setup) {
+			_begin = _end = allocate();
+			setup = true;
+		}
 	}
 	
 	static private Node allocate()
 	{
-		return FreeListObjectAlloc!(RBNode!Elem, ALLOC).alloc();
+		return FreeListObjectAlloc!(RBNode!(Elem, ALLOC), ALLOC).alloc();
 	}
 	
 	static private Node allocate(Elem v)
 	{
 		auto result = allocate();
+		logTrace("Allocating node ", cast(void*)result);
 		result.value = v;
 		return result;
 	}
@@ -225,9 +232,10 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
      *
      * Complexity: $(BIGOH 1)
      */
-	Range!Elem opSlice()
+	RBRange!(Elem, ALLOC) opSlice()
 	{
-		return makeRange(_begin, _end);
+		_defaultInitialize();
+		return range(_begin, _end);
 	}
 	
 	/**
@@ -237,6 +245,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
      */
 	ref Elem front()
 	{
+		_defaultInitialize();
 		return _begin.value;
 	}
 	
@@ -247,6 +256,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
      */
 	ref Elem back()
 	{
+		_defaultInitialize();
 		return _end.prev.value;
 	}
 	
@@ -258,6 +268,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
      +/
 	bool opBinaryRight(string op)(Elem e) const if (op == "in") 
 	{
+		_defaultInitialize();
 		return _find(e) !is null;
 	}
 	
@@ -268,8 +279,10 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
      */
 	void clear()
 	{
+		logTrace("Clearing rbtree");
 		while (length > 0)
-			removeBack();
+			removeAny();
+		logTrace(length, " items left");
 		return;
 	}
 	
@@ -279,8 +292,9 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
      *
      * Complexity: $(BIGOH log(n))
      */
-	size_t stableInsert(Stuff)(Stuff stuff) if (isImplicitlyConvertible!(Stuff, Elem))
+	size_t insert(Stuff)(Stuff stuff) if (isImplicitlyConvertible!(Stuff, Elem))
 	{
+		_defaultInitialize();
 		static if(allowDuplicates)
 		{
 			_add(stuff);
@@ -298,8 +312,9 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
      *
      * Complexity: $(BIGOH m * log(n))
      */
-	size_t stableInsert(Stuff)(Stuff stuff) if(isInputRange!Stuff && isImplicitlyConvertible!(ElementType!Stuff, Elem))
+	size_t insert(Stuff)(Stuff stuff) if(isInputRange!Stuff && isImplicitlyConvertible!(ElementType!Stuff, Elem))
 	{
+		_defaultInitialize();
 		size_t result = 0;
 		static if(allowDuplicates)
 		{
@@ -319,10 +334,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
 		}
 		return result;
 	}
-	
-	/// ditto
-	alias insert = stableInsert;
-	
+
 	
 	/**
      * Remove an element from the container and return its value.
@@ -331,6 +343,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
      */
 	Elem removeAny()
 	{
+		_defaultInitialize();
 		scope(success)
 			--_length;
 		auto n = _begin;
@@ -346,6 +359,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
      */
 	void removeFront()
 	{
+		_defaultInitialize();
 		scope(success)
 			--_length;
 		_begin = _begin.remove(_end);
@@ -358,6 +372,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int Alloc = 
      */
 	void removeBack()
 	{
+		_defaultInitialize();
 		scope(success)
 			--_length;
 		auto lastnode = _end.prev;
@@ -389,18 +404,20 @@ assert(equal(rbt[], [5]));
 	size_t remove(U...)(U elems)
 		if(allSatisfy!(isImplicitlyConvertibleToElem, U))
 	{
+		_defaultInitialize();
 		Elem[U.length] toRemove;
 		
 		foreach(i, e; elems)
 			toRemove[i] = e;
 		
-		return removeKey(toRemove[]);
+		return remove(toRemove[]);
 	}
 	
 	/++ Ditto +/
 	size_t remove(U)(U[] elems)
 		if(isImplicitlyConvertible!(U, Elem))
 	{
+		_defaultInitialize();
 		immutable lenBefore = length;
 		
 		foreach(e; elems)
@@ -425,10 +442,11 @@ assert(equal(rbt[], [5]));
 			isImplicitlyConvertible!(ElementType!Stuff, Elem) &&
 			!isDynamicArray!Stuff)
 	{
+		_defaultInitialize();
 		import std.array : array;
 		//We use array in case stuff is a Range from this RedBlackTree - either
 		//directly or indirectly.
-		return removeKey(array(stuff));
+		return remove(array(stuff));
 	}
 	
 	//Helper for removeKey.
@@ -444,8 +462,9 @@ assert(equal(rbt[], [5]));
      */
 	bool opEquals(ref RBTree rhs)
 	{
+		_defaultInitialize();
 		import std.algorithm : equal;
-		if (rhs is null) return false;
+		if (rhs.empty) return false;
 		
 		// If there aren't the same number of nodes, we can't be equal.
 		if (this._length != rhs._length) return false;
@@ -500,9 +519,10 @@ assert(equal(rbt[], [5]));
      *
      * Complexity: $(BIGOH log(n))
      */
-	Vector!Elem upperBound(Elem e)
+	auto upperBoundRange(Elem e)
 	{
-		return makeVector(makeRange(_firstGreater(e), _end));
+		_defaultInitialize();
+		return range(_firstGreater(e), _end);
 	}
 	
 	/**
@@ -511,9 +531,10 @@ assert(equal(rbt[], [5]));
      *
      * Complexity: $(BIGOH log(n))
      */
-	Vector!Elem lowerBound(Elem e)
+	auto lowerBoundRange(Elem e)
 	{
-		return makeVector(makeRange(_begin, _firstGreaterEqual(e)));
+		_defaultInitialize();
+		return range(_begin, _firstGreaterEqual(e));
 	}
 	
 	/**
@@ -522,36 +543,37 @@ assert(equal(rbt[], [5]));
      *
      * Complexity: $(BIGOH log(n))
      */
-	Vector!Elem equalRange(Elem e)
+	auto equalRange(Elem e)
 	{
+		_defaultInitialize();
 		auto beg = _firstGreaterEqual(e);
 		if(beg is _end || _less(e, beg.value))
 			// no values are equal
-			return makeVector(makeRange(beg, beg));
+			return range(beg, beg);
 		static if(allowDuplicates)
 		{
-			return makeVector(makeRange(beg, _firstGreater(e)));
+			return range(beg, _firstGreater(e));
 		}
 		else
 		{
 			// no sense in doing a full search, no duplicates are allowed,
 			// so we just get the next node.
-			return makeVector(makeRange(beg, beg.next));
+			return range(beg, beg.next);
 		}
 	}
-	
+
 	/**
      * Constructor. Pass in an array of elements, or individual elements to
      * initialize the tree with.
      */
 	this(Elem[] elems...)
 	{
-		_setup();
+		_defaultInitialize();
 		static if (is(Elem == void[])) {
-			foreach(elem;elems) stableInsert(elem);
+			foreach(elem;elems) insert(elem);
 		}
 		else
-			stableInsert(elems);
+			insert(elems);
 	}
 	
 	/**
@@ -559,10 +581,10 @@ assert(equal(rbt[], [5]));
      */
 	this(Stuff)(Stuff stuff) if (isInputRange!Stuff && isImplicitlyConvertible!(ElementType!Stuff, Elem))
 	{
-		_setup();
-		stableInsert(stuff);
+		_defaultInitialize();
+		insert(stuff);
 	}
-	this() { _setup(); }
+
 	~this() {
 		clear();
 	}
@@ -1057,7 +1079,8 @@ struct RBNode(V, int ALLOC)
 		_left = _right = _parent = null;
 		
 		/// this node object can now be safely deleted
-		FreeListObjectAlloc!(RBNode!(V, ALLOC), ALLOC).free(cast(RBNode!(V*, ALLOC))&this);
+		logTrace("Freeing node ", cast(void*)&this);
+		FreeListObjectAlloc!(RBNode!(V, ALLOC), ALLOC).free(cast(RBNode!(V, ALLOC)*)&this);
 		
 		return ret;
 	}
@@ -1121,28 +1144,11 @@ struct RBNode(V, int ALLOC)
 		else
 			return n.left.rightmost;
 	}
-	/*
-    Node dup(scope Node delegate(V v) alloc) const
-    {
-        //
-        // duplicate this and all child nodes
-        //
-        // The recursion should be lg(n), so we shouldn't have to worry about
-        // stack size.
-        //
-        Node copy = alloc(value);
-        copy.color = color;
-        if(_left !is null)
-            copy.left = _left.dup(alloc);
-        if(_right !is null)
-            copy.right = _right.dup(alloc);
-        return copy;
-    }
-    */
 	
 	@property Node dup() const
 	{
 		Node copy = FreeListObjectAlloc!(RBNode!(V, ALLOC), ALLOC).alloc();
+		logTrace("Allocating node ", cast(void*)copy);
 		copy.value = cast(V)value;
 		copy.color = color;
 		if(_left !is null)
@@ -1156,8 +1162,9 @@ struct RBNode(V, int ALLOC)
 /**
  * The range type for $(D RedBlackTree)
  */
-struct Range
+struct RBRange(Elem, int ALLOC)
 {
+	alias Node = RBNode!(Elem, ALLOC).Node;
 	private Node _begin;
 	private Node _end;
 	
@@ -1166,18 +1173,18 @@ struct Range
 		_begin = b;
 		_end = e;
 	}
-	
+
 	/**
-         * Returns $(D true) if the range is _empty
-         */
+     * Returns $(D true) if the range is _empty
+     */
 	@property bool empty() const
 	{
 		return _begin is _end;
 	}
 	
 	/**
-         * Returns the first element in the range
-         */
+     * Returns the first element in the range
+     */
 	@property ref Elem front()
 	{
 		return _begin.value;
@@ -1212,14 +1219,18 @@ struct Range
 	}
 	
 	/**
-         * Trivial _save implementation, needed for $(D isForwardRange).
+         * Trivial _save implementation, needed for $(D isForwardRBRange).
          */
-	@property Range save()
+	@property RBRange save()
 	{
-		return *cast(Range*)&this;
+		return *cast(RBRange*)&this;
 	}
 }
 
-Range!T makeRange(T)(Node!(T, ALLOC) start, Node!(T, ALLOC) end) {
-	/// ... todo
+private auto range(Elem, int ALLOC)(RBNode!(Elem, ALLOC)* start, RBNode!(Elem, ALLOC)* end) {
+	return RBRange!(Elem, ALLOC)(start, end);
+}
+
+auto vector(Elem, int ALLOC)(RBRange!(Elem, ALLOC) r) {
+	return Vector!(Unqual!Elem, ALLOC)(r);
 }

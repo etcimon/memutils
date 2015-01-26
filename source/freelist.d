@@ -7,9 +7,10 @@
     License: Subject to the terms of the MIT license.
     Authors: Sönke Ludwig, Etienne Cimon
 */
-module allocators.freelist;
+module memutils.freelist;
 
 import memutils.allocators;
+import std.algorithm : min;
 
 final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 	import std.typetuple;

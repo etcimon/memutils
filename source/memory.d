@@ -11,6 +11,9 @@ module memutils.memory;
 
 import memutils.allocators;
 import memutils.helpers;
+import core.memory : GC;
+import std.algorithm : min;
+import std.c.stdlib;
 
 final class GCAllocator : Allocator {
 	void[] alloc(size_t sz)
@@ -58,6 +61,32 @@ final class MallocAllocator : Allocator {
 		auto ptr = .malloc(sz + Allocator.alignment);
 		if (ptr is null) throw err;
 		return adjustPointerAlignment(ptr)[0 .. sz];
+	}
+
+	void[] realloc(void[] mem, size_t new_size)
+	{
+		size_t csz = min(mem.length, new_size);
+		auto p = extractUnalignedPointer(mem.ptr);
+		size_t oldmisalign = mem.ptr - p;
+		
+		auto pn = cast(ubyte*).realloc(p, new_size+Allocator.alignment);
+		if (p == pn) return pn[oldmisalign .. new_size+oldmisalign];
+		
+		auto pna = cast(ubyte*)adjustPointerAlignment(pn);
+		auto newmisalign = pna - pn;
+		
+		// account for changed alignment after realloc (move memory back to aligned position)
+		if (oldmisalign != newmisalign) {
+			if (newmisalign > oldmisalign) {
+				foreach_reverse (i; 0 .. csz)
+					pn[i + newmisalign] = pn[i + oldmisalign];
+			} else {
+				foreach (i; 0 .. csz)
+					pn[i + newmisalign] = pn[i + oldmisalign];
+			}
+		}
+		
+		return pna[0 .. new_size];
 	}
 	
 	void free(void[] mem)

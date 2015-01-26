@@ -13,12 +13,10 @@ template UnConst(T) {
 mixin template Embed(alias OBJ)
 {
 	alias TR = typeof(OBJ);
-	template T() {
-		static if (is(typeof(*OBJ) == struct))
+	static if (is(typeof(*OBJ) == struct))
 			alias T = typeof(*OBJ);
-		else
-			alias T = TR;
-	}
+	else
+		alias T = TR;
 
 	@property ref const(T) opStar() const
 	{
@@ -82,19 +80,7 @@ mixin template Embed(alias OBJ)
 		defaultInit();
 		opStar().opSliceAssign(args);
 	}
-	
-	void defaultInit() inout {
-		static if (is(TR == T*)) {
-			if (!OBJ) {
-				auto newObj = this.opCall();
-				(cast(RefCounted*)&this).OBJ = newObj.OBJ;
-				(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
-				//(cast(RefCounted*)&this).m_magic = 0x1EE75817;
-				newObj.OBJ = null;
-			}
-		}
-		
-	}
+
 	
 	auto opSlice(U...)(U args) const
 		if (__traits(hasMember, typeof(OBJ), "opSlice"))
@@ -106,9 +92,9 @@ mixin template Embed(alias OBJ)
 			return opStar().opSlice(args);
 		
 	}
-	
+
+	static if (__traits(hasMember, typeof(OBJ), "opDollar"))
 	size_t opDollar() const
-		if (__traits(hasMember, typeof(OBJ), "opDollar"))
 	{
 		return opStar().opDollar();
 	}

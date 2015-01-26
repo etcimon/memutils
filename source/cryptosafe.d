@@ -9,18 +9,18 @@
 * Distributed under the terms of the Simplified BSD License (see Botan's license.txt)
 */
 module memutils.cryptosafe;
-
-static if (Have_Botan_d || Cryptosafe):
+import memutils.constants;
+static if (HasBotan || HasCryptoSafe):
 
 import memutils.allocators;
-import memutils.constants;
+import memutils.securepool;
 
-final class CryptoSafeAllocator(Base : Allocator) : Allocator
+final class SecureAllocator(Base : Allocator) : Allocator
 {
 private:	
 	Base m_secondary;
 
-	static if (Have_Botan_d || SecurePool) {
+	static if (HasBotan || HasSecurePool) {
 
 		__gshared SecurePool ms_zeroise;	
 		shared static this() { 
@@ -36,7 +36,7 @@ public:
 	
 	void[] alloc(size_t n)
 	{
-		static if (Have_Botan_d || SecurePool) {
+		static if (HasBotan || HasSecurePool) {
 			if (void[] p = ms_zeroise.alloc(n)) {
 				return p;
 			}
@@ -44,12 +44,25 @@ public:
 		void[] p = m_secondary.alloc(n);
 		return p;
 	}
-	
+
+	void[] realloc(void[] mem, size_t n)
+	{
+		static if (HasBotan || HasSecurePool) {
+			import std.c.string : memcpy;
+			void[] new_mem = alloc(n);
+			memcpy(new_mem.ptr, mem.ptr, mem.length);
+			free(mem);
+			return new_mem;
+		} else {
+			return m_secondary.realloc(mem, n);
+		}
+	}
+
 	void free(void[] mem)
 	{
 		import std.c.string : memset;
 		memset(mem.ptr, 0, mem.length);
-		static if (Have_Botan_d || SecurePool)
+		static if (HasBotan || HasSecurePool)
 			if (ms_zeroise.free(mem))
 				return;
 		m_secondary.free(mem);

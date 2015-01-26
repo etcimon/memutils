@@ -1,29 +1,34 @@
 ﻿module memutils.vector;
 
-import core.exception, core.memory, core.stdc.stdlib, core.stdc.string,
-	std.algorithm, std.conv, std.exception, std.range,
-	std.traits, std.typecons;
+import std.algorithm : swap, initializeAll, empty;
+import std.traits;
+import std.c.string;
+import std.range : isInputRange, isForwardRange, ElementType, refRange, RefRange, hasLength;
+import core.exception : RangeError;
+import std.exception : enforce;
 import memutils.allocators;
 import memutils.helpers;
+import memutils.alloc;
+import memutils.refcounted;
 
 alias SecureArray(T) = Array!(T, CryptoSafeAllocator);
 
 template Array(T, int ALLOC = LocklessFreeList) 
-	if (!is (T == RefCounted!(Vector!(T, ALLOCATOR))))
+	if (!is (T == RefCounted!(Vector!(T, ALLOC))))
 {
-	alias Array = RefCounted!(Vector!(T, ALLOCATOR));
+	alias Array = RefCounted!(Vector!(T, ALLOC));
 }
 
 alias SecureVector(T) = Vector!(T, CryptoSafeAllocator);
 
 /// An array that uses a custom allocator.
-struct Vector(T, int ALLOCATOR = VulnerableAllocator)
+struct Vector(T, int ALLOC = LocklessFreeList)
 {
 	enum NOGC = true;
 	
 	@disable this(this);
 	
-	void opAssign()(auto ref Vector!(T, ALLOCATOR) other) {
+	void opAssign()(auto ref Vector!(T, ALLOC) other) {
 		this.swap(other);
 	}
 	
@@ -37,7 +42,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 		this(T[] p) 
 		{ 
 			_capacity = p.length; 
-			_payload = allocArray!(T, ALLOCATOR, true)(p.length);
+			_payload = allocArray!(T, ALLOC, true)(p.length);
 			
 			static if (isImplicitlyConvertible!(T, T))
 				_payload[0 .. p.length] = p[0 .. $];
@@ -52,7 +57,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 		{
 			T[] data = _payload.ptr[0 .. capacity];
 			if (data.ptr !is null)
-				freeArray!(T, ALLOCATOR, true)(data, length); // calls destructors and frees memory
+				freeArray!(T, ALLOC, true)(data, length); // calls destructors and frees memory
 		}
 		
 		void opAssign(Payload rhs)
@@ -71,7 +76,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
                     memset(_payload.ptr + newLength, 0, (elements - oldLength) * T.sizeof);
             }
 
-            freeArray!(T, false)(getAllocator!ALLOCATOR(), _payload.ptr[0 .. capacity]);
+            freeArray!(T, false)(getAllocator!ALLOC(), _payload.ptr[0 .. capacity]);
 
             static if ( hasIndirections!T )
                 GC.removeRange(_payload.ptr, T.sizeof * _capacity);
@@ -148,7 +153,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
              */
 			immutable oldLength = length;
 			TRACE("Oldlength = ", oldLength);
-			auto newPayload = allocArray!(T, ALLOCATOR, false)(elements)[0 .. oldLength];
+			auto newPayload = allocArray!(T, ALLOC, false)(elements)[0 .. oldLength];
 			static if ( hasIndirections!T ) {
 				// Zero out unused capacity to prevent gc from seeing
 				// false pointers
@@ -167,7 +172,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 			auto ub = _payload.ptr[0 .. _capacity];
 			if (ub) {
 				TRACE("Freeing old payload");
-				freeArray!(T, ALLOCATOR, false, false)(ub);
+				freeArray!(T, ALLOC, false, false)(ub);
 				
 				static if ( hasIndirections!T )
 					GC.removeRange(cast(void*) _payload.ptr);
@@ -273,13 +278,13 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 
         Complexity: $(BIGOH n).
      */
-	@property Vector!(T, ALLOCATOR) dup() const
+	@property Vector!(T, ALLOC) dup() const
 	{
 		static if (__traits(compiles, { T a; T b; a = b; } ()))
-			return Vector!(T, ALLOCATOR)(cast(T[])_data._payload);
+			return Vector!(T, ALLOC)(cast(T[])_data._payload);
 		else static if (__traits(hasMember, T, "dup")) // Element is @disable this(this) but has dup()
 		{
-			Vector!(T, ALLOCATOR) vec = Vector!(T, ALLOCATOR)(length);
+			Vector!(T, ALLOC) vec = Vector!(T, ALLOC)(length);
 			// swap each element with a duplicate
 			foreach (size_t i, ref el; _data._payload) {
 				T t = el.dup;
@@ -291,19 +296,19 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 	}
 	
 	/// ditto
-	@property RefCounted!(Vector!(T, ALLOCATOR)) dupr() const
+	@property RefCounted!(Vector!(T, ALLOC)) dupr() const
 	{
-		return RefCounted!(Vector!(T, ALLOCATOR))(cast(T[])_data._payload);
+		return RefCounted!(Vector!(T, ALLOC))(cast(T[])_data._payload);
 	}
 	
-	void swap(ref Vector!(T, ALLOCATOR) other) {
+	void swap(ref Vector!(T, ALLOC) other) {
 		import std.algorithm : swap;
 		.swap(_data._payload, other._data._payload);
 		.swap(_data._capacity, other._data._capacity);
 	}
 	
-	@property Vector!(T, ALLOCATOR) move() {
-		return Vector!(T, ALLOCATOR)(this);
+	@property Vector!(T, ALLOC) move() {
+		return Vector!(T, ALLOC)(this);
 	}
 	
 	/**
@@ -351,10 +356,12 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 	{
 		return _data._capacity;
 	}
-	
-	@property Range range() {
-		return refRange(this[]);
+
+	/*
+	@property auto range() {
+		return refRange(&_data._payload);
 	}
+	*/
 	
 	/**
         Ensures sufficient capacity to accommodate $(D e) elements.
@@ -373,7 +380,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 
         Complexity: $(BIGOH 1)
      */
-	T[] opSlice() const
+	const(T[]) opSlice() const
 	{
 		return _data._payload;
 	}
@@ -388,7 +395,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 	T[] opSlice(size_t i, size_t j) const
 	{
 		version (assert) if (i > j || j > length) throw new RangeError();
-		return _data._payload[i .. j];
+		return (cast(T[])_data._payload)[i .. j];
 	}
 	
 	/**
@@ -448,7 +455,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 		{
 			_data.length = value.length;
 			_data._payload.ptr[0 .. value.length] = value[0 .. $];
-		} else static if (is (Stuff == Vector!(T, ALLOCATOR))) {
+		} else static if (is (Stuff == Vector!(T, ALLOC))) {
 			_data.length = value._data.length;
 			_data._payload[] = value._data._payload[];
 		}
@@ -503,7 +510,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 		if (op == "~")
 	{
 		TRACE("Appending stuff");
-		RefCounted!(Vector!(T, ALLOCATOR)) result;
+		RefCounted!(Vector!(T, ALLOC)) result;
 		// @@@BUG@@ result ~= this[] doesn't work
 		auto r = this[];
 		result ~= r;
@@ -637,7 +644,20 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
     */
 	size_t insertBack(Stuff)(auto ref Stuff stuff)
 	{
-		return _data.pushBack(stuff);
+		static if (isImplicitlyConvertible!(Stuff, T[]))
+			return _data.pushBack(cast(T[])stuff);
+		else static if (isSomeString!(Stuff))
+			return _data.pushBack(cast(T[])stuff);
+		else static if (isInputRange!(Stuff) && isImplicitlyConvertible!(ForeachType!Stuff, T)) {
+			size_t i;
+			foreach (ref el; stuff) {
+				_data.pushBack(el);
+				i++;
+			}
+			return i;
+		}
+		else
+			return _data.pushBack(cast(T) stuff);
 	}
 
 	/**
@@ -754,11 +774,11 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 		return result;
 	}
 
-	bool opEquals(in RefCounted!(Vector!(T, ALLOCATOR)) other_) const {
-		import botan.constants : logTrace;
-		if (other_ is null && _data._payload.length == 0)
+	bool opEquals()(auto const ref RefCounted!(Vector!(T, ALLOC)) other_) const {
+		import memutils.constants : logTrace;
+		if (other_.empty && empty())
 			return true;
-		else if (other_ is null)
+		else if (other_.empty)
 			return false;
 		if (other_.length != length)
 			return false;
@@ -771,7 +791,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 		return true;
 	}
 	
-	bool opEquals()(auto const ref Vector!(T, ALLOCATOR) other_) const {
+	bool opEquals()(auto const ref Vector!(T, ALLOC) other_) const {
 		if (_data._payload.length == 0)
 			return true;
 		if (other_.length != length)
@@ -785,6 +805,16 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 		return true;
 	}
 	
+}
+
+auto array(T)(T[] val) 
+{
+	return Array!(Unqual!T)(val);
+}
+
+auto vector(T)(T[] val)
+{
+	return Vector!(Unqual!T)(val);
 }
 
 void TRACE(T...)(T t) {

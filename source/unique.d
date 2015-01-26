@@ -13,16 +13,13 @@
 module memutils.unique;
 
 import memutils.allocators;
+import memutils.constants;
+import memutils.alloc;
 
-struct Unique(T, int ALLOC = GCAllocator)
+struct Unique(T, int ALLOC = NativeGC)
 {
 	/** Represents a reference to $(D T). Resolves to $(D T*) if $(D T) is a value type. */
-	static if (is(T:Object))
-		alias RefT = T;
-	else static if (__traits(isAbstractClass, T))
-		alias RefT = T;
-	else
-		alias RefT = T*;
+	alias TR = RefTypeOf!T;
 	
 public:
 	/**
@@ -34,7 +31,7 @@ public:
     Unique!Foo f = new Foo;
     ----
     */
-	this(RefT p)
+	this(TR p)
 	{
 		debug(Unique) logTrace("Unique constructor with rvalue");
 		_p = p;
@@ -44,7 +41,7 @@ public:
     The nulling will ensure uniqueness as long as there
     are no previous aliases to the source.
     */
-	this(ref RefT p)
+	this(ref TR p)
 	{
 		_p = p;
 		debug(Unique) logTrace("Unique constructor nulling source");
@@ -66,7 +63,7 @@ public:
     ---
     */
 	this(U)(Unique!U u)
-		if (is(u.RefT:RefT))
+		if (is(u.TR:TR))
 	{
 		debug(Unique) logTrace("Unique constructor converting from ", U.stringof);
 		_p = u._p;
@@ -75,11 +72,11 @@ public:
 	
 	void free()
 	{
-		RefT p = null;
+		TR p = null;
 		opAssign(p);
 	}
 	
-	void opAssign(ref RefT p)
+	void opAssign(ref TR p)
 	{
 		destroy(this);
 		_p = p;
@@ -92,13 +89,13 @@ public:
         debug(Unique) logTrace("Unique opAssign converting from ", U.stringof);
         // first delete any resource we own
         destroy(this);
-        _p = cast(RefT)u._p;
-        cast(RefT)u._p = null;
+        _p = cast(TR)u._p;
+        cast(TR)u._p = null;
     }*/
 	
 	/// Transfer ownership from a $(D Unique) of a type that is convertible to our type.
 	void opAssign(U)(Unique!U u)
-		if (is(u.RefT:RefT))
+		if (is(u.TR:TR))
 	{
 		debug(Unique) logTrace("Unique opAssign converting from ", U.stringof);
 		// first delete any resource we own
@@ -110,7 +107,8 @@ public:
 	~this()
 	{
 		debug(Unique) logTrace("Unique destructor of ", (_p is null)? null: _p);
-		if (_p !is null) getAllocator!ALLOC().free(_p);
+		if (_p !is null)
+			FreeListObjectAlloc!(T, ALLOC).free(_p);
 		_p = null;
 	}
 	/** Returns whether the resource exists. */
@@ -135,13 +133,13 @@ public:
 	}
 	
 	/** Forwards member access to contents. */
-	RefT opDot() { return _p; }
-	const(RefT) opDot() const { return _p; }
+	TR opDot() { return _p; }
+	const(TR) opDot() const { return _p; }
 	
-	RefT opUnary(string op)() if (op == "*") { return _p; }
-	const(RefT) opUnary(string op)() const if (op == "*") { return _p; }
+	TR opUnary(string op)() if (op == "*") { return _p; }
+	const(TR) opUnary(string op)() const if (op == "*") { return _p; }
 	
-	RefT get() { return _p; }
+	TR get() { return _p; }
 	
 	bool opCast(T : bool)() const {
 		return !isEmpty;
@@ -154,5 +152,5 @@ public:
 	@disable this(this);
 	
 private:
-	RefT _p;
+	TR _p;
 }

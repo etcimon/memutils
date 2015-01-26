@@ -7,16 +7,19 @@
 */
 module memutils.hashmap;
 
-import memutils.helpers;
-import memutils.allocators;
 import std.conv : emplace, to;
 import std.traits;
 import std.algorithm : countUntil;
 import memutils.refcounted;
+import memutils.constants;
+import memutils.helpers;
+import memutils.allocators;
+import memutils.alloc;
 
-alias HashMapRef(Key, Value, int ALLOCATOR = VulnerableAllocator) = RefCounted!(HashMapRef!(Key, Value, ALLOCATOR));
 
-struct HashMap(Key, Value, int ALLOCATOR)
+alias HashMapRef(Key, Value, int ALLOC = LocklessFreeList) = RefCounted!(HashMap!(Key, Value, ALLOC));
+
+struct HashMap(Key, Value, int ALLOC = LocklessFreeList)
 {
 	@disable this(this);
 
@@ -37,14 +40,15 @@ struct HashMap(Key, Value, int ALLOCATOR)
 	
 	~this()
 	{
-		if (m_table) freeArray!(TableEntry, ALLOCATOR)(m_table);
+		if (m_table) freeArray!(TableEntry, ALLOC)(m_table);
 	}
-		
+
+	@property bool empty() const { return length == 0; }
 	@property size_t length() const { return m_length; }
 	
 	void remove(Key key)
 	{
-		logTrace("Remove key: ", Key.stringof, " val: ", Value.stringof);
+		//logTrace("Remove key: ", Key.stringof, " val: ", Value.stringof);
 		auto idx = findIndex(key);
 		assert (idx != size_t.max, "Removing non-existent element.");
 		auto i = idx;
@@ -65,21 +69,14 @@ struct HashMap(Key, Value, int ALLOCATOR)
 		}
 	}
 	
-	Value get(Key key, lazy Value default_value = Value.init) const
+	Value get(in Key key, lazy Value default_value = Value.init) const
 	{
 		auto idx = this.findIndex(key);
 		if (idx == size_t.max) return default_value;
 		const Value ret = m_table[idx].value;
 		return *cast(Value*)&ret;
 	}
-	
-	Value get(in Key key, lazy Value default_value = Value.init)
-	{
-		auto idx = findIndex(key);
-		if (idx == size_t.max) return default_value;
-		return m_table[idx].value;
-	}
-	
+		
 	static if (!is(typeof({ Value v; const(Value) vc; v = vc; }))) {
 		const(Value) get(Key key, lazy const(Value) default_value = Value.init)
 		{
@@ -235,13 +232,10 @@ struct HashMap(Key, Value, int ALLOCATOR)
 			{
 				m_hasher = (Key k) {
 					import std.typecons : scoped;
-					import botan.hash.md4; // fixme: use xxhash
 					import memutils.vector : Array;
 					Array!ubyte s = k.toArray();
-					auto md4 = scoped!MD4();
-					md4.update(s);
-					auto hash = md4.finished();
-					return *cast(size_t*)hash.ptr;
+					size_t hash = hashOf(s[], 0);
+					return hash;
 				};
 			}
 			else static if ((__traits(hasMember, Key, "isRefCounted") && __traits(hasMember, typeof(*(Key())), "toVector") ) ||
@@ -249,13 +243,10 @@ struct HashMap(Key, Value, int ALLOCATOR)
 			{
 				m_hasher = (Key k) {
 					import std.typecons : scoped;
-					import botan.hash.md4;
 					import memutils.vector : Array;
 					Vector!ubyte s = k.toVector();
-					auto md4 = scoped!MD4();
-					md4.update(s);
-					auto hash = md4.finished();
-					return *cast(size_t*)hash.ptr;
+					size_t hash = hashOf(s[], 0);
+					return hash;
 				};
 			}
 			else static if (( __traits(hasMember, Key, "isRefCounted") && __traits(hasMember, typeof(*(Key())), "toString") ) ||
@@ -295,7 +286,7 @@ struct HashMap(Key, Value, int ALLOCATOR)
 		new_size = 1 << pot;
 		
 		auto oldtable = m_table;
-		m_table = allocArray!(TableEntry, ALLOCATOR)(new_size);
+		m_table = allocArray!(TableEntry, ALLOC)(new_size);
 		foreach (ref el; m_table) {
 			static if (is(Key == struct)) {
 				emplace(cast(UnConst!Key*)&el.key);
@@ -309,7 +300,7 @@ struct HashMap(Key, Value, int ALLOCATOR)
 			auto idx = findInsertIndex(el.key);
 			(cast(ubyte[])(&m_table[idx])[0 .. 1])[] = (cast(ubyte[])(&el)[0 .. 1])[];
 		}
-		if (oldtable) freeArray!(TableEntry, ALLOCATOR, true, false)(oldtable);
+		if (oldtable) freeArray!(TableEntry, ALLOC, true, false)(oldtable);
 	}
 }
 

@@ -2,13 +2,19 @@
 
 import memutils.allocators;
 import memutils.helpers;
+import std.conv : to, emplace;
+import std.traits : hasIndirections, Unqual, isImplicitlyConvertible;
 
-struct RefCounted(T, int ALLOC = VulnerableAllocator)
+struct RefCounted(T, int ALLOC = LocklessFreeList)
 {
-	enum isRefCounted = true;
+	static if (__traits(hasMember, T, "NOGC")) 
+		enum NOGC = T.NOGC;
+	else 
+		enum NOGC = false;
 
-	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
-	else enum NOGC = false;
+	mixin Embed!m_object;
+
+	enum isRefCounted = true;
 
 	enum ElemSize = AllocSize!T;	
 	alias TR = RefTypeOf!T;	
@@ -20,8 +26,8 @@ struct RefCounted(T, int ALLOC = VulnerableAllocator)
 	static RefCounted opCall(ARGS...)(auto ref ARGS args)
 	{
 		RefCounted ret;
-		auto mem = getAllocator!VulnerableAllocatorImpl().alloc(ElemSize);
-		ret.m_refCount = cast(ulong*)getAllocator!VulnerableAllocatorImpl().alloc(ulong.sizeof).ptr;
+		auto mem = getAllocator!ALLOC().alloc(ElemSize);
+		ret.m_refCount = cast(ulong*)getAllocator!ALLOC().alloc(ulong.sizeof).ptr;
 		(*ret.m_refCount) = 1;
 		static if( hasIndirections!T && !NOGC) GC.addRange(mem.ptr, ElemSize);
 		ret.m_object = cast(TR)emplace!(Unqual!T)(mem, args);
@@ -52,14 +58,8 @@ struct RefCounted(T, int ALLOC = VulnerableAllocator)
 	
 	void copyctor() {
 		
-		if (!m_object) {
+		if (!m_object) 
 			defaultInit();
-			import backtrace.backtrace;
-			import std.stdio : stdout;
-			static if (T.stringof.countUntil("OIDImpl") == -1 &&
-				T.stringof.countUntil("HashMap!(string,") == -1)
-				printPrettyTrace(stdout, PrintOptions.init, 3); 
-		}
 		checkInvariants();
 		if (m_object) (*m_refCount)++; 
 		
@@ -119,12 +119,12 @@ struct RefCounted(T, int ALLOC = VulnerableAllocator)
 		static if (is(TR == T*)) .destroy(*objc);
 		else .destroy(objc);
 		static if( hasIndirections!T && !NOGC ) GC.removeRange(cast(void*)m_object);
-		getAllocator!VulnerableAllocatorImpl().free((cast(void*)m_object)[0 .. ElemSize]);
-		getAllocator!VulnerableAllocatorImpl().free((cast(void*)m_refCount)[0 .. ulong.sizeof]);
+		getAllocator!ALLOC().free((cast(void*)m_object)[0 .. ElemSize]);
+		getAllocator!ALLOC().free((cast(void*)m_refCount)[0 .. ulong.sizeof]);
 	}
 
 	U opCast(U)() const nothrow
-		if (!is ( U == bool ))
+		if (isImplicitlyConvertible!(U, T))
 	{
 		assert(U.sizeof == typeof(this).sizeof, "Error, U: "~ U.sizeof.to!string~ " != this: " ~ typeof(this).sizeof.to!string);
 		try { 
@@ -149,9 +149,23 @@ struct RefCounted(T, int ALLOC = VulnerableAllocator)
 		} catch(Throwable e) { try logError("Error in catch: ", e.toString()); catch {} }
 		return U.init;
 	}
-		
+
 	private @property ulong refCount() const {
 		return *m_refCount;
+	}
+
+
+	private void defaultInit() inout {
+		static if (is(TR == T*)) {
+			if (!m_object) {
+				auto newObj = this.opCall();
+				(cast(RefCounted*)&this).m_object = newObj.m_object;
+				(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
+				//(cast(RefCounted*)&this).m_magic = 0x1EE75817;
+				newObj.m_object = null;
+			}
+		}
+		
 	}
 	
 	private void checkInvariants()

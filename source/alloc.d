@@ -1,9 +1,13 @@
 ﻿module memutils.alloc;
 
-import memutils.allocators;
 import core.thread : Fiber;	
+import std.traits : isPointer, hasIndirections, hasElaborateDestructor;
+import core.memory : GC;
+import std.conv : emplace;
+import memutils.allocators;
+public import memutils.constants;
 
-void getFiberPool(Fiber f) {
+Allocator getFiberPool(Fiber f) {
 	if (!f)
 		return getAllocator!NativeGC();
 	if (auto ptr = (&f in g_fiberAlloc)) {
@@ -18,14 +22,14 @@ void getFiberPool(Fiber f) {
 
 void destroyFiberPool(Fiber f) {
 	if (auto ptr = (&f in g_fiberAlloc)) {
-		gs_fiberAlloc.remove(&f);
-		*ptr.freeAll();
+		g_fiberAlloc.remove(&f);
+		ptr.freeAll();
 		delete *ptr;
 	}
 }
 
 
-private:
+package:
 
 template FreeListObjectAlloc(T, int ALLOC)
 {
@@ -59,7 +63,7 @@ template FreeListObjectAlloc(T, int ALLOC)
 auto allocObject(T, int ALLOC = LocklessAllocator, bool MANAGED = true, ARGS...)(ARGS args)
 {
 	mixin(translateAllocator());
-	auto allocator = getAllocator();
+	auto allocator = thisAllocator();
 	auto mem = allocator.alloc(AllocSize!T);
 	static if( MANAGED ){
 		static if( hasIndirections!T )
@@ -73,7 +77,7 @@ auto allocObject(T, int ALLOC = LocklessAllocator, bool MANAGED = true, ARGS...)
 T[] allocArray(T, int ALLOC = LocklessAllocator, bool MANAGED = true)(size_t n)
 {
 	mixin(translateAllocator());
-	auto allocator = getAllocator();
+	auto allocator = thisAllocator();
 	auto mem = allocator.alloc(T.sizeof * n);
 	auto ret = cast(T[])mem;
 	static if ( MANAGED )
@@ -94,7 +98,7 @@ T[] allocArray(T, int ALLOC = LocklessAllocator, bool MANAGED = true)(size_t n)
 void freeArray(T, int ALLOC = LocklessAllocator, bool MANAGED = true, bool DESTROY = true)(ref T[] array, size_t max_destroy = size_t.max)
 {
 	mixin(translateAllocator());
-	auto allocator = getAllocator();
+	auto allocator = thisAllocator();
 	
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;

@@ -9,7 +9,7 @@
 		Shin Fujishiro,
 		Kenji Hara
 */
-module lifetime.scoped;
+module memutils.scoped;
 
 
 /**

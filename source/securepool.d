@@ -9,15 +9,15 @@
 * Distributed under the terms of the Simplified BSD License (see Botan's license.txt)
 */
 module memutils.securepool;
-
-static if (Have_Botan_d || SecurePool):
+import memutils.constants;
+static if (HasBotan || HasSecurePool):
 
 package:
 
 import memutils.rbtree;
 import std.algorithm;
-import botan.constants;
 import core.sync.mutex;
+import std.conv : to;
 
 version(Posix) {
 	import core.sys.linux.sys.mman;
@@ -86,8 +86,9 @@ public:
 				// If we have a perfect fit, use it immediately
 				if (slot.length == n && (cast(size_t)slot.ptr % alignment) == 0)
 				{
-					m_freelist.removeKey(slot);
-					clearMem(slot.ptr, slot.length);
+					m_freelist.remove(slot);
+					import std.c.string : memset;
+					memset(slot.ptr, 0, slot.length);
 					
 					assert(cast(size_t)(slot.ptr - m_pool.ptr) % alignment == 0, "Returning correctly aligned pointer");
 					
@@ -114,11 +115,11 @@ public:
 				if (remainder.length > 0) {
 					*best_fit_ref = remainder;
 				} else {
-					m_freelist.removeKey(best_fit);
+					m_freelist.remove(best_fit);
 				}
-				
-				clearMem(best_fit.ptr + alignment_padding, n);
-				
+				import std.c.string : memset;
+				memset(best_fit.ptr + alignment_padding, 0, n);
+
 				size_t offset = best_fit.ptr - m_pool.ptr;
 				
 				assert((cast(size_t)(m_pool.ptr) + offset + alignment_padding) % alignment == 0, "Returning correctly aligned pointer");
@@ -145,7 +146,7 @@ public:
 			bool is_merged;
 			void[] combined;
 			
-			auto upper_range = m_freelist.upperBound(mem);
+			auto upper_range = m_freelist.upperBoundRange(mem);
 			if (!upper_range.empty && (upper_range.front().ptr - alignment) < (mem.ptr + mem.length))
 			{
 				//import std.stdio : writeln;
@@ -157,11 +158,11 @@ public:
 				assert(alignment_padding < alignment, "Alignment padding error on upper bound");
 				combined = mem.ptr[0 .. mem.length + alignment_padding + upper_elem.length];
 				
-				m_freelist.removeKey(upper_elem);
+				m_freelist.remove(upper_elem);
 				mem = combined;
 			}
 			
-			auto lower_range = m_freelist.lowerBound(mem);
+			auto lower_range = m_freelist.lowerBoundRange(mem);
 			if (!lower_range.empty && (lower_range.back().ptr + lower_range.back().length + alignment) > mem.ptr)
 			{
 				//import std.stdio : writeln;
@@ -171,7 +172,7 @@ public:
 				size_t alignment_padding = mem.ptr - ( lower_range.back().ptr + lower_range.back().length );
 				assert(alignment_padding < alignment, "Alignment padding error on lower bound " ~ mem.ptr.to!string ~ ": " ~ alignment_padding.to!string ~ "/" ~ alignment.to!string);
 				combined = lower_elem.ptr[0 .. lower_elem.length + alignment_padding + mem.length];
-				m_freelist.removeKey(lower_elem);
+				m_freelist.remove(lower_elem);
 				mem = combined;
 			}
 			m_freelist.insert(mem);
@@ -200,8 +201,9 @@ package:
 			}
 			
 			m_pool_unaligned = pool_ptr[0 .. pool_size];
-			
-			clearMem(m_pool_unaligned.ptr, m_pool_unaligned.length);
+
+			import std.c.string : memset;
+			memset(m_pool_unaligned.ptr, 0, m_pool_unaligned.length);
 			
 			if (mlock(m_pool_unaligned.ptr, m_pool_unaligned.length) != 0)
 			{
@@ -222,7 +224,8 @@ package:
 	{
 		if (m_pool)
 		{
-			clearMem(m_pool_unaligned.ptr, m_pool_unaligned.length);
+			import std.c.string : memset;
+			memset(m_pool_unaligned.ptr, 0, m_pool_unaligned.length);
 			munlock(m_pool_unaligned.ptr, m_pool_unaligned.length);
 			munmap(m_pool_unaligned.ptr, m_pool_unaligned.length);
 			m_pool = null;
@@ -232,7 +235,7 @@ package:
 	
 private:
 	__gshared Mutex m_mtx;
-	RBTree!(void[], "a.ptr < b.ptr") m_freelist;
+	RBTree!(void[], "a.ptr < b.ptr", false, Mallocator) m_freelist;
 	void[] m_pool;
 	void[] m_pool_unaligned;
 }
