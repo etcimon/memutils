@@ -1,8 +1,16 @@
-﻿module memutils.allocators.pool;
+﻿/**
+	Memory pool with destructors, useful for scoped allocators.
 
-import memutils.allocators.allocators;
+    Copyright: © 2012-2013 RejectedSoftware e.K.
+    		   © 2014-2015 Etienne Cimon
+    License: Subject to the terms of the MIT license.
+    Authors: Sönke Ludwig, Etienne Cimon
+*/
+module memutils.pool;
 
-final class PoolAllocator(Base = MallocAllocator) : Allocator {
+import memutils.allocators;
+
+final class PoolAllocator(Base : Allocator) : Allocator {
 	static struct Pool { Pool* next; void[] data; void[] remaining; }
 	static struct Destructor { Destructor* next; void function(void*) destructor; void* object; }
 	private {

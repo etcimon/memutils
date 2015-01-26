@@ -1,4 +1,16 @@
-﻿module memutils.securepool;
+﻿/*
+* Derived from Botan's Mlock Allocator
+* 
+* This is a more advanced base allocator.
+* 
+* (C) 2012,2014 Jack Lloyd
+* (C) 2014,2015 Etienne Cimon
+*
+* Distributed under the terms of the Simplified BSD License (see Botan's license.txt)
+*/
+module memutils.securepool;
+
+static if (Have_Botan_d || SecurePool):
 
 package:
 
@@ -63,7 +75,7 @@ public:
 			if (!m_pool)
 				return null;
 			
-			if (n > m_pool.length || n > BOTAN_MLOCK_ALLOCATOR_MAX_ALLOCATION)
+			if (n > m_pool.length || n > SecurePool_MLock_Max)
 				return null;
 			
 			void[]* best_fit_ref;
@@ -169,9 +181,6 @@ public:
 package:
 	this()
 	{
-		
-		m_freelist = RedBlackTree!(void[], "a.ptr < b.ptr")();
-		
 		logTrace("Loading SecurePool instance ...");
 		m_mtx = new Mutex;
 		
@@ -223,7 +232,7 @@ package:
 	
 private:
 	__gshared Mutex m_mtx;
-	RedBlackTree!(void[], "a.ptr < b.ptr") m_freelist;
+	RBTree!(void[], "a.ptr < b.ptr") m_freelist;
 	void[] m_pool;
 	void[] m_pool_unaligned;
 }

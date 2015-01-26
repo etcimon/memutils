@@ -1,8 +1,17 @@
-﻿module allocators.freelist;
+﻿/**
+	FreeList allocator proxy templates used to prevent memory segmentation
+	on base allocator.
 
-import memutils.allocators.allocators;
+    Copyright: © 2012-2013 RejectedSoftware e.K.
+    		   © 2014-2015 Etienne Cimon
+    License: Subject to the terms of the MIT license.
+    Authors: Sönke Ludwig, Etienne Cimon
+*/
+module allocators.freelist;
 
-final class AutoFreeListAllocator(Base) : Allocator {
+import memutils.allocators;
+
+final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 	import std.typetuple;
 	
 	private {

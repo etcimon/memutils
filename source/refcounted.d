@@ -1,25 +1,17 @@
-﻿module memutils.lifetime.refcounted;
+﻿module memutils.refcounted;
 
-import memutils.allocators.allocators;
+import memutils.allocators;
 import memutils.helpers;
 
 struct RefCounted(T, int ALLOC = VulnerableAllocator)
 {
 	enum isRefCounted = true;
+
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
-	enum ElemSize = AllocSize!T;
-	
-	static if( is(T == class) ){
-		alias TR = T;
-	} else static if (__traits(isAbstractClass, T)) {
-		alias TR = T;
-	} else static if (is(T == interface)) {
-		alias TR = T;
-	} else {
-		alias TR = T*;
-	}
-	
+
+	enum ElemSize = AllocSize!T;	
+	alias TR = RefTypeOf!T;	
 	private TR m_object;
 	private ulong* m_refCount;
 	private void function(void*) m_free;
@@ -65,7 +57,7 @@ struct RefCounted(T, int ALLOC = VulnerableAllocator)
 			import backtrace.backtrace;
 			import std.stdio : stdout;
 			static if (T.stringof.countUntil("OIDImpl") == -1 &&
-				T.stringof.countUntil("HashMapImpl!(string,") == -1)
+				T.stringof.countUntil("HashMap!(string,") == -1)
 				printPrettyTrace(stdout, PrintOptions.init, 3); 
 		}
 		checkInvariants();
@@ -130,49 +122,7 @@ struct RefCounted(T, int ALLOC = VulnerableAllocator)
 		getAllocator!VulnerableAllocatorImpl().free((cast(void*)m_object)[0 .. ElemSize]);
 		getAllocator!VulnerableAllocatorImpl().free((cast(void*)m_refCount)[0 .. ulong.sizeof]);
 	}
-	
-	@property ref const(T) opStar() const
-	{
-		(cast(RefCounted*)&this).defaultInit();
-		checkInvariants();
-		static if (is(TR == T*)) return *m_object;
-		else return m_object;
-	}
-	
-	@property ref T opStar() {
-		defaultInit();
-		checkInvariants();
-		static if (is(TR == T*)) return *m_object;
-		else return m_object;
-	}
-	
-	alias opStar this;
-	
-	auto opBinaryRight(string op, Key)(Key key)
-	inout if (op == "in" && __traits(hasMember, typeof(m_object), "opBinaryRight")) {
-		defaultInit();
-		return opStar().opBinaryRight!("in")(key);
-	}
-	
-	bool opCast(U : bool)() const {
-		return m_object !is null;
-	}
-	
-	bool opEquals(U)(U other) const
-	{
-		defaultInit();
-		static if (__traits(compiles, (cast(TR)m_object).opEquals(cast(T) other.m_object)))
-			return opStar().opEquals(cast(T) other.m_object);
-		else
-			return opStar().opEquals(other);
-	}
-	
-	int opCmp(U)(U other) const
-	{
-		defaultInit();
-		return opStar().opCmp(other);
-	}
-	
+
 	U opCast(U)() const nothrow
 		if (!is ( U == bool ))
 	{
@@ -199,105 +149,7 @@ struct RefCounted(T, int ALLOC = VulnerableAllocator)
 		} catch(Throwable e) { try logError("Error in catch: ", e.toString()); catch {} }
 		return U.init;
 	}
-	
-	int opApply(U...)(U args)
-		if (__traits(hasMember, typeof(m_object), "opApply"))
-	{
-		defaultInit();
-		return opStar().opApply(args);
-	}
-	
-	int opApply(U...)(U args) const
-		if (__traits(hasMember, typeof(m_object), "opApply"))
-	{
-		defaultInit();
-		return opStar().opApply(args);
-	}
-	
-	void opSliceAssign(U...)(U args)
-		if (__traits(hasMember, typeof(m_object), "opSliceAssign"))
-	{
-		defaultInit();
-		opStar().opSliceAssign(args);
-	}
-	
-	void defaultInit() inout {
-		static if (is(TR == T*)) {
-			if (!m_object) {
-				auto newObj = this.opCall();
-				(cast(RefCounted*)&this).m_object = newObj.m_object;
-				(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
-				//(cast(RefCounted*)&this).m_magic = 0x1EE75817;
-				newObj.m_object = null;
-			}
-		}
 		
-	}
-	
-	auto opSlice(U...)(U args) const
-		if (__traits(hasMember, typeof(m_object), "opSlice"))
-	{
-		defaultInit();
-		static if (is(U == void))
-			return opStar().opSlice();
-		else
-			return opStar().opSlice(args);
-		
-	}
-	
-	size_t opDollar() const
-	{
-		static if (__traits(hasMember, typeof(m_object), "opDollar"))
-			return opStar().opDollar();
-		else assert(false, "Cannot call opDollar on object: " ~ T.stringof);
-	}
-	
-	void opOpAssign(string op, U...)(U args)
-		if (__traits(compiles, opStar().opOpAssign!op(args)))
-	{
-		defaultInit();
-		opStar().opOpAssign!op(args);
-	}
-	
-	//pragma(msg, T.stringof);
-	static if (T.stringof == `Vector!(ubyte, 2)`) {
-		void opOpAssign(string op, U)(U input)
-			if (op == "^")
-		{
-			if (opStar().length < input.length)
-				opStar().resize(input.length);
-			
-			xorBuf(opStar().ptr, input.ptr, input.length);
-		}
-	}
-	auto opBinary(string op, U...)(U args)
-		if (__traits(compiles, opStar().opBinary!op(args)))
-	{
-		defaultInit();
-		return opStar().opBinary!op(args);
-	}
-	
-	void opIndexAssign(U, V)(in U arg1, in V arg2)
-		if (__traits(hasMember, typeof(opStar()), "opIndexAssign"))
-	{
-		
-		defaultInit();
-		opStar().opIndexAssign(arg1, arg2);
-	}
-	
-	auto ref opIndex(U...)(U args) inout
-		if (__traits(hasMember, typeof(opStar()), "opIndex"))
-	{
-		return opStar().opIndex(args);
-	}
-	
-	static if (__traits(compiles, opStar().opBinaryRight!("in")(ReturnType!(opStar().front).init)))
-		bool opBinaryRight(string op, U)(U e) const if (op == "in") 
-	{
-		defaultInit();
-		return opStar().opBinaryRight!("in")(e);
-	}
-	
 	private @property ulong refCount() const {
 		return *m_refCount;
 	}

@@ -5,50 +5,21 @@
     License: Subject to the terms of the MIT license, as written in the included LICENSE.txt file.
     Authors: SÃ¶nke Ludwig
 */
-module memutils.containers.hashmap;
+module memutils.hashmap;
 
 import memutils.helpers;
 import memutils.allocators;
 import std.conv : emplace, to;
 import std.traits;
 import std.algorithm : countUntil;
+import memutils.refcounted;
 
-struct DefaultHashMapTraits(Key) {
-	enum clearValue = Key.init;
-	static bool equals(in Key a, in Key b)
-	{
-		static if (__traits(hasMember, Key, "isRefCounted") && 
-			is (typeof(*(Key())) == class) && 
-			__traits(compiles, "bool c = a.opEquals(b);"))
-		{
-			if (a is null && b !is null) {
-				return b.opEquals(a);
-			}
-			else if (a !is null && b is null) {
-				return a.opEquals(b);
-			}
-			else if (a !is null && b !is null) // both are equally null
-			{
-				
-				return a.opEquals(b);
-			}
-			else {
-				return true;
-			}
-		}
-		else static if (__traits(hasMember, Key, "isRefCounted") && is (typeof(*(Key())) == class)) {
-			return *a is *b;
-		}
-		else {
-			return a == b;
-		}
-	}
-}
+alias HashMapRef(Key, Value, int ALLOCATOR = VulnerableAllocator) = RefCounted!(HashMapRef!(Key, Value, ALLOCATOR));
 
-alias HashMap(Key, Value, int ALLOCATOR = VulnerableAllocator) = RefCounted!(HashMapImpl!(Key, Value, ALLOCATOR));
-
-struct HashMapImpl(Key, Value, int ALLOCATOR)
+struct HashMap(Key, Value, int ALLOCATOR)
 {
+	@disable this(this);
+
 	enum NOGC = true;
 	alias Traits = DefaultHashMapTraits!Key;
 	struct TableEntry {
@@ -68,9 +39,7 @@ struct HashMapImpl(Key, Value, int ALLOCATOR)
 	{
 		if (m_table) freeArray!(TableEntry, ALLOCATOR)(m_table);
 	}
-	
-	@disable this(this);
-	
+		
 	@property size_t length() const { return m_length; }
 	
 	void remove(Key key)
@@ -267,7 +236,7 @@ struct HashMapImpl(Key, Value, int ALLOCATOR)
 				m_hasher = (Key k) {
 					import std.typecons : scoped;
 					import botan.hash.md4; // fixme: use xxhash
-					import memutils.containers.vector : Array;
+					import memutils.vector : Array;
 					Array!ubyte s = k.toArray();
 					auto md4 = scoped!MD4();
 					md4.update(s);
@@ -281,7 +250,7 @@ struct HashMapImpl(Key, Value, int ALLOCATOR)
 				m_hasher = (Key k) {
 					import std.typecons : scoped;
 					import botan.hash.md4;
-					import memutils.containers.vector : Array;
+					import memutils.vector : Array;
 					Vector!ubyte s = k.toVector();
 					auto md4 = scoped!MD4();
 					md4.update(s);
@@ -344,10 +313,35 @@ struct HashMapImpl(Key, Value, int ALLOCATOR)
 	}
 }
 
-private template UnConst(T) {
-	static if (is(T U == const(U))) {
-		alias UnConst = U;
-	} else static if (is(T V == immutable(V))) {
-		alias UnConst = V;
-	} else alias UnConst = T;
+
+struct DefaultHashMapTraits(Key) {
+	enum clearValue = Key.init;
+	static bool equals(in Key a, in Key b)
+	{
+		static if (__traits(hasMember, Key, "isRefCounted") && 
+			is (typeof(*(Key())) == class) && 
+			__traits(compiles, "bool c = a.opEquals(b);"))
+		{
+			if (a is null && b !is null) {
+				return b.opEquals(a);
+			}
+			else if (a !is null && b is null) {
+				return a.opEquals(b);
+			}
+			else if (a !is null && b !is null) // both are equally null
+			{
+				
+				return a.opEquals(b);
+			}
+			else {
+				return true;
+			}
+		}
+		else static if (__traits(hasMember, Key, "isRefCounted") && is (typeof(*(Key())) == class)) {
+			return *a is *b;
+		}
+		else {
+			return a == b;
+		}
+	}
 }

@@ -2,21 +2,6 @@
 
 package:
 
-void* extractUnalignedPointer(void* base)
-{
-	ubyte misalign = *(cast(const(ubyte)*)base-1);
-	assert(misalign <= Allocator.alignment);
-	return base - misalign;
-}
-
-void* adjustPointerAlignment(void* base)
-{
-	ubyte misalign = Allocator.alignment - (cast(size_t)base & Allocator.alignmentMask);
-	base += misalign;
-	*(cast(ubyte*)base-1) = misalign;
-	return base;
-}
-
 template UnConst(T) {
 	static if (is(T U == const(U))) {
 		alias UnConst = U;
@@ -25,97 +10,140 @@ template UnConst(T) {
 	} else alias UnConst = T;
 }
 
-pure {
-	/**
-    * XOR arrays. Postcondition output[i] = input[i] ^ output[i] forall i = 0...length
-    * @param output = the input/output buffer
-    * @param input = the read-only input buffer
-    * @param length = the length of the buffers
-    */
-	void xorBuf(T)(T* output, const(T)* input, size_t length)
+mixin template Embed(alias OBJ)
+{
+	alias TR = typeof(OBJ);
+	template T() {
+		static if (is(typeof(*OBJ) == struct))
+			alias T = typeof(*OBJ);
+		else
+			alias T = TR;
+	}
+
+	@property ref const(T) opStar() const
 	{
-		while (length >= 8)
-		{
-			output[0 .. 8] ^= input[0 .. 8];
-			
-			output += 8; input += 8; length -= 8;
-		}
-		
-		output[0 .. length] ^= input[0 .. length];
+		(cast(RefCounted*)&this).defaultInit();
+		checkInvariants();
+		static if (is(TR == T*)) return *OBJ;
+		else return OBJ;
 	}
 	
-	/**
-    * XOR arrays. Postcondition output[i] = input[i] ^ in2[i] forall i = 0...length
-    * @param output = the output buffer
-    * @param input = the first input buffer
-    * @param in2 = the second output buffer
-    * @param length = the length of the three buffers
-    */
-	void xorBuf(T)(T* output,
-		const(T)* input,
-		const(T)* input2,
-		size_t length)
-	{
-		while (length >= 8)
-		{
-			output[0 .. 8] = input[0 .. 8] ^ input2[0 .. 8];
-			
-			input += 8; input2 += 8; output += 8; length -= 8;
-		}
-		
-		output[0 .. length] = input[0 .. length] ^ input2[0 .. length];
+	@property ref T opStar() {
+		defaultInit();
+		checkInvariants();
+		static if (is(TR == T*)) return *OBJ;
+		else return OBJ;
 	}
 	
-	version(none) {
-		static if (BOTAN_TARGET_UNALIGNED_MEMORY_ACCESS_OK) {
-			
-			void xorBuf(ubyte* output, const(ubyte)* input, size_t length)
-			{
-				while (length >= 8)
-				{
-					*cast(ulong*)(output) ^= *cast(const ulong*)(input);
-					output += 8; input += 8; length -= 8;
-				}
-				
-				output[0 .. length] ^= input[0 .. length];
-			}
-			
-			void xorBuf(ubyte* output,
-				const(ubyte)* input,
-				const(ubyte)* input2,
-				size_t length)
-			{
-				while (length >= 8)
-				{
-					*cast(ulong*)(output) = (*cast(const ulong*) input) ^ (*cast(const ulong*)input2);
-					
-					input += 8; input2 += 8; output += 8; length -= 8;
-				}
-				
-				output[0 .. length] = input[0 .. length] ^ input2[0 .. length];
-			}
-			
-		}
+	alias opStar this;
+	
+	auto opBinaryRight(string op, Key)(Key key)
+	inout if (op == "in" && __traits(hasMember, typeof(OBJ), "opBinaryRight")) {
+		defaultInit();
+		return opStar().opBinaryRight!("in")(key);
 	}
-}
-void xorBuf(int Alloc, int Alloc2)(ref Vector!( ubyte, Alloc ) output,
-	ref Vector!( ubyte, Alloc2 ) input,
-	size_t n)
-{
-	xorBuf(output.ptr, input.ptr, n);
-}
-
-void xorBuf(int Alloc)(ref Vector!( ubyte, Alloc ) output,
-	const(ubyte)* input,
-	size_t n)
-{
-	xorBuf(output.ptr, input, n);
-}
-
-void xorBuf(int Alloc, int Alloc2)(ref Vector!( ubyte, Alloc ) output,
-	const(ubyte)* input,
-	ref Vector!( ubyte, Alloc2 ) input2,
-	size_t n)
-{
-	xorBuf(output.ptr, input, input2.ptr, n);
+	
+	bool opCast(U : bool)() const {
+		return OBJ !is null;
+	}
+	
+	bool opEquals(U)(auto ref U other) const
+	{
+		defaultInit();
+		static if (__traits(compiles, (cast(TR)OBJ).opEquals(cast(T) other.OBJ)))
+			return opStar().opEquals(cast(T) other.OBJ);
+		else
+			return opStar().opEquals(other);
+	}
+	
+	int opCmp(U)(auto ref U other) const
+	{
+		defaultInit();
+		return opStar().opCmp(other);
+	}
+	
+	int opApply(U...)(U args)
+		if (__traits(hasMember, typeof(OBJ), "opApply"))
+	{
+		defaultInit();
+		return opStar().opApply(args);
+	}
+	
+	int opApply(U...)(U args) const
+		if (__traits(hasMember, typeof(OBJ), "opApply"))
+	{
+		defaultInit();
+		return opStar().opApply(args);
+	}
+	
+	void opSliceAssign(U...)(U args)
+		if (__traits(hasMember, typeof(OBJ), "opSliceAssign"))
+	{
+		defaultInit();
+		opStar().opSliceAssign(args);
+	}
+	
+	void defaultInit() inout {
+		static if (is(TR == T*)) {
+			if (!OBJ) {
+				auto newObj = this.opCall();
+				(cast(RefCounted*)&this).OBJ = newObj.OBJ;
+				(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
+				//(cast(RefCounted*)&this).m_magic = 0x1EE75817;
+				newObj.OBJ = null;
+			}
+		}
+		
+	}
+	
+	auto opSlice(U...)(U args) const
+		if (__traits(hasMember, typeof(OBJ), "opSlice"))
+	{
+		defaultInit();
+		static if (is(U == void))
+			return opStar().opSlice();
+		else
+			return opStar().opSlice(args);
+		
+	}
+	
+	size_t opDollar() const
+		if (__traits(hasMember, typeof(OBJ), "opDollar"))
+	{
+		return opStar().opDollar();
+	}
+	
+	void opOpAssign(string op, U...)(auto ref U args)
+		if (__traits(compiles, opStar().opOpAssign!op(args)))
+	{
+		defaultInit();
+		opStar().opOpAssign!op(args);
+	}
+	
+	auto opBinary(string op, U...)(auto ref U args)
+		if (__traits(compiles, opStar().opBinary!op(args)))
+	{
+		defaultInit();
+		return opStar().opBinary!op(args);
+	}
+	
+	void opIndexAssign(U, V)(auto const ref U arg1, auto const ref V arg2)
+		if (__traits(hasMember, typeof(opStar()), "opIndexAssign"))
+	{		
+		defaultInit();
+		opStar().opIndexAssign(arg1, arg2);
+	}
+	
+	auto ref opIndex(U...)(U args) inout
+		if (__traits(hasMember, typeof(opStar()), "opIndex"))
+	{
+		return opStar().opIndex(args);
+	}
+	
+	static if (__traits(compiles, opStar().opBinaryRight!("in")(ReturnType!(opStar().front).init)))
+		bool opBinaryRight(string op, U)(auto ref U e) const if (op == "in") 
+	{
+		defaultInit();
+		return opStar().opBinaryRight!("in")(e);
+	}
 }

@@ -1,10 +1,18 @@
-﻿module memutils.containers.vector;
+﻿module memutils.vector;
 
 import core.exception, core.memory, core.stdc.stdlib, core.stdc.string,
 	std.algorithm, std.conv, std.exception, std.range,
 	std.traits, std.typecons;
-import memutils.allocators.allocators;
+import memutils.allocators;
 import memutils.helpers;
+
+alias SecureArray(T) = Array!(T, CryptoSafeAllocator);
+
+template Array(T, int ALLOC = LocklessFreeList) 
+	if (!is (T == RefCounted!(Vector!(T, ALLOCATOR))))
+{
+	alias Array = RefCounted!(Vector!(T, ALLOCATOR));
+}
 
 alias SecureVector(T) = Vector!(T, CryptoSafeAllocator);
 
@@ -258,137 +266,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 	this()(auto ref typeof(this) other) {
 		this.swap(other);
 	}
-	
-	/**
-        Defines the container's primary range, which is a random-access range.
-    */
-	static struct Range
-	{
-		private Vector!(T, ALLOCATOR)* _outer;
-		private size_t _a, _b;
-		import std.traits : isNarrowString;
-		
-		private this(ref Vector!(T, ALLOCATOR) data, size_t a, size_t b)
-		{
-			_outer = &data;
-			_a = a;
-			_b = b;
-		}
-		
-		@property Range save()
-		{
-			return this;
-		}
-		
-		@property bool empty() @safe pure nothrow const
-		{
-			return _a >= _b;
-		}
-		
-		@property size_t length() @safe pure nothrow const
-		{
-			return _b - _a;
-		}
-		alias opDollar = length;
-		
-		@property ref T front()
-		{
-			version (assert) if (empty) throw new RangeError();
-			return (*_outer)[_a];
-		}
-		
-		@property ref T back()
-		{
-			version (assert) if (empty) throw new RangeError();
-			return (*_outer)[_b - 1];
-		}
-		
-		void popFront() @safe pure nothrow
-		{
-			version (assert) if (empty) throw new RangeError();
-			++_a;
-		}
-		
-		void popBack() @safe pure nothrow
-		{
-			version (assert) if (empty) throw new RangeError();
-			--_b;
-		}
-		
-		T moveFront()
-		{
-			version (assert) if (empty || _a >= _outer.length) throw new RangeError();
-			return .move(_outer._data._payload[_a]);
-		}
-		
-		T moveBack()
-		{
-			version (assert) if (empty || _b  > _outer.length) throw new RangeError();
-			return .move(_outer._data._payload[_b - 1]);
-		}
-		
-		T moveAt(size_t i)
-		{
-			version (assert) if (_a + i >= _b || _a + i >= _outer.length) throw new RangeError();
-			return .move(_outer._data._payload[_a + i]);
-		}
-		
-		ref T opIndex(size_t i)
-		{
-			version (assert) if (_a + i >= _b) throw new RangeError();
-			return (*_outer)[_a + i];
-		}
-		
-		typeof(this) opSlice()
-		{
-			return typeof(this)(*_outer, _a, _b);
-		}
-		
-		typeof(this) opSlice(size_t i, size_t j)
-		{
-			version (assert) if (i > j || _a + j > _b) throw new RangeError();
-			return typeof(this)(*_outer, _a + i, _a + j);
-		}
-		
-		void opSliceAssign(T value)
-		{
-			version (assert) if (_b > _outer.length) throw new RangeError();
-			(*_outer)[_a .. _b] = value;
-		}
-		
-		void opSliceAssign(T value, size_t i, size_t j)
-		{
-			version (assert) if (_a + j > _b) throw new RangeError();
-			(*_outer)[_a + i .. _a + j] = value;
-		}
-		
-		void opSliceUnary(string op)()
-			if(op == "++" || op == "--")
-		{
-			version (assert) if (_b > _outer.length) throw new RangeError();
-			mixin(op~"_outer[_a .. _b];");
-		}
-		
-		void opSliceUnary(string op)(size_t i, size_t j)
-			if(op == "++" || op == "--")
-		{
-			version (assert) if (_a + j > _b) throw new RangeError();
-			mixin(op~"_outer[_a + i .. _a + j];");
-		}
-		
-		void opSliceOpAssign(string op)(T value)
-		{
-			version (assert) if (_b > _outer.length) throw new RangeError();
-			mixin("_outer[_a .. _b] "~op~"= value;");
-		}
-		
-		void opSliceOpAssign(string op)(T value, size_t i, size_t j)
-		{
-			version (assert) if (_a + j > _b) throw new RangeError();
-			mixin("_outer[_a + i .. _a + j] "~op~"= value;");
-		}
-	}
-	
+
 	/**
         Duplicates the container. The elements themselves are not transitively
         duplicated.
@@ -475,7 +353,7 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 	}
 	
 	@property Range range() {
-		return Range(this, 0, length);
+		return refRange(this[]);
 	}
 	
 	/**
@@ -491,50 +369,26 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 	}
 	
 	/**
-        Returns a range that iterates over elements of the container, in
-        forward order.
+        Returns an array that can be translated to a range using ($D refRange).
 
         Complexity: $(BIGOH 1)
      */
-	static if (!is(T == ubyte))
-		Range opSlice()
+	T[] opSlice() const
 	{
-		return Range(this, 0, length);
-	}
-	
-	static if (!is(T == ubyte))
-		Range opSlice() const
-	{
-		UnConst!(typeof(this)) _ref = cast(UnConst!(typeof(this))) this;
-		return Range(_ref, 0UL, length);
-	}
-	
-	static if (is(T == ubyte))
-		string opSlice() const
-	{
-		return cast(string) _data._payload;
+		return _data._payload;
 	}
 	
 	/**
-        Returns a range that iterates over elements of the container from
-        index $(D a) up to (excluding) index $(D b).
+        Returns an array of the container from index $(D a) up to (excluding) index $(D b).
 
         Precondition: $(D a <= b && b <= length)
 
         Complexity: $(BIGOH 1)
      */
-	static if (!is(T == ubyte))
-		Range opSlice(size_t i, size_t j)
+	T[] opSlice(size_t i, size_t j) const
 	{
 		version (assert) if (i > j || j > length) throw new RangeError();
-		return Range(this, i, j);
-	}
-	
-	static if (is(T == ubyte))
-		string opSlice(size_t i, size_t j)
-	{
-		version (assert) if (i > j || j > length) throw new RangeError();
-		return cast(string) _data._payload[i .. j];
+		return _data._payload[i .. j];
 	}
 	
 	/**
@@ -663,7 +517,19 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 	{
 		if (this.length < input.length)
 			this.resize(input.length);
-		
+
+		pure static void xorBuf(T)(T* output, const(T)* input, size_t length)
+		{
+			while (length >= 8)
+			{
+				output[0 .. 8] ^= input[0 .. 8];
+				
+				output += 8; input += 8; length -= 8;
+			}
+			
+			output[0 .. length] ^= input[0 .. length];
+		}
+
 		xorBuf(this.ptr, input.ptr, input.length);
 	}
 	
@@ -770,28 +636,10 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
         elements in $(D stuff)
     */
 	size_t insertBack(Stuff)(auto ref Stuff stuff)
-		if (isImplicitlyConvertible!(Stuff, T) || is( T == Stuff ) ||
-			(isInputRange!Stuff && (isImplicitlyConvertible!(ElementType!Stuff, T) || (is(T == ElementType!Stuff) && !isImplicitlyConvertible!(T, T))) ))
 	{
 		return _data.pushBack(stuff);
 	}
-	
-	static if (is (T == ubyte))
-	size_t insertBack(string stuff) {
-		return _data.pushBack(cast(ubyte[]) stuff);
-	}
-	
-	size_t pushBack(ref Vector!(T, ALLOCATOR) rhs)
-	{
-		return pushBack(rhs[]);
-	}
-	
-	size_t pushBack(ref RefCounted!(Vector!(T, ALLOCATOR)) rhs)
-	{
-		return pushBack(rhs[]);
-	}
-	
-	alias popBack = removeBack;
+
 	/**
         Removes the value at the back of the container. The stable version
         behaves the same, but guarantees that ranges iterating over the
@@ -811,8 +659,6 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 	}
 	
 	void removeFront() { this.length = this.length - 1; }
-	/// ditto
-	alias stableRemoveBack = removeBack;
 	
 	/**
         Removes $(D howMany) values at the front or back of the
@@ -837,39 +683,33 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 		_data._payload = _data._payload[0 .. $ - howMany];
 		return howMany;
 	}
-	/// ditto
-	alias stableRemoveBack = removeBack;
-	alias insert_before = insertBefore;
+
 	/**
-        Inserts $(D stuff) before, after, or instead range $(D r), which must
-        be a valid range previously extracted from this container. $(D stuff)
-        can be a value convertible to $(D T) or a range of objects convertible
-        to $(D T). The stable version behaves the same, but guarantees that
-        ranges iterating over the container are never invalidated.
+        Inserts $(D stuff) before position i.
 
         Returns: The number of values inserted.
 
         Complexity: $(BIGOH n + m), where $(D m) is the length of $(D stuff)
      */
-	size_t insertBefore(Stuff)(Range r, Stuff stuff)
+	void insertBefore(Stuff)(size_t i, Stuff stuff)
 		if (isImplicitlyConvertible!(Stuff, T))
 	{
-		enforce(r._outer._data is _data && r._a <= length);
+		enforce(i <= length);
 		reserve(length + 1);
+
 		// Move elements over by one slot
-		memmove(_data._payload.ptr + r._a + 1,
-			_data._payload.ptr + r._a,
-			T.sizeof * (length - r._a));
-		emplace(_data._payload.ptr + r._a, stuff);
+		memmove(_data._payload.ptr + i + 1,
+				_data._payload.ptr + i,
+				T.sizeof * (length - i));
+		emplace(_data._payload.ptr + i, stuff);
 		_data._payload = _data._payload.ptr[0 .. _data._payload.length + 1];
-		return 1;
 	}
 	
 	/// ditto
-	size_t insertBefore(Stuff)(Range r, Stuff stuff)
+	size_t insertBefore(Stuff)(size_t i, Stuff stuff)
 		if (isInputRange!Stuff && isImplicitlyConvertible!(ElementType!Stuff, T))
 	{
-		enforce(r._outer._data is _data && r._a <= length);
+		enforce(i <= length);
 		static if (isForwardRange!Stuff)
 		{
 			// Can find the length in advance
@@ -877,11 +717,11 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 			if (!extra) return 0;
 			reserve(length + extra);
 			// Move elements over by extra slots
-			memmove(_data._payload.ptr + r._a + extra,
-				_data._payload.ptr + r._a,
-				T.sizeof * (length - r._a));
-			foreach (p; _data._payload.ptr + r._a ..
-				_data._payload.ptr + r._a + extra)
+			memmove(_data._payload.ptr + i + extra,
+				_data._payload.ptr + i,
+				T.sizeof * (length - i));
+			foreach (p; _data._payload.ptr + i ..
+				_data._payload.ptr + i + extra)
 			{
 				emplace(p, stuff.front);
 				stuff.popFront();
@@ -892,68 +732,28 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 		else
 		{
 			enforce(_data);
-			immutable offset = r._a;
+			immutable offset = i;
 			enforce(offset <= length);
 			auto result = pushBack(stuff);
 			bringToFront(this[offset .. length - result],
-				this[length - result .. length]);
+						 this[length - result .. length]);
 			return result;
 		}
 	}
 	
 	/// ditto
-	size_t insertAfter(Stuff)(Range r, Stuff stuff)
+	size_t insertAfter(Stuff)(size_t i, Stuff stuff)
 	{
 		enforce(r._outer._data is _data);
 		// TODO: optimize
-		immutable offset = r._b;
+		immutable offset = i;
 		enforce(offset <= length);
 		auto result = pushBack(stuff);
 		bringToFront(this[offset .. length - result],
-			this[length - result .. length]);
+					 this[length - result .. length]);
 		return result;
 	}
-	
-	/// ditto
-	size_t replace(Stuff)(Range r, Stuff stuff)
-		if (isInputRange!Stuff && isImplicitlyConvertible!(ElementType!Stuff, T))
-	{
-		enforce(r._outer._data is _data);
-		size_t result;
-		for (; !stuff.empty; stuff.popFront())
-		{
-			if (r.empty)
-			{
-				// insert the rest
-				return result + insertBefore(r, stuff);
-			}
-			r.front = stuff.front;
-			r.popFront();
-			++result;
-		}
-		// Remove remaining stuff in r
-		linearRemove(r);
-		return result;
-	}
-	
-	/// ditto
-	size_t replace(Stuff)(Range r, Stuff stuff)
-		if (isImplicitlyConvertible!(Stuff, T))
-	{
-		enforce(r._outer._data is _data);
-		if (r.empty)
-		{
-			insertBefore(r, stuff);
-		}
-		else
-		{
-			r.front = stuff;
-			r.popFront();
-			linearRemove(r);
-		}
-		return 1;
-	}
-	
+
 	bool opEquals(in RefCounted!(Vector!(T, ALLOCATOR)) other_) const {
 		import botan.constants : logTrace;
 		if (other_ is null && _data._payload.length == 0)
@@ -972,27 +772,10 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 	}
 	
 	bool opEquals()(auto const ref Vector!(T, ALLOCATOR) other_) const {
-		import botan.constants : logTrace;
 		if (_data._payload.length == 0)
 			return true;
 		if (other_.length != length)
 			return false;
-		foreach  (const size_t i, const ref T t; _data._payload) {
-			if (t != other_[i])
-			{
-				return false;
-			}
-		}
-		return true;
-	}
-	
-	bool opEquals()(auto ref Vector!(T, ALLOCATOR) other_) const {
-		import botan.constants : logTrace;
-		if (_data._payload.length == 0)
-			return true;
-		if (other_.length != length)
-			return false;
-		
 		foreach  (const size_t i, const ref T t; _data._payload) {
 			if (t != other_[i])
 			{
@@ -1007,15 +790,4 @@ struct Vector(T, int ALLOCATOR = VulnerableAllocator)
 void TRACE(T...)(T t) {
 	//import std.stdio : writeln;
 	//writeln(t);
-}
-
-/**
-* Existence check for values
-*/
-bool valueExists(T, int Alloc)(auto const ref Vector!(T, Alloc) vec, in T val)
-{
-	for (size_t i = 0; i != vec.length; ++i)
-		if (vec[i] == val)
-			return true;
-	return false;
 }

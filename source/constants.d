@@ -1,8 +1,19 @@
 ﻿module memutils.constants;
 
-enum LogLevel = Trace;
-enum AdvancedCryptoSafety = true; /// uses a swap protected pool on top of CryptoSafeAllocator
-								  /// otherwise, uses a regular lockless freelist
+enum { // overhead allocator definitions, lazily loaded
+	NativeGC = 0x00, // instances are freed automatically when no references exist in the program's threads
+	LocklessFreeList = 0x01, // instances are owned by the creating thread thus must be freed by it
+	CryptoSafeAllocator = 0x02, // Same as above, but zeroise is called upon freeing
+	ScopedFiberPool = 0x03 // One per fiber, calls object destructors when reset. Uses GC if no fiber is set
+}
+
+
+package:
+const LogLevel = Trace;
+const CryptoSafe = true;
+const SecurePool = true; /// uses a swap protected pool on top of CryptoSafeAllocator
+						/// otherwise, uses a regular lockless freelist
+const SecurePool_MLock_Max = 524_287;
 
 enum { // LogLevel
 	Trace,

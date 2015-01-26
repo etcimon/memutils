@@ -1,25 +1,33 @@
 ﻿/**
-    Defines a string based multi-map with conserved insertion order.
+    Defines a string based dictionary list with conserved insertion order.
 
     Copyright: © 2012-2014 RejectedSoftware e.K.
     License: Subject to the terms of the MIT license, as written in the included LICENSE.txt file.
     Authors: Sönke Ludwig
 */
-module containers.dictionarylist;
+module memutils.dictionarylist;
 
 import memutils.helpers;
 import memutils.allocators;
+import memutils.refcounted;
+import std.conv : to;
+import std.exception : enforce;
+
+alias DictionaryListRef(KEY, VALUE, int ALLOC, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, case_sensitive, NUM_STATIC_FIELDS));
 
 /**
  * 
     Behaves similar to $(D VALUE[string]) but the insertion order is not changed
     and multiple values per key are supported.
-    Note that despite case not being relevant for matching keyse, iterating
-    over the map will yield    the original case of the key that was put in.
+    
+    Note that despite case not being relevant for matching keys, iterating
+    over the list will yield the original case of the key that was put in.
 
     Insertion and lookup has O(n) complexity.
 */
 struct DictionaryList(KEY, VALUE, int ALLOC, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) {
+	@disable this(this);
+
 	import std.typecons : Tuple;
 	
 	private {
@@ -29,8 +37,7 @@ struct DictionaryList(KEY, VALUE, int ALLOC, bool case_sensitive = true, size_t 
 		Field[] m_extendedFields;
 		static char[256] s_keyBuffer;
 	}
-	
-	@disable this(this);
+
 	
 	alias KeyType = KEY;
 	alias ValueType = VALUE;

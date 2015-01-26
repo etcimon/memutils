@@ -1,12 +1,15 @@
-﻿module memutils.containers.circular;
+﻿module memutils.circularbuffer;
 
-import memutils.memory.memory;
+import memutils.allocators;
+import memutils.constants;
 import std.algorithm;
 
 /**
-TODO: clear ring buffer fields upon removal (to run struct destructors, if T is a struct)
+TODO: clear ring buffer static fields upon removal (to run struct destructors, if T is a struct)
 */
-struct CircularBuffer(T, size_t N = 0, int ALLOCATOR = VulnerableAllocator) {
+struct CircularBuffer(T, size_t N = 0, int ALLOCATOR = LocklessFreeList) {
+	@disable this(this);
+
 	private {
 		static if( N > 0 ) T[N] m_buffer;
 		else T[] m_buffer;
