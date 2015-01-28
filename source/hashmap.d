@@ -232,7 +232,7 @@ struct HashMap(Key, Value, int ALLOC = LocklessFreeList)
 		while (new_size > 1) pot++, new_size /= 2;
 		new_size = 1 << pot;
 		auto old_size = m_table.length;
-
+		assert(new_size > old_size); // todo: Allow hashmap to become smaller?
 		if (m_table)
 			m_table = reallocArray!(TableEntry, ALLOC)(m_table, new_size);
 		else

@@ -57,32 +57,12 @@ struct Vector(T, int ALLOC = LocklessFreeList)
 		{
 			T[] data = _payload.ptr[0 .. capacity];
 			if (data.ptr !is null)
-				freeArray!(T, ALLOC, true)(data, length); // calls destructors and frees memory
+				freeArray!(T, ALLOC)(data, length); // calls destructors and frees memory
 		}
 		
 		void opAssign(Payload rhs)
 		{
 			assert(false);
-			/* Done already, just in case the RefCounted requires it
-            // shorten
-            static if (hasElaborateDestructor!T) {
-                foreach (ref e; _payload.ptr[newLength .. _payload.length])
-                    .destroy(e);
-                
-                
-                // Zero out unused capacity to prevent gc from seeing
-                // false pointers
-                static if (hasIndirections!T)
-                    memset(_payload.ptr + newLength, 0, (elements - oldLength) * T.sizeof);
-            }
-
-            freeArray!(T, false)(getAllocator!ALLOC(), _payload.ptr[0 .. capacity]);
-
-            static if ( hasIndirections!T )
-                GC.removeRange(_payload.ptr, T.sizeof * _capacity);
-
-            _capacity = rhs._capacity;
-            _payload = rhs._payload; */
 		}
 		
 		// Duplicate data
@@ -145,6 +125,8 @@ struct Vector(T, int ALLOC = LocklessFreeList)
 		void reserve(size_t elements)
 		{
 			if (elements <= capacity) return;
+			// todo: allow vector to become smaller?
+
 			if (_payload) {
 				_payload = reallocArray!(T, ALLOC)(_payload, elements)[0 .. _payload.length];
 			}

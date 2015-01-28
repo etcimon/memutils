@@ -133,10 +133,10 @@ void refCountedCastTest(int ALLOC)() {
 			doIncr(a);
 			assert(a.get() == 3);
 		}
-
-		assert(a.get() == 3);
-		destroy(a);
-		assert(!a);
+		ARef c = a;
+		assert(c.get() == 3);
+		destroy(c);
+		assert(a);
 	}
 	// The B object allocates a lot more. If A destructor called B's dtor we get 0 here.
 	assert(getAllocator!ALLOC().bytesAllocated() == 0);
@@ -144,7 +144,7 @@ void refCountedCastTest(int ALLOC)() {
 
 
 
-// todo: test FiberPool, Circular buffer, Scoped, FreeList casting
+// todo: test FiberPool, Circular buffer, Scoped
 
 unittest {
 	hashmapFreeListTest!NativeGC();

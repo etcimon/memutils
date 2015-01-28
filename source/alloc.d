@@ -75,27 +75,6 @@ auto allocObject(T, int ALLOC = LocklessAllocator, bool MANAGED = true, ARGS...)
 	return emplace!T(mem, args);
 }
 
-T[] reallocArray(T, int ALLOC = LocklessAllocator)(T[] array, size_t n) {
-	mixin(translateAllocator());
-	auto allocator = thisAllocator();
-	auto mem = allocator.realloc(cast(void[]) array, T.sizeof * n);
-	auto ret = cast(T[])mem;
-
-	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
-	else enum NOGC = false;
-
-	static if (hasIndirections!T && !NOGC) {
-		if (ret.ptr != array.ptr) {
-			GC.removeRange(array.ptr);
-			GC.addRange(ret.ptr, ret.length, typeid(T));
-		}
-		// Zero out unused capacity to prevent gc from seeing false pointers
-		memset(ret.ptr + array.length, 0, (n - array.length) * T.sizeof);
-	}
-
-	return ret;
-}
-
 T[] allocArray(T, int ALLOC = LocklessAllocator)(size_t n)
 {
 	mixin(translateAllocator());
@@ -115,7 +94,29 @@ T[] allocArray(T, int ALLOC = LocklessAllocator)(size_t n)
 	return ret;
 }
 
-void freeArray(T, int ALLOC = LocklessAllocator, bool DESTROY = true)(ref T[] array, size_t max_destroy = size_t.max)
+T[] reallocArray(T, int ALLOC = LocklessAllocator)(T[] array, size_t n) {
+	assert(n > array.length, "Cannot reallocate to smaller sizes");
+	mixin(translateAllocator());
+	auto allocator = thisAllocator();
+	auto mem = allocator.realloc(cast(void[]) array, T.sizeof * n);
+	auto ret = cast(T[])mem;
+	
+	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
+	else enum NOGC = false;
+	
+	static if (hasIndirections!T && !NOGC) {
+		if (ret.ptr != array.ptr) {
+			GC.removeRange(array.ptr);
+			GC.addRange(ret.ptr, ret.length, typeid(T));
+		}
+		// Zero out unused capacity to prevent gc from seeing false pointers
+		memset(ret.ptr + array.length, 0, (n - array.length) * T.sizeof);
+	}
+	
+	return ret;
+}
+
+void freeArray(T, int ALLOC = LocklessAllocator)(ref T[] array, size_t max_destroy = size_t.max)
 {
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
@@ -127,7 +128,7 @@ void freeArray(T, int ALLOC = LocklessAllocator, bool DESTROY = true)(ref T[] ar
 		GC.removeRange(array.ptr);
 	}
 
-	static if (DESTROY && hasElaborateDestructor!T) { // calls destructors
+	static if (hasElaborateDestructor!T) { // calls destructors
 		size_t i;
 		foreach (ref e; array) {
 			static if (is(T == struct) && isPointer!T) .destroy(*e);
