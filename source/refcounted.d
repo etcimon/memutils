@@ -4,6 +4,7 @@ import memutils.allocators;
 import memutils.helpers;
 import std.conv : to, emplace;
 import std.traits : hasIndirections, Unqual, isImplicitlyConvertible;
+import core.memory : GC;
 
 struct RefCounted(T, int ALLOC = LocklessFreeList)
 {
@@ -113,18 +114,14 @@ struct RefCounted(T, int ALLOC = LocklessFreeList)
 		m_free = null;
 		m_magic = 0x1EE75817;
 	}
-	
-	private void _deinit() {
-		auto objc = m_object;
-		static if (is(TR == T*)) .destroy(*objc);
-		else .destroy(objc);
-		static if( hasIndirections!T && !NOGC ) GC.removeRange(cast(void*)m_object);
-		getAllocator!ALLOC().free((cast(void*)m_object)[0 .. ElemSize]);
-		getAllocator!ALLOC().free((cast(void*)m_refCount)[0 .. ulong.sizeof]);
+
+	U opCast(U : bool)() const nothrow
+	{
+		return !(m_object is null && !m_refCount && !m_free);
 	}
 
 	U opCast(U)() const nothrow
-		if (isImplicitlyConvertible!(U, T))
+		if (__traits(hasMember, U, "isRefCounted") && (isImplicitlyConvertible!(U.T, T) || isImplicitlyConvertible!(T, U.T)))
 	{
 		assert(U.sizeof == typeof(this).sizeof, "Error, U: "~ U.sizeof.to!string~ " != this: " ~ typeof(this).sizeof.to!string);
 		try { 
@@ -149,6 +146,16 @@ struct RefCounted(T, int ALLOC = LocklessFreeList)
 		} catch(Throwable e) { try logError("Error in catch: ", e.toString()); catch {} }
 		return U.init;
 	}
+
+	private void _deinit() {
+		auto objc = m_object;
+		static if (is(TR == T*)) .destroy(*objc);
+		else .destroy(objc);
+		static if( hasIndirections!T && !NOGC ) GC.removeRange(cast(void*)m_object);
+		getAllocator!ALLOC().free((cast(void*)m_object)[0 .. ElemSize]);
+		getAllocator!ALLOC().free((cast(void*)m_refCount)[0 .. ulong.sizeof]);
+	}
+
 
 	private @property ulong refCount() const {
 		return *m_refCount;

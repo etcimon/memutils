@@ -4,10 +4,7 @@ import memutils.allocators;
 import memutils.constants;
 import std.algorithm;
 
-/**
-TODO: clear ring buffer static fields upon removal (to run struct destructors, if T is a struct)
-*/
-struct CircularBuffer(T, size_t N = 0, int ALLOCATOR = LocklessFreeList) {
+struct CircularBuffer(T, size_t N = 0, int ALLOC = LocklessFreeList) {
 	@disable this(this);
 
 	private {
@@ -19,6 +16,14 @@ struct CircularBuffer(T, size_t N = 0, int ALLOCATOR = LocklessFreeList) {
 	static if( N == 0 ){
 		this(size_t capacity) { m_buffer = new T[capacity]; }
 		~this() { if (m_buffer) delete m_buffer; }
+	} 
+	else {
+		// clear ring buffer static fields upon removal (to run struct destructors, if T is a struct)
+		~this() 
+		{ 
+			//fixme: Test this
+			//destroy(m_buffer[m_start .. m_fill]); 
+		}
 	}
 	@property bool empty() const { return m_fill == 0; }
 	@property bool full() const { return m_fill == m_buffer.length; }

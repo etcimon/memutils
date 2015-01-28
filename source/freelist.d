@@ -31,11 +31,11 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 	
 	void[] alloc(size_t sz)
 	{
+		//logTrace("AFL alloc ", sz);
 		if (sz > nthFreeListSize!(freeListCount-1)) return m_baseAlloc.alloc(sz);
 		foreach (i; iotaTuple!freeListCount)
 			if (sz <= nthFreeListSize!(i))
 				return m_freeLists[i].alloc().ptr[0 .. sz];
-		//logTrace("AFL alloc %08X(%d)", ret.ptr, sz);
 		assert(false);
 	}
 
@@ -62,7 +62,7 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 
 	void free(void[] data)
 	{
-		//logTrace("AFL free %08X(%s)", data.ptr, data.length);
+		//logTrace("AFL free ", data.length);
 		if (data.length > nthFreeListSize!(freeListCount-1)) {
 			m_baseAlloc.free(data);
 			return;

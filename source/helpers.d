@@ -40,11 +40,7 @@ mixin template Embed(alias OBJ)
 		defaultInit();
 		return opStar().opBinaryRight!("in")(key);
 	}
-	
-	bool opCast(U : bool)() const {
-		return OBJ !is null;
-	}
-	
+
 	bool opEquals(U)(auto ref U other) const
 	{
 		defaultInit();

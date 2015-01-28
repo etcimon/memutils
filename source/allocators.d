@@ -232,7 +232,6 @@ template RefTypeOf(T) {
 
 
 unittest {
-	logTrace("Testing memory/memory.d ...");
 	void testAlign(void* p, size_t adjustment) {
 		void* pa = adjustPointerAlignment(p);
 		assert((cast(size_t)pa & Allocator.alignmentMask) == 0, "Non-aligned pointer.");
@@ -262,7 +261,6 @@ unittest {
 }
 
 unittest {
-	logTrace("Testing memory.d ...");
 	foreach( i; 0 .. 20 ){
 		auto ia = alignedSize(i);
 		assert(ia >= i);

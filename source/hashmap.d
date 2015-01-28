@@ -17,7 +17,7 @@ import memutils.allocators;
 import memutils.alloc;
 
 
-alias HashMapRef(Key, Value, int ALLOC = LocklessFreeList) = RefCounted!(HashMap!(Key, Value, ALLOC));
+alias HashMapRef(Key, Value, int ALLOC = LocklessFreeList) = RefCounted!(HashMap!(Key, Value, ALLOC), ALLOC);
 
 struct HashMap(Key, Value, int ALLOC = LocklessFreeList)
 {
@@ -217,7 +217,7 @@ struct HashMap(Key, Value, int ALLOC = LocklessFreeList)
 		while (newsize >= (newcap*2)/3) newcap *= 2;
 		resize(newcap);
 	}
-	
+
 	private void resize(size_t new_size)
 	{
 		assert(!m_resizing);
@@ -225,69 +225,22 @@ struct HashMap(Key, Value, int ALLOC = LocklessFreeList)
 		scope(exit) m_resizing = false;
 		
 		if (!m_hasher) {
-			
-			
-			static if ((__traits(hasMember, Key, "isRefCounted") && __traits(hasMember, typeof(*(Key())), "toArray") ) ||
-				__traits(hasMember, Key, "toArray"))
-			{
-				m_hasher = (Key k) {
-					import std.typecons : scoped;
-					import memutils.vector : Array;
-					Array!ubyte s = k.toArray();
-					size_t hash = hashOf(s[], 0);
-					return hash;
-				};
-			}
-			else static if ((__traits(hasMember, Key, "isRefCounted") && __traits(hasMember, typeof(*(Key())), "toVector") ) ||
-				__traits(hasMember, Key, "toVector"))
-			{
-				m_hasher = (Key k) {
-					import std.typecons : scoped;
-					import memutils.vector : Array;
-					Vector!ubyte s = k.toVector();
-					size_t hash = hashOf(s[], 0);
-					return hash;
-				};
-			}
-			else static if (( __traits(hasMember, Key, "isRefCounted") && __traits(hasMember, typeof(*(Key())), "toString") ) ||
-				__traits(hasMember, Key, "toString"))
-			{
-				m_hasher = (Key k) {
-					import std.typecons : scoped;
-					import botan.hash.md4;
-					string s = k.toString();
-					auto md4 = scoped!MD4();
-					md4.update(s);
-					auto hash = md4.finished();
-					return *cast(size_t*)hash.ptr;
-				};
-			}
-			
-			else static if (__traits(compiles, (){ Key t; size_t hash = t.toHash(); }())) {
-				static if (isPointer!Key || is(Unqual!Key == class)) m_hasher = k => k ? k.toHash() : 0;
-				else m_hasher = k => k.toHash();
-			} else static if (__traits(compiles, (){ Key t; size_t hash = t.toHashShared(); }())) {
-				static if (isPointer!Key || is(Unqual!Key == class)) m_hasher = k => k ? k.toHashShared() : 0;
-				else m_hasher = k => k.toHashShared();
-			} 
-			else static if (__traits(hasMember, Key, "isRefCounted")) {
-				
-				auto typeinfo = typeid(typeof(*(Key())));
-				m_hasher = k => typeinfo.getHash(&k);
-			}
-			else {
-				auto typeinfo = typeid(Key);
-				m_hasher = k => typeinfo.getHash(&k);
-			}
+			setupHasher();
 		}
 		
 		uint pot = 0;
 		while (new_size > 1) pot++, new_size /= 2;
 		new_size = 1 << pot;
-		
-		auto oldtable = m_table;
-		m_table = allocArray!(TableEntry, ALLOC)(new_size);
-		foreach (ref el; m_table) {
+		auto old_size = m_table.length;
+
+		if (m_table)
+			m_table = reallocArray!(TableEntry, ALLOC)(m_table, new_size);
+		else
+			m_table = allocArray!(TableEntry, ALLOC)(new_size);
+
+
+		/// fixme: Use initializeAll ?
+		foreach (ref el; m_table[old_size .. new_size]) {
 			static if (is(Key == struct)) {
 				emplace(cast(UnConst!Key*)&el.key);
 				static if (Traits.clearValue !is Key.init)
@@ -295,12 +248,63 @@ struct HashMap(Key, Value, int ALLOC = LocklessFreeList)
 			} else el.key = cast(UnConst!Key)Traits.clearValue;
 			emplace(&el.value);
 		}
-		foreach (ref el; oldtable)
-		if (!Traits.equals(el.key, Traits.clearValue)) {
-			auto idx = findInsertIndex(el.key);
-			(cast(ubyte[])(&m_table[idx])[0 .. 1])[] = (cast(ubyte[])(&el)[0 .. 1])[];
+	}
+
+	void setupHasher() {
+
+		
+		static if ((__traits(hasMember, Key, "isRefCounted") && __traits(hasMember, typeof(*(Key())), "toArray") ) ||
+			__traits(hasMember, Key, "toArray"))
+		{
+			m_hasher = (Key k) {
+				import std.typecons : scoped;
+				import memutils.vector : Array;
+				Array!ubyte s = k.toArray();
+				size_t hash = hashOf(s[], 0);
+				return hash;
+			};
 		}
-		if (oldtable) freeArray!(TableEntry, ALLOC, true, false)(oldtable);
+		else static if ((__traits(hasMember, Key, "isRefCounted") && __traits(hasMember, typeof(*(Key())), "toVector") ) ||
+			__traits(hasMember, Key, "toVector"))
+		{
+			m_hasher = (Key k) {
+				import std.typecons : scoped;
+				import memutils.vector : Array;
+				Vector!ubyte s = k.toVector();
+				size_t hash = hashOf(s[], 0);
+				return hash;
+			};
+		}
+		else static if (( __traits(hasMember, Key, "isRefCounted") && __traits(hasMember, typeof(*(Key())), "toString") ) ||
+			__traits(hasMember, Key, "toString"))
+		{
+			m_hasher = (Key k) {
+				import std.typecons : scoped;
+				import botan.hash.md4;
+				string s = k.toString();
+				auto md4 = scoped!MD4();
+				md4.update(s);
+				auto hash = md4.finished();
+				return *cast(size_t*)hash.ptr;
+			};
+		}
+		
+		else static if (__traits(compiles, (){ Key t; size_t hash = t.toHash(); }())) {
+			static if (isPointer!Key || is(Unqual!Key == class)) m_hasher = k => k ? k.toHash() : 0;
+			else m_hasher = k => k.toHash();
+		} else static if (__traits(compiles, (){ Key t; size_t hash = t.toHashShared(); }())) {
+			static if (isPointer!Key || is(Unqual!Key == class)) m_hasher = k => k ? k.toHashShared() : 0;
+			else m_hasher = k => k.toHashShared();
+		} 
+		else static if (__traits(hasMember, Key, "isRefCounted")) {
+			
+			auto typeinfo = typeid(typeof(*(Key())));
+			m_hasher = k => typeinfo.getHash(&k);
+		}
+		else {
+			auto typeinfo = typeid(Key);
+			m_hasher = k => typeinfo.getHash(&k);
+		}
 	}
 }
 

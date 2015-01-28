@@ -11,6 +11,7 @@
 module memutils.cryptosafe;
 import memutils.constants;
 static if (HasBotan || HasCryptoSafe):
+pragma(msg, "Enhanced memory security is enabled.");
 
 import memutils.allocators;
 import memutils.securepool;
@@ -24,7 +25,6 @@ private:
 
 		__gshared SecurePool ms_zeroise;	
 		shared static this() { 
-			logTrace("Loading SecurePool ...");
 			if (!ms_zeroise) ms_zeroise = new SecurePool;
 		}
 	}
@@ -37,7 +37,9 @@ public:
 	void[] alloc(size_t n)
 	{
 		static if (HasBotan || HasSecurePool) {
+			//logTrace("CryptoSafe alloc ", n);
 			if (void[] p = ms_zeroise.alloc(n)) {
+				//logTrace("P: ", p.length, " & ", p.ptr);
 				return p;
 			}
 		}

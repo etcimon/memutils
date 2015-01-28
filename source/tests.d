@@ -4,12 +4,13 @@ import memutils.all;
 import std.stdio : writeln;
 
 // Test hashmap, freelists
-unittest {
+void hashmapFreeListTest(int ALLOC)() {
+	assert(getAllocator!ALLOC().bytesAllocated() == 0);
 	{
-		HashMapRef!(string, string) hm;
+		HashMapRef!(string, string, ALLOC) hm;
 		hm["hey"] = "you";
-		assert(getAllocator!LocklessFreeList().bytesAllocated() > 0);
-		void hello(HashMapRef!(string, string) map) {
+		assert(getAllocator!ALLOC().bytesAllocated() > 0);
+		void hello(HashMapRef!(string, string, ALLOC) map) {
 			assert(map["hey"] == "you");
 			map["you"] = "hey";
 		}
@@ -18,31 +19,31 @@ unittest {
 		destroy(hm);
 		assert(hm.empty);
 	}
-	assert(getAllocator!LocklessFreeList().bytesAllocated() == 0);
+	assert(getAllocator!ALLOC().bytesAllocated() == 0);
 	
 }
 
 // Test Vector, FreeLists & Array
-unittest {
+void vectorArrayTest(int ALLOC)() {
 	{
-		assert(getAllocator!LocklessFreeList().bytesAllocated() == 0);
-		Vector!ubyte data;
+		assert(getAllocator!ALLOC().bytesAllocated() == 0);
+		Vector!(ubyte, ALLOC) data;
 		data ~= "Hello there";
-		assert(getAllocator!LocklessFreeList().bytesAllocated() > 0);
+		assert(getAllocator!ALLOC().bytesAllocated() > 0);
 		assert(data[] == "Hello there");
 
-		Vector!(Array!ubyte) arr;
+		Vector!(Array!(ubyte, ALLOC), ALLOC) arr;
 		arr ~= data.dupr;
 		assert(arr[0] == data && arr[0][] == "Hello there");
 	}
-	assert(getAllocator!LocklessFreeList().bytesAllocated() == 0);
+	assert(getAllocator!ALLOC().bytesAllocated() == 0);
 }
 
 // Test HashMap, FreeLists & Array
-unittest {
-	assert(getAllocator!LocklessFreeList().bytesAllocated() == 0);
+void hashmapComplexTest(int ALLOC)() {
+	assert(getAllocator!ALLOC().bytesAllocated() == 0);
 	{
-		HashMap!(string, Array!dchar) hm;
+		HashMap!(string, Array!dchar, ALLOC) hm;
 		hm["hey"] = array("you"d);
 		hm["hello"] = hm["hey"];
 		assert(*hm["hello"] is *hm["hey"]);
@@ -52,45 +53,118 @@ unittest {
 		assert(vec[] == hm["hey"][]);
 
 
-		assert(!__traits(compiles, { void handler(HashMap!(string, Array!dchar) hm) { } handler(hm); }));
+		assert(!__traits(compiles, { void handler(HashMap!(string, Array!dchar, ALLOC) hm) { } handler(hm); }));
 	}
 
-	assert(getAllocator!LocklessFreeList().bytesAllocated() == 0);
+	assert(getAllocator!ALLOC().bytesAllocated() == 0);
 }
 
 // Test RBTree
-unittest {
-	assert(getAllocator!LocklessFreeList().bytesAllocated() == 0);
+void rbTreeTest(int ALLOC)() {
+	assert(getAllocator!ALLOC().bytesAllocated() == 0);
 	{
-		RBTree!(int, "a < b", true, LocklessFreeList) rbtree;
+		RBTree!(int, "a < b", true, ALLOC) rbtree;
 
 		rbtree.insert( [50, 51, 52, 53, 54] );
 		auto vec = rbtree.lowerBoundRange(52).vector();
 		assert(vec[] == [50, 51]);
 	}
-	assert(getAllocator!LocklessFreeList().bytesAllocated() == 0);
+	assert(getAllocator!ALLOC().bytesAllocated() == 0);
 }
 
 // Test Unique
 void uniqueTest(int ALLOC)() {
-	class A { int a; }
-	Unique!(A, ALLOC) a;
-	auto inst = FreeListObjectAlloc!(A, ALLOC).alloc();
-	A a_check = inst;
-	inst.a = 10;
-	auto bytes = getAllocator!ALLOC().bytesAllocated();
-	assert(bytes > 0);
-	a = inst;
-	assert(!inst);
-	assert(a.a == 10);
-	a.free();
-	assert(getAllocator!ALLOC().bytesAllocated() < bytes);
+
+	assert(getAllocator!ALLOC().bytesAllocated() == 0);
+	{
+		class A { int a; }
+		Unique!(A, ALLOC) a;
+		auto inst = FreeListObjectAlloc!(A, ALLOC).alloc();
+		A a_check = inst;
+		inst.a = 10;
+		auto bytes = getAllocator!ALLOC().bytesAllocated();
+		assert(bytes > 0);
+		a = inst;
+		assert(!inst);
+		assert(a.a == 10);
+		a.free();
+	}
+	assert(getAllocator!ALLOC().bytesAllocated() == 0);
 }
 
+// Test FreeList casting
+void refCountedCastTest(int ALLOC)() {
+	class A {
+		this() { a=0; }
+		protected int a;
+		protected void incr() {
+			a += 1;
+		}
+		public final int get() {
+			return a;
+		}
+	}
+	class B : A {
+		int c;
+		int d;
+		long e;
+		override protected void incr() {
+			a += 3;
+		}
+	}
+
+	alias ARef = RefCounted!(A, ALLOC);
+	alias BRef = RefCounted!(B, ALLOC);
+
+	assert(getAllocator!ALLOC().bytesAllocated() == 0);
+	{
+		ARef a;
+		a = ARef();
+		a.incr();
+		assert(a.get() == 1);
+		destroy(a); /// destruction test
+		assert(!a);
+		assert(getAllocator!ALLOC().bytesAllocated() == 0);
+
+		{ /// cast test
+			BRef b = BRef();
+			a = cast(ARef) b;
+			static void doIncr(ARef a_ref) { a_ref.incr(); }
+			doIncr(a);
+			assert(a.get() == 3);
+		}
+
+		assert(a.get() == 3);
+		destroy(a);
+		assert(!a);
+	}
+	// The B object allocates a lot more. If A destructor called B's dtor we get 0 here.
+	assert(getAllocator!ALLOC().bytesAllocated() == 0);
+}
+
+
+
+// todo: test FiberPool, Circular buffer, Scoped, FreeList casting
+
 unittest {
+	hashmapFreeListTest!NativeGC();
+	hashmapFreeListTest!CryptoSafe();
+	hashmapFreeListTest!LocklessFreeList();
+	vectorArrayTest!NativeGC();
+	vectorArrayTest!CryptoSafe();
+	vectorArrayTest!LocklessFreeList();
+	hashmapComplexTest!NativeGC();
+	hashmapComplexTest!CryptoSafe();
+	hashmapComplexTest!LocklessFreeList();
+	rbTreeTest!NativeGC();
+	rbTreeTest!CryptoSafe();
+	rbTreeTest!LocklessFreeList();
 	uniqueTest!NativeGC();
 	uniqueTest!CryptoSafe();
 	uniqueTest!LocklessFreeList();
+	refCountedCastTest!NativeGC();
+	refCountedCastTest!CryptoSafe();
+	refCountedCastTest!LocklessFreeList();
 }
 
 version(unittest) static this() 

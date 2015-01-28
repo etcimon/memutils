@@ -141,7 +141,8 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int ALLOC)
 	
 	// used for convenience
 	private alias Node = RBNode!(Elem, ALLOC).Node;
-	
+
+	private Node   _root;
 	private Node   _end;
 	private Node   _begin;
 	private size_t _length;
@@ -150,7 +151,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int ALLOC)
 	{
 		static bool setup;
 		if (!setup) {
-			_begin = _end = allocate();
+			_begin = _end = _root = allocate();
 			setup = true;
 		}
 	}
@@ -163,7 +164,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int ALLOC)
 	static private Node allocate(Elem v)
 	{
 		auto result = allocate();
-		logTrace("Allocating node ", cast(void*)result);
+		//logTrace("Allocating node ", cast(void*)result);
 		result.value = v;
 		return result;
 	}
@@ -279,10 +280,10 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int ALLOC)
      */
 	void clear()
 	{
-		logTrace("Clearing rbtree");
+		//logTrace("Clearing rbtree");
 		while (length > 0)
 			removeAny();
-		logTrace(length, " items left");
+		//logTrace(length, " items left");
 		return;
 	}
 	
@@ -587,6 +588,7 @@ assert(equal(rbt[], [5]));
 
 	~this() {
 		clear();
+		FreeListObjectAlloc!(RBNode!(Elem, ALLOC), ALLOC).free(_root);
 	}
 	
 	private this(Node end, size_t length)
@@ -1079,7 +1081,7 @@ struct RBNode(V, int ALLOC)
 		_left = _right = _parent = null;
 		
 		/// this node object can now be safely deleted
-		logTrace("Freeing node ", cast(void*)&this);
+		//logTrace("Freeing node ", cast(void*)&this);
 		FreeListObjectAlloc!(RBNode!(V, ALLOC), ALLOC).free(cast(RBNode!(V, ALLOC)*)&this);
 		
 		return ret;
@@ -1148,7 +1150,7 @@ struct RBNode(V, int ALLOC)
 	@property Node dup() const
 	{
 		Node copy = FreeListObjectAlloc!(RBNode!(V, ALLOC), ALLOC).alloc();
-		logTrace("Allocating node ", cast(void*)copy);
+		//logTrace("Allocating node ", cast(void*)copy);
 		copy.value = cast(V)value;
 		copy.color = color;
 		if(_left !is null)

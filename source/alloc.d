@@ -4,6 +4,7 @@ import core.thread : Fiber;
 import std.traits : isPointer, hasIndirections, hasElaborateDestructor;
 import core.memory : GC;
 import std.conv : emplace;
+import std.c.string : memset;
 import memutils.allocators;
 public import memutils.constants;
 
@@ -44,7 +45,7 @@ template FreeListObjectAlloc(T, int ALLOC)
 	{
 		//logInfo("alloc %s/%d", T.stringof, ElemSize);
 		auto mem = getAllocator!ALLOC().alloc(ElemSize);
-		static if( hasIndirections!T && !NOGC ) GC.addRange(mem.ptr, ElemSize);
+		static if( hasIndirections!T && !NOGC ) GC.addRange(mem.ptr, ElemSize, typeid(T));
 		return emplace!T(mem, args);
 	}
 	
@@ -65,37 +66,56 @@ auto allocObject(T, int ALLOC = LocklessAllocator, bool MANAGED = true, ARGS...)
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
 	auto mem = allocator.alloc(AllocSize!T);
-	static if( MANAGED ){
-		static if( hasIndirections!T )
-			GC.addRange(mem.ptr, mem.length);
-		return emplace!T(mem, args);
-	}
-	else static if( is(T == class) ) return cast(T)mem.ptr;
-	else return cast(T*)mem.ptr;
+	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
+	else enum NOGC = false;
+
+	static if( hasIndirections!T && !NOGC )
+		GC.addRange(mem.ptr, mem.length, typeid(T));
+
+	return emplace!T(mem, args);
 }
 
-T[] allocArray(T, int ALLOC = LocklessAllocator, bool MANAGED = true)(size_t n)
+T[] reallocArray(T, int ALLOC = LocklessAllocator)(T[] array, size_t n) {
+	mixin(translateAllocator());
+	auto allocator = thisAllocator();
+	auto mem = allocator.realloc(cast(void[]) array, T.sizeof * n);
+	auto ret = cast(T[])mem;
+
+	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
+	else enum NOGC = false;
+
+	static if (hasIndirections!T && !NOGC) {
+		if (ret.ptr != array.ptr) {
+			GC.removeRange(array.ptr);
+			GC.addRange(ret.ptr, ret.length, typeid(T));
+		}
+		// Zero out unused capacity to prevent gc from seeing false pointers
+		memset(ret.ptr + array.length, 0, (n - array.length) * T.sizeof);
+	}
+
+	return ret;
+}
+
+T[] allocArray(T, int ALLOC = LocklessAllocator)(size_t n)
 {
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
 	auto mem = allocator.alloc(T.sizeof * n);
 	auto ret = cast(T[])mem;
-	static if ( MANAGED )
-	{
-		static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
-		else enum NOGC = false;
-		
-		static if( hasIndirections!T && !NOGC )
-			GC.addRange(mem.ptr, mem.length);
-		// TODO: use memset for class, pointers and scalars
-		foreach (ref el; ret) { // calls constructors
-			emplace!T(cast(void[])((&el)[0 .. 1]));
-		}
+
+	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
+	else enum NOGC = false;
+	
+	static if( hasIndirections!T && !NOGC )
+		GC.addRange(mem.ptr, mem.length, typeid(T));
+	// TODO: use memset for class, pointers and scalars
+	foreach (ref el; ret) { // calls constructors
+		emplace!T(cast(void[])((&el)[0 .. 1]));
 	}
 	return ret;
 }
 
-void freeArray(T, int ALLOC = LocklessAllocator, bool MANAGED = true, bool DESTROY = true)(ref T[] array, size_t max_destroy = size_t.max)
+void freeArray(T, int ALLOC = LocklessAllocator, bool DESTROY = true)(ref T[] array, size_t max_destroy = size_t.max)
 {
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
@@ -103,9 +123,10 @@ void freeArray(T, int ALLOC = LocklessAllocator, bool MANAGED = true, bool DESTR
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
-	static if (MANAGED && hasIndirections!T && !NOGC) {
+	static if (hasIndirections!T && !NOGC) {
 		GC.removeRange(array.ptr);
 	}
+
 	static if (DESTROY && hasElaborateDestructor!T) { // calls destructors
 		size_t i;
 		foreach (ref e; array) {

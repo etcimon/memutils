@@ -18,6 +18,7 @@ import memutils.rbtree;
 import std.algorithm;
 import core.sync.mutex;
 import std.conv : to;
+import memutils.allocators;
 
 version(Posix) {
 	import core.sys.linux.sys.mman;
@@ -67,7 +68,7 @@ version(Windows) {
 
 final class SecurePool
 {
-	__gshared immutable size_t alignment = 8;
+	__gshared immutable size_t alignment = Allocator.alignment;
 public:
 	void[] alloc(size_t n)
 	{
@@ -147,7 +148,7 @@ public:
 			void[] combined;
 			
 			auto upper_range = m_freelist.upperBoundRange(mem);
-			if (!upper_range.empty && (upper_range.front().ptr - alignment) < (mem.ptr + mem.length))
+			if (!upper_range.empty && upper_range.front().ptr > (mem.ptr + mem.length) && (upper_range.front().ptr - alignment) < (mem.ptr + mem.length))
 			{
 				//import std.stdio : writeln;
 				//logTrace("Pool item (>): ", upper_range.front().ptr, " .. ", upper_range.front().ptr + upper_range.front().length, " <==> ", mem.ptr, " .. ", mem.ptr + mem.length);
@@ -163,10 +164,10 @@ public:
 			}
 			
 			auto lower_range = m_freelist.lowerBoundRange(mem);
-			if (!lower_range.empty && (lower_range.back().ptr + lower_range.back().length + alignment) > mem.ptr)
+			if (!lower_range.empty && (lower_range.back().ptr + lower_range.back().length) < mem.ptr && (lower_range.back().ptr + lower_range.back().length + alignment) > mem.ptr)
 			{
-				//import std.stdio : writeln;
-				//logTrace("Pool item (<): ", lower_range.back().ptr, " .. ", lower_range.back().ptr + lower_range.back().length, " <==> ", mem.ptr, " .. ", mem.ptr + mem.length);
+				// import std.stdio : writeln;
+				// logTrace("Pool item (<): ", lower_range.back().ptr, " .. ", lower_range.back().ptr + lower_range.back().length, " <==> ", mem.ptr, " .. ", mem.ptr + mem.length);
 				// we can merge with the next block
 				void[] lower_elem = lower_range.back();
 				size_t alignment_padding = mem.ptr - ( lower_range.back().ptr + lower_range.back().length );
@@ -182,7 +183,7 @@ public:
 package:
 	this()
 	{
-		logTrace("Loading SecurePool instance ...");
+		// logTrace("Loading SecurePool instance ...");
 		m_mtx = new Mutex;
 		
 		auto pool_size = mlock_limit();
@@ -275,7 +276,7 @@ size_t mlock_limit()
 	}
 }
 
-bool ptr_in_pool(in void[] pool, in void* buf_ptr, size_t bufsize)
+bool ptr_in_pool(in void[] pool, in void* buf_ptr, size_t bufsize) pure
 {
 	if (buf_ptr < pool.ptr || buf_ptr >= pool.ptr + pool.length)
 		return false;
@@ -285,7 +286,7 @@ bool ptr_in_pool(in void[] pool, in void* buf_ptr, size_t bufsize)
 	return true;
 }
 
-size_t padding_for_alignment(size_t offset, size_t desired_alignment)
+size_t padding_for_alignment(size_t offset, size_t desired_alignment) pure
 {
 	size_t mod = offset % desired_alignment;
 	if (mod == 0)

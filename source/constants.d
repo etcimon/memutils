@@ -1,13 +1,13 @@
 ﻿module memutils.constants;
 
 enum { // overhead allocator definitions, lazily loaded
-	NativeGC = 0x00, // instances are freed automatically when no references exist in the program's threads
-	LocklessFreeList = 0x01, // instances are owned by the creating thread thus must be freed by it
-	CryptoSafe = 0x02, // Same as above, but zeroise is called upon freeing
-	ScopedFiberPool = 0x03 // One per fiber, calls object destructors when reset. Uses GC if no fiber is set
+	NativeGC = 0x01, // instances are freed automatically when no references exist in the program's threads
+	LocklessFreeList = 0x02, // instances are owned by the creating thread thus must be freed by it
+	CryptoSafe = 0x03, // Same as above, but zeroise is called upon freeing
+	ScopedFiberPool = 0x04 // One per fiber, calls object destructors when reset. Uses GC if no fiber is set
 }
 
-package enum Mallocator = 0x04; // For use by the DebugAllocator.
+package enum Mallocator = 0x05; // For use by the DebugAllocator.
 
 
 package:

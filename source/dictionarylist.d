@@ -13,7 +13,7 @@ import memutils.refcounted;
 import std.conv : to;
 import std.exception : enforce;
 
-alias DictionaryListRef(KEY, VALUE, int ALLOC, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, case_sensitive, NUM_STATIC_FIELDS));
+alias DictionaryListRef(KEY, VALUE, int ALLOC, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, case_sensitive, NUM_STATIC_FIELDS), ALLOC);
 
 /**
  * 
@@ -230,7 +230,7 @@ struct DictionaryList(KEY, VALUE, int ALLOC, bool case_sensitive = true, size_t 
 		return (cast() this).opApply(cast(int delegate(ref ValueType)) del);
 	}
 	
-	bool opEquals(in RefCounted!(DictionaryList!(KEY, VALUE)) other) const
+	bool opEquals(in RefCounted!(DictionaryList!(KEY, VALUE, ALLOC), ALLOC) other) const
 	{
 		if (*other is null)
 			return false;

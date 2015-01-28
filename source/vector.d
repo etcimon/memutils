@@ -14,9 +14,9 @@ import memutils.refcounted;
 alias SecureArray(T) = Array!(T, CryptoSafeAllocator);
 
 template Array(T, int ALLOC = LocklessFreeList) 
-	if (!is (T == RefCounted!(Vector!(T, ALLOC))))
+	if (!is (T == RefCounted!(Vector!(T, ALLOC), ALLOC)))
 {
-	alias Array = RefCounted!(Vector!(T, ALLOC));
+	alias Array = RefCounted!(Vector!(T, ALLOC), ALLOC);
 }
 
 alias SecureVector(T) = Vector!(T, CryptoSafeAllocator);
@@ -42,7 +42,7 @@ struct Vector(T, int ALLOC = LocklessFreeList)
 		this(T[] p) 
 		{ 
 			_capacity = p.length; 
-			_payload = allocArray!(T, ALLOC, true)(p.length);
+			_payload = allocArray!(T, ALLOC)(p.length);
 			
 			static if (isImplicitlyConvertible!(T, T))
 				_payload[0 .. p.length] = p[0 .. $];
@@ -145,40 +145,12 @@ struct Vector(T, int ALLOC = LocklessFreeList)
 		void reserve(size_t elements)
 		{
 			if (elements <= capacity) return;
-			immutable sz = elements * T.sizeof;
-			/* Because of the transactional nature of this
-             * relative to the garbage collector, ensure no
-             * threading bugs by using malloc/copy/free rather
-             * than realloc.
-             */
-			immutable oldLength = length;
-			TRACE("Oldlength = ", oldLength);
-			auto newPayload = allocArray!(T, ALLOC, false)(elements)[0 .. oldLength];
-			static if ( hasIndirections!T ) {
-				// Zero out unused capacity to prevent gc from seeing
-				// false pointers
-				TRACE("Zeroing from ", newPayload.ptr + oldLength, "length: ", (elements - oldLength) * T.sizeof);
-				memset(newPayload.ptr + oldLength, 0, (elements - oldLength) * T.sizeof);
-				GC.addRange(newPayload.ptr, sz);
-			}
-			
-			// copy old data over to new array
 			if (_payload) {
-				TRACE("Copying from : ", _payload.ptr, " to: ", newPayload.ptr, " length: ", T.sizeof * oldLength);
-				memcpy(newPayload.ptr, _payload.ptr, T.sizeof * oldLength);
+				_payload = reallocArray!(T, ALLOC)(_payload, elements)[0 .. _payload.length];
 			}
-			
-			TRACE("New payload: ", newPayload);
-			auto ub = _payload.ptr[0 .. _capacity];
-			if (ub) {
-				TRACE("Freeing old payload");
-				freeArray!(T, ALLOC, false, false)(ub);
-				
-				static if ( hasIndirections!T )
-					GC.removeRange(cast(void*) _payload.ptr);
-			}
-			TRACE("Reservation done. ");
-			_payload = newPayload;
+			else
+				_payload = allocArray!(T, ALLOC)(elements)[0 .. _payload.length];
+			/// logTrace("Reserved ", elements, " elements.");
 			_capacity = elements;
 		}
 		
@@ -206,11 +178,12 @@ struct Vector(T, int ALLOC = LocklessFreeList)
 			if (isImplicitlyConvertible!(T, T) && isImplicitlyConvertible!(Stuff, T))
 		{
 			TRACE("Vector.append");
+			//logTrace("Capacity: ", _capacity, " length: ", length);
 			if (_capacity == length)
 			{
 				reserve(1 + capacity * 3 / 2);
 			}
-			assert(capacity > length && _payload.ptr);
+			assert(capacity > length && _payload.ptr, "Payload pointer " ~ _payload.ptr.to!string ~ "'s capacity: " ~ capacity.to!string ~ " must be more than " ~ length.to!string);
 			emplace(_payload.ptr + _payload.length, stuff);
 			_payload = _payload.ptr[0 .. _payload.length + 1];
 			return 1;
@@ -296,9 +269,9 @@ struct Vector(T, int ALLOC = LocklessFreeList)
 	}
 	
 	/// ditto
-	@property RefCounted!(Vector!(T, ALLOC)) dupr() const
+	@property RefCounted!(Vector!(T, ALLOC), ALLOC) dupr() const
 	{
-		return RefCounted!(Vector!(T, ALLOC))(cast(T[])_data._payload);
+		return RefCounted!(Vector!(T, ALLOC), ALLOC)(cast(T[])_data._payload);
 	}
 	
 	void swap(ref Vector!(T, ALLOC) other) {
@@ -510,7 +483,7 @@ struct Vector(T, int ALLOC = LocklessFreeList)
 		if (op == "~")
 	{
 		TRACE("Appending stuff");
-		RefCounted!(Vector!(T, ALLOC)) result;
+		RefCounted!(Vector!(T, ALLOC), ALLOC) result;
 		// @@@BUG@@ result ~= this[] doesn't work
 		auto r = this[];
 		result ~= r;
@@ -605,7 +578,7 @@ struct Vector(T, int ALLOC = LocklessFreeList)
 			return 0;
 	}
 	
-	int opCmp(int Alloc)(const RefCounted!(Vector!(T, Alloc)) other) const 
+	int opCmp(int Alloc)(const RefCounted!(Vector!(T, Alloc), ALLOC) other) const 
 	{
 		if (this[] == other[])
 			return 0;
@@ -774,7 +747,7 @@ struct Vector(T, int ALLOC = LocklessFreeList)
 		return result;
 	}
 
-	bool opEquals()(auto const ref RefCounted!(Vector!(T, ALLOC)) other_) const {
+	bool opEquals()(auto const ref RefCounted!(Vector!(T, ALLOC), ALLOC) other_) const {
 		import memutils.constants : logTrace;
 		if (other_.empty && empty())
 			return true;
