@@ -128,7 +128,7 @@ T[] reallocArray(T, ALLOC = ThisThread)(T[] array, size_t n) {
 	return ret;
 }
 
-void freeArray(T, ALLOC = ThisThread)(ref T[] array, size_t max_destroy = size_t.max)
+void freeArray(T, ALLOC = ThisThread)(auto ref T[] array, size_t max_destroy = size_t.max)
 {
 	import core.memory : GC;
 	mixin(translateAllocator());

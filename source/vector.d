@@ -766,7 +766,7 @@ struct Vector(T, ALLOC = ThisThread)
 	}
 
 	bool opEquals()(auto const ref T[] other) {
-		logTrace("other: ", other, " this: ", _data._payload);
+		//logTrace("other: ", other, " this: ", _data._payload);
 		return other == _data._payload;
 	}
 	

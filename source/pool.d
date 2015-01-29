@@ -22,6 +22,7 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 		Pool* m_fullPools;
 		Vector!(void delegate()) m_destructors;
 		size_t m_poolSize;
+		int m_pools;
 	}
 	
 	this(size_t pool_size = 64*1024)
@@ -36,12 +37,14 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 
 		Pool* pprev = null;
 		Pool* p = cast(Pool*)m_freePools;
-		while( p && p.remaining.length < aligned_sz ) {
+		size_t i;
+		while(i < m_pools && p && p.remaining.length < aligned_sz ) {
 			pprev = p;
 			p = p.next;
+			i++;
 		}
 		
-		if( !p ) {
+		if( !p || p.remaining.length == 0 || p.remaining.length < aligned_sz ) {
 			auto pmem = m_baseAllocator.alloc(AllocSize!Pool);
 			
 			p = emplace!Pool(pmem);
@@ -49,10 +52,12 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 			p.remaining = p.data;
 			p.next = cast(Pool*)m_freePools;
 			m_freePools = p;
+			m_pools++;
 			pprev = null;
 		}
-		
+		// logTrace("0 .. ", aligned_sz, " but remaining: ", p.remaining.length);
 		auto ret = p.remaining[0 .. aligned_sz];
+		// logTrace("p.remaining: ", aligned_sz, " .. ", p.remaining.length);
 		p.remaining = p.remaining[aligned_sz .. $];
 		if( !p.remaining.length ){
 			if( pprev ) {
@@ -101,24 +106,27 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 		foreach (ref dtor; m_destructors)
 			dtor();
 		destroy(m_destructors);
-		
+
+		size_t i;
 		// put all full Pools into the free pools list
-		for (Pool* p = cast(Pool*)m_fullPools, pnext; p; p = pnext) {
+		for (Pool* p = cast(Pool*)m_fullPools, pnext; p && i < m_pools; (p = p.next), i++) {
 			pnext = p.next;
 			p.next = cast(Pool*)m_freePools;
 			m_freePools = cast(Pool*)p;
 		}
-		
+		i=0;
 		// free up all pools
-		for (Pool* p = cast(Pool*)m_freePools; p; p = p.next)
+		for (Pool* p = cast(Pool*)m_freePools; p && i < m_pools; (p = p.next), i++) {
 			p.remaining = p.data;
+		}
 	}
 	
 	void reset()
 	{
 		freeAll();
 		Pool* pnext;
-		for (auto p = cast(Pool*)m_freePools; p; p = pnext) {
+		size_t i;
+		for (auto p = cast(Pool*)m_freePools; p && i < m_pools; (p = p.next), i++) {
 			pnext = p.next;
 			m_baseAllocator.free(p.data);
 			m_baseAllocator.free((cast(void*)p)[0 .. AllocSize!Pool]);
@@ -134,9 +142,11 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 	@property size_t totalSize()
 	{
 		size_t amt = 0;
-		for (auto p = m_fullPools; p; p = p.next)
+		size_t i;
+		for (auto p = m_fullPools; p && i < m_pools; (p = p.next), i++)
 			amt += p.data.length;
-		for (auto p = m_freePools; p; p = p.next)
+		i=0;
+		for (auto p = m_freePools; p && i < m_pools; (p = p.next), i++)
 			amt += p.data.length;
 		return amt;
 	}
@@ -144,9 +154,11 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 	@property size_t allocatedSize()
 	{
 		size_t amt = 0;
-		for (auto p = m_fullPools; p; p = p.next)
+		size_t i;
+		for (auto p = m_fullPools; p && i < m_pools; (p = p.next), i++)
 			amt += p.data.length;
-		for (auto p = m_freePools; p; p = p.next)
+		i = 0;
+		for (auto p = m_freePools; p && i < m_pools; (p = p.next), i++)
 			amt += p.data.length - p.remaining.length;
 		return amt;
 	}

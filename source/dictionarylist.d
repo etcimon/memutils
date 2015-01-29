@@ -35,13 +35,13 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 	private {
 		static struct Field { uint keyCheckSum; KEY key; VALUE value; }
 		Field[NUM_STATIC_FIELDS] m_fields;
-		size_t m_fieldCount = 0;
+		size_t m_fieldCount;
 		Field[] m_extendedFields;
+		size_t m_extendedFieldCount;
 	}
 
 	~this() {
-		if (m_extendedFields)
-			freeArray!(Field, ALLOC)(m_extendedFields);
+		if (m_extendedFields) freeArray!(Field, ALLOC)(m_extendedFields.ptr[0 .. m_extendedFieldCount]);
 	}
 	
 	alias KeyType = KEY;
@@ -100,12 +100,12 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 	{
 		auto keysum = computeCheckSumI(key);
 		if (m_fieldCount < m_fields.length) {
-			logTrace("Appending: ", value);
+			// logTrace("Appending: ", value);
 			m_fields[m_fieldCount++] = Field(keysum, *cast(KeyType*) &key, value);
-			logTrace("Now have: ", m_fields, " with ", m_fieldCount);
+			// logTrace("Now have: ", m_fields, " with ", m_fieldCount);
 		}
 		else {
-			logTrace("Growing");
+			// logTrace("Growing");
 			grow(1);
 			m_extendedFields[$-1] = Field(keysum, *cast(KeyType*) &key, value);
 		}
@@ -135,15 +135,15 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 		import std.array;
 		auto ret = Vector!(ValueType, ALLOC)();
 		this.opApply( (k, const ref v) {
-				logTrace("Looping ", k, " => ", v);
+				// logTrace("Looping ", k, " => ", v);
 				if (matches(key, k)) {
-					logTrace("Appending: ", v);
+					// logTrace("Appending: ", v);
 					ret ~= v;
 					return 0;
 				}
 				return 1;
 			});
-		logTrace("Finished getValuesat with: ", ret[]);
+		// logTrace("Finished getValuesat with: ", ret[]);
 		return ret.move();
 	}
 	
@@ -209,7 +209,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 	int opApply(int delegate(KeyType key, ref ValueType val) del)
 	{
 		foreach (ref kv; m_fields[0 .. m_fieldCount]) {
-			logTrace("Looping: ", kv, " 0 .. ", m_fieldCount);
+			// logTrace("Looping: ", kv, " 0 .. ", m_fieldCount);
 			if (auto ret = del(kv.key, kv.value))
 				return ret;
 		}
@@ -270,10 +270,22 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 	}
 
 	private void grow(size_t n) {
-		if (m_extendedFields)
-			reallocArray!(Field, ALLOC)(m_extendedFields, m_extendedFields.length + n);
-		else
-			m_extendedFields = allocArray!(Field, ALLOC)(16);
+		if (m_extendedFields.length + n < m_extendedFieldCount) {
+			m_extendedFields = m_extendedFields.ptr[0 .. m_extendedFields.length + n];
+			return;
+		}
+		if (m_extendedFields.ptr !is null)
+		{
+			size_t oldsz = m_extendedFields.length;
+			m_extendedFields = m_extendedFields.ptr[0 .. m_extendedFieldCount];
+			m_extendedFieldCount = (m_extendedFieldCount + n)*3/2;
+			// logTrace("Extended field count: ", m_extendedFieldCount);
+			m_extendedFields = reallocArray!(Field, ALLOC)(m_extendedFields, m_extendedFieldCount)[0 .. oldsz + n];
+		}
+		else {
+			m_extendedFieldCount = 16;
+			m_extendedFields = allocArray!(Field, ALLOC)(16).ptr[0 .. n];
+		}
 	}
 
 	private ptrdiff_t getIndex(in Field[] map, in KeyType key, uint keysum)

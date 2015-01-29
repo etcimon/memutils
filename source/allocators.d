@@ -31,7 +31,8 @@ static if (HasDebugAllocations) {
 	static if (HasCryptoSafe)
 		alias CryptoSafeAllocator = DebugAllocator!(SecureAllocator!(AutoFreeListAllocator!(MallocAllocator)));
 	alias FiberPool = DebugAllocator!(PoolAllocator!(AutoFreeListAllocator!(MallocAllocator)));
-	alias ProxyGCAllocator = DebugAllocator!GCAllocator;
+	version(unittest) alias ProxyGCAllocator = DebugAllocator!GCAllocator;
+	else alias ProxyGCAllocator = GCAllocator; // the GC doesn't need to count alloc/free pairs
 }
 else {
 	alias LocklessAllocator = AutoFreeListAllocator!(MallocAllocator);

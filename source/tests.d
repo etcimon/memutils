@@ -200,7 +200,14 @@ void dictionaryListTest(ALLOC)()
 	b.insert("A", 2);
 	assert(b["A"] == 1);
 	assert(b.getValuesAt("a") == [1, 2]);
-	logTrace("Done");
+
+	foreach (int i; 0 .. 15_000) {
+		b.insert("a", i);
+	}
+
+	assert(b.getValuesAt("a").length == 15_002);
+
+	//logTrace("Done");
 }
 
 void propagateTests(alias fct)() {
