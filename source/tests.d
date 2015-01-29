@@ -221,6 +221,40 @@ void propagateTests(alias fct)() {
 	destroyFiberPool(f);
 }
 
+void highLevelAllocTest() {
+	class A {
+		int a;
+	}
+	A a = ThisThread.alloc!A();
+	a.a = 10;
+	ThisThread.free(a);
+	assert(!a);
+
+	Fiber f;
+	f = new Fiber(delegate { 
+			A b = ThisFiber.alloc!A();
+			b.a = 10;
+			ThisFiber.free(b);
+		});
+	f.call();
+	destroyFiberPool(f);
+
+	A gcAllocated() {
+		A c = GC.alloc!A();
+		c.a = 10;
+		return c;
+	}
+
+	assert(gcAllocated().a == 10);
+
+	ubyte[] ub = ThisThread.alloc!(ubyte[])(150);
+	
+	assert(ub.length == 150);
+	ub[50] = 'a';
+	ThisThread.free(ub);
+	assert(ub is null);
+}
+
 // TODO: test FiberPool, Circular buffer, Scoped
 unittest {
 	propagateTests!hashmapFreeListTest();
@@ -231,6 +265,8 @@ unittest {
 	propagateTests!refCountedCastTest();
 	propagateTests!circularBufferTest();
 	propagateTests!dictionaryListTest();
+
+	highLevelAllocTest();
 }
 
 version(unittest) static this() 

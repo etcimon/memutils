@@ -53,10 +53,10 @@ struct Vector(T, ALLOC = ThisThread)
 		}
 		
 		// Destructor releases array memory
-		~this()
+		~this() const
 		{
-			T[] data = _payload.ptr[0 .. capacity];
-			if (data.ptr !is null)
+			T[] data = cast(T[])_payload.ptr[0 .. capacity];
+			if (data.ptr !is null )
 				freeArray!(T, ALLOC)(data, length); // calls destructors and frees memory
 		}
 		

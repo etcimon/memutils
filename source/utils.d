@@ -37,19 +37,19 @@ void destroyFiberPool(Fiber f = Fiber.getThis()) {
 import std.traits : isArray;
 
 struct GC {
-	mixin ConvenienceAllocators!NativeGC;
+	mixin ConvenienceAllocators!(NativeGC, typeof(this));
 }
 
 struct ThisFiber {
-	mixin ConvenienceAllocators!ScopedFiberPool;
+	mixin ConvenienceAllocators!(ScopedFiberPool, typeof(this));
 }
 
 struct ThisThread {
-	mixin ConvenienceAllocators!LocklessFreeList;
+	mixin ConvenienceAllocators!(LocklessFreeList, typeof(this));
 }
 
 struct SecureMem {
-	mixin ConvenienceAllocators!CryptoSafe;
+	mixin ConvenienceAllocators!(CryptoSafe, typeof(this));
 }
 
 package struct Malloc {
@@ -153,45 +153,52 @@ void freeArray(T, ALLOC = ThisThread)(auto ref T[] array, size_t max_destroy = s
 	array = null;
 }
 
-mixin template ConvenienceAllocators(alias ALLOC) {
+mixin template ConvenienceAllocators(alias ALLOC, alias THIS) {
 	package enum ident = ALLOC;
-
+static:
 	// objects
-	auto alloc(T, ARGS...)(ARGS args) 
-		if (!isArray(T))
+	auto alloc(T, ARGS...)(auto ref ARGS args) 
+		if (!isArray!T)
 	{
-		return ObjectAllocator!(T, ALLOC).alloc(args);
+		return ObjectAllocator!(T, THIS).alloc(args);
 	}
 	
-	void free(T)(T* obj)
+	void free(T)(ref T* obj)
 		if (!isArray!T && !is(T : Object))
 	{
-		return ObjectAllocator!(T, ALLOC).free(obj);
+		scope(exit) obj = null;
+		ObjectAllocator!(T, THIS).free(obj);
 	}
 	
-	void free(T)(T obj)
+	void free(T)(ref T obj)
 		if (!isArray!T && is(T  : Object))
 	{
-		return ObjectAllocator!(T, ALLOC).free(obj);
+		scope(exit) obj = null;
+		ObjectAllocator!(T, THIS).free(obj);
 	}
 
 	/// arrays
-	auto alloc(T, ARGS...)(ARGS args)
-		if (isArray(T))
-	{
-		return allocArray!(T, ALLOC).alloc(args);
-	}
-	
-	auto realloc(T)(T arr)
+	auto alloc(T)(size_t n)
 		if (isArray!T)
 	{
-		return reallocArray!(T, ALLOC);
+		import std.range : ElementType;
+		return allocArray!(ElementType!T, THIS)(n);
 	}
 	
-	void free(T)(T arr)
+	auto realloc(T)(ref T arr, size_t n)
 		if (isArray!T)
 	{
-		return freeArray!(T, ALLOC);
+		import std.range : ElementType;
+		scope(exit) arr = null;
+		return reallocArray!(ElementType!T, THIS)(arr, n);
+	}
+	
+	void free(T)(ref T arr)
+		if (isArray!T)
+	{
+		import std.range : ElementType;
+		scope(exit) arr = null;
+		freeArray!(ElementType!T, THIS)(arr);
 	}
 
 }
