@@ -14,12 +14,12 @@ import memutils.refcounted;
 import memutils.constants;
 import memutils.helpers;
 import memutils.allocators;
-import memutils.alloc;
+import memutils.utils;
 
 
-alias HashMapRef(Key, Value, int ALLOC = LocklessFreeList) = RefCounted!(HashMap!(Key, Value, ALLOC), ALLOC);
+alias HashMapRef(Key, Value, ALLOC = ThisThread) = RefCounted!(HashMap!(Key, Value, ALLOC), ALLOC);
 
-struct HashMap(Key, Value, int ALLOC = LocklessFreeList)
+struct HashMap(Key, Value, ALLOC = ThisThread)
 {
 	@disable this(this);
 
@@ -48,14 +48,12 @@ struct HashMap(Key, Value, int ALLOC = LocklessFreeList)
 	
 	void remove(Key key)
 	{
-		//logTrace("Remove key: ", Key.stringof, " val: ", Value.stringof);
 		auto idx = findIndex(key);
 		assert (idx != size_t.max, "Removing non-existent element.");
 		auto i = idx;
 		while (true) {
 			m_table[i].key = Traits.clearValue;
 			m_table[i].value = Value.init;
-			
 			size_t j = i, r;
 			do {
 				if (++i >= m_table.length) i -= m_table.length;
@@ -64,6 +62,7 @@ struct HashMap(Key, Value, int ALLOC = LocklessFreeList)
 					return;
 				}
 				r = m_hasher(m_table[i].key) & (m_table.length-1);
+
 			} while ((j<r && r<=i) || (i<j && j<r) || (r<=i && i<j));
 			m_table[j] = m_table[i];
 		}
@@ -279,13 +278,9 @@ struct HashMap(Key, Value, int ALLOC = LocklessFreeList)
 			__traits(hasMember, Key, "toString"))
 		{
 			m_hasher = (Key k) {
-				import std.typecons : scoped;
-				import botan.hash.md4;
 				string s = k.toString();
-				auto md4 = scoped!MD4();
-				md4.update(s);
-				auto hash = md4.finished();
-				return *cast(size_t*)hash.ptr;
+				size_t hash = typeid(string).getHash(&s);
+				return hash;
 			};
 		}
 		

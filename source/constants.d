@@ -7,10 +7,10 @@ enum { // overhead allocator definitions, lazily loaded
 	ScopedFiberPool = 0x04 // One per fiber, calls object destructors when reset. Uses GC if no fiber is set
 }
 
-package enum Mallocator = 0x05; // For use by the DebugAllocator.
-
-
 package:
+
+enum Mallocator = 0x05; // For use by the DebugAllocator.
+
 const LogLevel = Trace;
 version(CryptoSafe) 	const HasCryptoSafe = true;
 else					const HasCryptoSafe = false;

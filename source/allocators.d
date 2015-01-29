@@ -9,6 +9,7 @@
 module memutils.allocators;
 
 public import memutils.constants;
+import core.thread : Fiber;
 import core.exception : OutOfMemoryError;
 import core.stdc.stdlib;
 import core.memory;
@@ -20,14 +21,16 @@ import std.traits : ReturnType;
 import memutils.hashmap : HashMap;
 import memutils.pool;
 import memutils.memory;
+import memutils.debugger;
 import memutils.cryptosafe;
 import memutils.freelist;
+import memutils.utils : Malloc;
 
 static if (HasDebugAllocations) {
 	alias LocklessAllocator = DebugAllocator!(AutoFreeListAllocator!(MallocAllocator));
 	static if (HasCryptoSafe)
 		alias CryptoSafeAllocator = DebugAllocator!(SecureAllocator!(AutoFreeListAllocator!(MallocAllocator)));
-	alias FiberPool = PoolAllocator!LocklessAllocator;
+	alias FiberPool = DebugAllocator!(PoolAllocator!(AutoFreeListAllocator!(MallocAllocator)));
 	alias ProxyGCAllocator = DebugAllocator!GCAllocator;
 }
 else {
@@ -45,7 +48,14 @@ interface Allocator {
 	
 	void[] alloc(size_t sz)
 	out { assert((cast(size_t)__result.ptr & alignmentMask) == 0, "alloc() returned misaligned data."); }
-	
+
+	void[] realloc(void[] mem, size_t new_sz)
+	in {
+		assert(mem.ptr !is null, "realloc() called with null array.");
+		assert((cast(size_t)mem.ptr & alignmentMask) == 0, "misaligned pointer passed to realloc().");
+	}
+	out { assert((cast(size_t)__result.ptr & alignmentMask) == 0, "realloc() returned misaligned data."); }
+
 	void free(void[] mem)
 	in {
 		assert(mem.ptr !is null, "free() called with null array.");
@@ -53,85 +63,9 @@ interface Allocator {
 	}
 }
 
-/**
-* Another proxy allocator used to aggregate statistics and to enforce correct usage.
-*/
-final class DebugAllocator(Base) : Allocator {
-	private {
-		Base m_baseAlloc;
-		HashMap!(void*, size_t, Mallocator) m_blocks;
-		size_t m_bytes;
-		size_t m_maxBytes;
-	}
-	
-	this()
-	{
-		m_baseAlloc = getAllocator!Base();
-		m_blocks = HashMap!(void*, size_t, Mallocator)();
-	}
-	
-	@property size_t allocatedBlockCount() const { return m_blocks.length; }
-	@property size_t bytesAllocated() const { return m_bytes; }
-	@property size_t maxBytesAllocated() const { return m_maxBytes; }
-	
-	void[] alloc(size_t sz)
-	{
-		auto ret = m_baseAlloc.alloc(sz);
-		synchronized(this) {
-			assert(ret.length == sz, "base.alloc() returned block with wrong size.");
-			assert(m_blocks.get(cast(const)ret.ptr, size_t.max) == size_t.max, "base.alloc() returned block that is already allocated.");
-			m_blocks[ret.ptr] = sz;
-			m_bytes += sz;
-			if( m_bytes > m_maxBytes ){
-				m_maxBytes = m_bytes;
-				//logDebug("New allocation maximum: %d (%d blocks)", m_maxBytes, m_blocks.length);
-			}
-		}
-		return ret;
-	}
-
-	void[] realloc(void[] mem, size_t new_size)
-	{
-		void[] ret;
-		size_t sz;
-		synchronized(this) {
-			sz = m_blocks.get(mem.ptr, size_t.max);
-			assert(sz != size_t.max, "realloc() called with non-allocated pointer.");
-			assert(sz == mem.length, "realloc() called with block of wrong size.");
-		}
-		ret = m_baseAlloc.realloc(mem, new_size);
-		synchronized(this) {
-			assert(ret.length == new_size, "base.realloc() returned block with wrong size.");
-			assert(ret.ptr is mem.ptr || m_blocks.get(ret.ptr, size_t.max) == size_t.max, "base.realloc() returned block that is already allocated.");
-			m_bytes -= sz;
-			m_blocks.remove(mem.ptr);
-			m_blocks[ret.ptr] = new_size;
-			m_bytes += new_size;
-		}
-		return ret;
-	}
-
-	void free(void[] mem)
-	{
-		size_t sz;
-		synchronized(this) {
-			sz = m_blocks.get(cast(const)mem.ptr, size_t.max);
-			assert(sz != size_t.max, "free() called with non-allocated object.");
-			assert(sz == mem.length, "free() called with block of wrong size.");
-		}
-
-		m_baseAlloc.free(mem);
-
-		synchronized(this) {
-			m_bytes -= sz;
-			m_blocks.remove(mem.ptr);
-		}
-	}
-}
-
 package:
 
-static HashMap!(void*, FiberPool, Mallocator) g_fiberAlloc;
+static HashMap!(Fiber, FiberPool, Malloc) g_fiberAlloc;
 
 auto getAllocator(int ALLOC)() {
 	static if (ALLOC == LocklessFreeList) alias R = LocklessAllocator;
@@ -141,11 +75,7 @@ auto getAllocator(int ALLOC)() {
 	else static if (ALLOC == Mallocator) alias R = MallocAllocator;
 	else static assert(false, "Invalid allocator specified");
 
-	return getAllocator!R();
-}
-
-R getAllocator(R)() {
-	static if (R.stringof == "ProxyGCAllocator") {	
+	static if (ALLOC == NativeGC) {	
 		static __gshared R alloc;
 		
 		if (!alloc)
@@ -153,35 +83,26 @@ R getAllocator(R)() {
 		
 		return alloc;
 	}
-	else static if (R.stringof == "FiberPool") {
-		import core.thread : Fiber;
+	else static if (ALLOC == ScopedFiberPool) {
 		
-		auto f = Fiber.getThis();
-		if (!f)
-			return getAllocator!GCAllocator();
-		if (auto ptr = (&f in g_fiberAlloc)) {
+		Fiber f = Fiber.getThis();
+		assert(f !is null);
+		if (auto ptr = (f in g_fiberAlloc)) {
 			return *ptr;
 		}
-		
-		auto ret = new FiberPool();
-		g_fiberAlloc[&f] = ret;
+		auto ret = new R();
+		g_fiberAlloc[f] = ret;
 		return ret;
 	}
-	else {
+	else return getAllocator!R();
+}
+
+R getAllocator(R)() {
 		static R alloc;
 		
 		if (!alloc)
 			alloc = new R;
 		return alloc;
-	}
-}
-
-string translateAllocator() { /// requires (int ALLOC) template parameter
-	return `
-	static assert(ALLOC, "The 'int ALLOC' template parameter is not in scope.");
-	ReturnType!(getAllocator!ALLOC) thisAllocator() {
-		return getAllocator!ALLOC();
-	}`;
 }
 
 size_t alignedSize(size_t sz)

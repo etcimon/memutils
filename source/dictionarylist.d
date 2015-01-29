@@ -13,7 +13,7 @@ import memutils.refcounted;
 import std.conv : to;
 import std.exception : enforce;
 
-alias DictionaryListRef(KEY, VALUE, int ALLOC, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, case_sensitive, NUM_STATIC_FIELDS), ALLOC);
+alias DictionaryListRef(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, case_sensitive, NUM_STATIC_FIELDS), ALLOC);
 
 /**
  * 
@@ -25,7 +25,7 @@ alias DictionaryListRef(KEY, VALUE, int ALLOC, bool case_sensitive = true, size_
 
     Insertion and lookup has O(n) complexity.
 */
-struct DictionaryList(KEY, VALUE, int ALLOC, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) {
+struct DictionaryList(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) {
 	@disable this(this);
 
 	import std.typecons : Tuple;

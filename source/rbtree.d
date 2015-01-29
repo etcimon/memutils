@@ -17,9 +17,9 @@ import memutils.allocators;
 import memutils.refcounted;
 import memutils.vector;
 import memutils.constants;
-import memutils.alloc;
+import memutils.utils;
 
-alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, int ALLOC = LocklessFreeList) = RefCounted!(RBTree!(T, less, ALLOC));
+alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, ALLOC = ThisThread) = RefCounted!(RBTree!(T, less, ALLOC));
 
 /**
  * All inserts, removes, searches, and any function in general has complexity
@@ -39,7 +39,7 @@ alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, int ALLOC
  * ignored on insertion.  If duplicates are allowed, then new elements are
  * inserted after all existing duplicate elements.
  */
-struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int ALLOC)
+struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC)
 	if(is(typeof(binaryFun!less(T.init, T.init))))
 {
 	@disable this(this);
@@ -158,7 +158,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, int ALLOC)
 	
 	static private Node allocate()
 	{
-		return FreeListObjectAlloc!(RBNode!(Elem, ALLOC), ALLOC).alloc();
+		return ObjectAllocator!(RBNode!(Elem, ALLOC), ALLOC).alloc();
 	}
 	
 	static private Node allocate(Elem v)
@@ -588,7 +588,7 @@ assert(equal(rbt[], [5]));
 
 	~this() {
 		clear();
-		FreeListObjectAlloc!(RBNode!(Elem, ALLOC), ALLOC).free(_root);
+		ObjectAllocator!(RBNode!(Elem, ALLOC), ALLOC).free(_root);
 	}
 	
 	private this(Node end, size_t length)
@@ -611,7 +611,7 @@ assert(equal(rbt[], [5]));
  *
  * A Red Black tree should have O(lg(n)) insertion, removal, and search time.
  */
-struct RBNode(V, int ALLOC)
+struct RBNode(V, ALLOC)
 {
 	/*
      * Convenience alias
@@ -1082,7 +1082,7 @@ struct RBNode(V, int ALLOC)
 		
 		/// this node object can now be safely deleted
 		//logTrace("Freeing node ", cast(void*)&this);
-		FreeListObjectAlloc!(RBNode!(V, ALLOC), ALLOC).free(cast(RBNode!(V, ALLOC)*)&this);
+		ObjectAllocator!(RBNode!(V, ALLOC), ALLOC).free(cast(RBNode!(V, ALLOC)*)&this);
 		
 		return ret;
 	}
@@ -1149,7 +1149,7 @@ struct RBNode(V, int ALLOC)
 	
 	@property Node dup() const
 	{
-		Node copy = FreeListObjectAlloc!(RBNode!(V, ALLOC), ALLOC).alloc();
+		Node copy = ObjectAllocator!(RBNode!(V, ALLOC), ALLOC).alloc();
 		//logTrace("Allocating node ", cast(void*)copy);
 		copy.value = cast(V)value;
 		copy.color = color;
@@ -1164,7 +1164,7 @@ struct RBNode(V, int ALLOC)
 /**
  * The range type for $(D RedBlackTree)
  */
-struct RBRange(Elem, int ALLOC)
+struct RBRange(Elem, ALLOC)
 {
 	alias Node = RBNode!(Elem, ALLOC).Node;
 	private Node _begin;
@@ -1229,10 +1229,10 @@ struct RBRange(Elem, int ALLOC)
 	}
 }
 
-private auto range(Elem, int ALLOC)(RBNode!(Elem, ALLOC)* start, RBNode!(Elem, ALLOC)* end) {
+private auto range(Elem, ALLOC)(RBNode!(Elem, ALLOC)* start, RBNode!(Elem, ALLOC)* end) {
 	return RBRange!(Elem, ALLOC)(start, end);
 }
 
-auto vector(Elem, int ALLOC)(RBRange!(Elem, ALLOC) r) {
+auto vector(Elem, ALLOC)(RBRange!(Elem, ALLOC) r) {
 	return Vector!(Unqual!Elem, ALLOC)(r);
 }

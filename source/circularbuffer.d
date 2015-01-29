@@ -3,8 +3,10 @@
 import memutils.allocators;
 import memutils.constants;
 import std.algorithm;
+import std.traits : hasElaborateDestructor, isBasicType;
+import memutils.utils;
 
-struct CircularBuffer(T, size_t N = 0, int ALLOC = LocklessFreeList) {
+struct CircularBuffer(T, size_t N = 0, ALLOC = ThisThread) {
 	@disable this(this);
 
 	private {
@@ -72,6 +74,8 @@ struct CircularBuffer(T, size_t N = 0, int ALLOC = LocklessFreeList) {
 	void popFrontN(size_t n) { assert(length >= n); m_start = mod(m_start + n); m_fill -= n; }
 	void popBack() { assert(!empty); m_fill--; }
 	void popBackN(size_t n) { assert(length >= n); m_fill -= n; }
+
+	// moves all the values from the buffer one step down at start of the reference range
 	void removeAt(Range r)
 	{
 		assert(r.m_buffer is m_buffer);
@@ -93,7 +97,10 @@ struct CircularBuffer(T, size_t N = 0, int ALLOC = LocklessFreeList) {
 				m_buffer[i] = m_buffer[i+1];
 		}
 		m_fill--;
-		destroy(m_buffer[mod(m_start+m_fill)]); // TODO: only call destroy for non-POD T
+		static if (hasElaborateDestructor!T) { // calls destructors
+			static if (is(T == struct) && isPointer!T) .destroy(*m_buffer[mod(m_start+m_fill)]);
+			else .destroy(m_buffer[mod(m_start+m_fill)]);
+		}
 	}
 	inout(T)[] peek() inout { return m_buffer[m_start .. min(m_start+m_fill, m_buffer.length)]; }
 	T[] peekDst() {

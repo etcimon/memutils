@@ -83,7 +83,7 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 	}
 }
 
-final class FreeListAlloc(Base) : Allocator
+final class FreeListAlloc(Base : Allocator) : Allocator
 {
 	private static struct FreeListSlot { FreeListSlot* next; }
 	private {
@@ -127,7 +127,14 @@ final class FreeListAlloc(Base) : Allocator
 		//logInfo("Alloc %d bytes: alloc: %d, free: %d", SZ, s_nalloc, s_nfree);
 		return mem;
 	}
-	
+
+	void[] realloc(void[] mem, size_t sz)
+	{
+		assert(mem.length == m_elemSize);
+		assert(sz == m_elemSize);
+		return mem;
+	}
+
 	void free(void[] mem)
 	{
 		assert(mem.length == m_elemSize, "Memory block passed to free has wrong size.");

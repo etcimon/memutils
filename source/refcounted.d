@@ -4,10 +4,11 @@ import memutils.allocators;
 import memutils.helpers;
 import std.conv : to, emplace;
 import std.traits : hasIndirections, Unqual, isImplicitlyConvertible;
-import core.memory : GC;
+import memutils.utils;
 
-struct RefCounted(T, int ALLOC = LocklessFreeList)
+struct RefCounted(T, ALLOC = ThisThread)
 {
+	import core.memory : GC;
 	static if (__traits(hasMember, T, "NOGC")) 
 		enum NOGC = T.NOGC;
 	else 
@@ -17,7 +18,7 @@ struct RefCounted(T, int ALLOC = LocklessFreeList)
 
 	enum isRefCounted = true;
 
-	enum ElemSize = AllocSize!T;	
+	enum ElemSize = AllocSize!T;
 	alias TR = RefTypeOf!T;	
 	private TR m_object;
 	private ulong* m_refCount;
@@ -27,8 +28,8 @@ struct RefCounted(T, int ALLOC = LocklessFreeList)
 	static RefCounted opCall(ARGS...)(auto ref ARGS args)
 	{
 		RefCounted ret;
-		auto mem = getAllocator!ALLOC().alloc(ElemSize);
-		ret.m_refCount = cast(ulong*)getAllocator!ALLOC().alloc(ulong.sizeof).ptr;
+		auto mem = getAllocator!(ALLOC.ident)().alloc(ElemSize);
+		ret.m_refCount = cast(ulong*)getAllocator!(ALLOC.ident)().alloc(ulong.sizeof).ptr;
 		(*ret.m_refCount) = 1;
 		static if( hasIndirections!T && !NOGC) GC.addRange(mem.ptr, ElemSize);
 		ret.m_object = cast(TR)emplace!(Unqual!T)(mem, args);
@@ -152,8 +153,8 @@ struct RefCounted(T, int ALLOC = LocklessFreeList)
 		static if (is(TR == T*)) .destroy(*objc);
 		else .destroy(objc);
 		static if( hasIndirections!T && !NOGC ) GC.removeRange(cast(void*)m_object);
-		getAllocator!ALLOC().free((cast(void*)m_object)[0 .. ElemSize]);
-		getAllocator!ALLOC().free((cast(void*)m_refCount)[0 .. ulong.sizeof]);
+		getAllocator!(ALLOC.ident)().free((cast(void*)m_object)[0 .. ElemSize]);
+		getAllocator!(ALLOC.ident)().free((cast(void*)m_refCount)[0 .. ulong.sizeof]);
 	}
 
 

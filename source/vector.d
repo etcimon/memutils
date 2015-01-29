@@ -8,12 +8,12 @@ import core.exception : RangeError;
 import std.exception : enforce;
 import memutils.allocators;
 import memutils.helpers;
-import memutils.alloc;
+import memutils.utils;
 import memutils.refcounted;
 
 alias SecureArray(T) = Array!(T, CryptoSafeAllocator);
 
-template Array(T, int ALLOC = LocklessFreeList) 
+template Array(T, ALLOC = ThisThread) 
 	if (!is (T == RefCounted!(Vector!(T, ALLOC), ALLOC)))
 {
 	alias Array = RefCounted!(Vector!(T, ALLOC), ALLOC);
@@ -22,7 +22,7 @@ template Array(T, int ALLOC = LocklessFreeList)
 alias SecureVector(T) = Vector!(T, CryptoSafeAllocator);
 
 /// An array that uses a custom allocator.
-struct Vector(T, int ALLOC = LocklessFreeList)
+struct Vector(T, ALLOC = ThisThread)
 {
 	enum NOGC = true;
 	
@@ -88,8 +88,12 @@ struct Vector(T, int ALLOC = LocklessFreeList)
 			{
 				// shorten
 				static if (hasElaborateDestructor!T) {
-					foreach (ref e; _payload.ptr[newLength .. _payload.length])
-						.destroy(e);
+					foreach (ref e; _payload.ptr[newLength .. _payload.length]) {
+						static if (is(T == struct) && isPointer!T)
+							.destroy(*e);
+						else
+							.destroy(e);
+					}
 					
 					// Zero out unused capacity to prevent gc from seeing
 					// false pointers
@@ -127,12 +131,13 @@ struct Vector(T, int ALLOC = LocklessFreeList)
 			if (elements <= capacity) return;
 			// todo: allow vector to become smaller?
 
+			TRACE("Reserve ", length, " => ", elements, " elements.");
+
 			if (_payload) {
 				_payload = reallocArray!(T, ALLOC)(_payload, elements)[0 .. _payload.length];
 			}
 			else
 				_payload = allocArray!(T, ALLOC)(elements)[0 .. _payload.length];
-			/// logTrace("Reserved ", elements, " elements.");
 			_capacity = elements;
 		}
 		

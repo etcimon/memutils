@@ -14,9 +14,9 @@ module memutils.unique;
 
 import memutils.allocators;
 import memutils.constants;
-import memutils.alloc;
+import memutils.utils;
 
-struct Unique(T, int ALLOC = NativeGC)
+struct Unique(T, ALLOC = GC)
 {
 	/** Represents a reference to $(D T). Resolves to $(D T*) if $(D T) is a value type. */
 	alias TR = RefTypeOf!T;
@@ -108,7 +108,7 @@ public:
 	{
 		debug(Unique) logTrace("Unique destructor of ", (_p is null)? null: _p);
 		if (_p !is null)
-			FreeListObjectAlloc!(T, ALLOC).free(_p);
+			ObjectAllocator!(T, ALLOC).free(_p);
 		_p = null;
 	}
 	/** Returns whether the resource exists. */

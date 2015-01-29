@@ -11,11 +11,11 @@ module memutils.memory;
 
 import memutils.allocators;
 import memutils.helpers;
-import core.memory : GC;
 import std.algorithm : min;
 import std.c.stdlib;
 
 final class GCAllocator : Allocator {
+	import core.memory : GC;
 	void[] alloc(size_t sz)
 	{
 		auto mem = GC.malloc(sz+Allocator.alignment);

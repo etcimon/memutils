@@ -11,14 +11,16 @@ module memutils.pool;
 import memutils.allocators;
 import std.conv : emplace;
 import std.algorithm : min, max;
+import memutils.vector;
+
 final class PoolAllocator(Base : Allocator) : Allocator {
 	static struct Pool { Pool* next; void[] data; void[] remaining; }
-	static struct Destructor { Destructor* next; void function(void*) destructor; void* object; }
+
 	private {
 		Allocator m_baseAllocator;
 		Pool* m_freePools;
 		Pool* m_fullPools;
-		Destructor* m_destructors;
+		Vector!(void delegate()) m_destructors;
 		size_t m_poolSize;
 	}
 	
@@ -27,39 +29,19 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 		m_poolSize = pool_size;
 		m_baseAllocator = getAllocator!Base();
 	}
-	
-	@property size_t totalSize()
-	{
-		size_t amt = 0;
-		for (auto p = m_fullPools; p; p = p.next)
-			amt += p.data.length;
-		for (auto p = m_freePools; p; p = p.next)
-			amt += p.data.length;
-		return amt;
-	}
-	
-	@property size_t allocatedSize()
-	{
-		size_t amt = 0;
-		for (auto p = m_fullPools; p; p = p.next)
-			amt += p.data.length;
-		for (auto p = m_freePools; p; p = p.next)
-			amt += p.data.length - p.remaining.length;
-		return amt;
-	}
-	
+
 	void[] alloc(size_t sz)
 	{
 		auto aligned_sz = alignedSize(sz);
-		
+
 		Pool* pprev = null;
 		Pool* p = cast(Pool*)m_freePools;
-		while( p && p.remaining.length < aligned_sz ){
+		while( p && p.remaining.length < aligned_sz ) {
 			pprev = p;
 			p = p.next;
 		}
 		
-		if( !p ){
+		if( !p ) {
 			auto pmem = m_baseAllocator.alloc(AllocSize!Pool);
 			
 			p = emplace!Pool(pmem);
@@ -73,7 +55,7 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 		auto ret = p.remaining[0 .. aligned_sz];
 		p.remaining = p.remaining[aligned_sz .. $];
 		if( !p.remaining.length ){
-			if( pprev ){
+			if( pprev ) {
 				pprev.next = p.next;
 			} else {
 				m_freePools = p.next;
@@ -89,12 +71,12 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 	{
 		auto aligned_sz = alignedSize(arr.length);
 		auto aligned_newsz = alignedSize(newsize);
-		
-		if( aligned_newsz <= aligned_sz ) return arr[0 .. newsize]; // TODO: back up remaining
+		// logTrace("realloc: ", arr.ptr, " sz ", arr.length, " aligned: ", aligned_sz, " => ", newsize, " aligned: ", aligned_newsz);
+		if( aligned_newsz <= aligned_sz ) return arr.ptr[0 .. newsize];
 		
 		auto pool = m_freePools;
 		bool last_in_pool = pool && arr.ptr+aligned_sz == pool.remaining.ptr;
-		if( last_in_pool && pool.remaining.length+aligned_sz >= aligned_newsz ){
+		if( last_in_pool && pool.remaining.length+aligned_sz >= aligned_newsz ) {
 			pool.remaining = pool.remaining[aligned_newsz-aligned_sz .. $];
 			arr = arr.ptr[0 .. aligned_newsz];
 			assert(arr.ptr+arr.length == pool.remaining.ptr, "Last block does not align with the remaining space!?");
@@ -109,14 +91,16 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 	
 	void free(void[] mem)
 	{
+
 	}
 	
 	void freeAll()
 	{
+		//logTrace("Destroying ", totalSize(), " of data, allocated: ", allocatedSize());
 		// destroy all initialized objects
-		for (auto d = m_destructors; d; d = d.next)
-			d.destructor(cast(void*)d.object);
-		m_destructors = null;
+		foreach (ref dtor; m_destructors)
+			dtor();
+		destroy(m_destructors);
 		
 		// put all full Pools into the free pools list
 		for (Pool* p = cast(Pool*)m_fullPools, pnext; p; p = pnext) {
@@ -142,10 +126,28 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 		m_freePools = null;
 		
 	}
-	
-	private static destroy(T)(void* ptr)
+
+	void onDestroy(void delegate() dtor) {
+		m_destructors ~= dtor;
+	}
+
+	@property size_t totalSize()
 	{
-		static if( is(T == class) ) .destroy(cast(T)ptr);
-		else .destroy(*cast(T*)ptr);
+		size_t amt = 0;
+		for (auto p = m_fullPools; p; p = p.next)
+			amt += p.data.length;
+		for (auto p = m_freePools; p; p = p.next)
+			amt += p.data.length;
+		return amt;
+	}
+	
+	@property size_t allocatedSize()
+	{
+		size_t amt = 0;
+		for (auto p = m_fullPools; p; p = p.next)
+			amt += p.data.length;
+		for (auto p = m_freePools; p; p = p.next)
+			amt += p.data.length - p.remaining.length;
+		return amt;
 	}
 }

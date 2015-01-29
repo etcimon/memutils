@@ -19,6 +19,7 @@ import std.algorithm;
 import core.sync.mutex;
 import std.conv : to;
 import memutils.allocators;
+import memutils.utils : Malloc;
 
 version(Posix) {
 	import core.sys.linux.sys.mman;
@@ -236,7 +237,7 @@ package:
 	
 private:
 	__gshared Mutex m_mtx;
-	RBTree!(void[], "a.ptr < b.ptr", false, Mallocator) m_freelist;
+	RBTree!(void[], "a.ptr < b.ptr", false, Malloc) m_freelist;
 	void[] m_pool;
 	void[] m_pool_unaligned;
 }
