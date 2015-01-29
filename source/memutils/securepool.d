@@ -211,7 +211,8 @@ package:
 			{
 				munmap(m_pool_unaligned.ptr, m_pool_unaligned.length);
 				m_pool_unaligned = null;
-				throw new Exception("Could not mlock " ~ to!string(m_pool.length) ~ " bytes");
+				logError("Could not mlock " ~ to!string(m_pool.length) ~ " bytes");
+				return;
 			}
 			
 			version(Posix) posix_madvise(m_pool_unaligned.ptr, m_pool_unaligned.length, MADV_DONTDUMP);
