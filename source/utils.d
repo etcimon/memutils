@@ -8,7 +8,8 @@ import memutils.allocators;
 import std.algorithm : startsWith;
 public import memutils.constants;
 
-FiberPool getFiberPool(Fiber f) {
+// TODO: Do I need this?
+/*FiberPool getFiberPool(Fiber f) {
 	assert(f);
 
 	if (auto ptr = (f in g_fiberAlloc)) 
@@ -20,7 +21,7 @@ FiberPool getFiberPool(Fiber f) {
 		g_fiberAlloc[f] = ret;
 		return ret;
 	}
-}
+}*/
 
 void destroyFiberPool(Fiber f = Fiber.getThis()) {
 	if (auto ptr = (f in g_fiberAlloc)) {

@@ -5,7 +5,6 @@ import std.stdio : writeln;
 
 // Test hashmap, freelists
 void hashmapFreeListTest(ALLOC)() {
-	logTrace("hashmapFreeListTest ",  ALLOC.stringof);
 	Fiber f = Fiber.getThis();
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
 	{
@@ -27,7 +26,6 @@ void hashmapFreeListTest(ALLOC)() {
 
 // Test Vector, FreeLists & Array
 void vectorArrayTest(ALLOC)() {
-	logTrace("vectorArrayTest ", ALLOC.stringof);
 	{
 		assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
 		Vector!(ubyte, ALLOC) data;
@@ -44,7 +42,6 @@ void vectorArrayTest(ALLOC)() {
 
 // Test HashMap, FreeLists & Array
 void hashmapComplexTest(ALLOC)() {
-	logTrace("hashmapComplexTest ",  ALLOC.stringof);
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
 	{
 		HashMap!(string, Array!dchar, ALLOC) hm;
@@ -65,7 +62,6 @@ void hashmapComplexTest(ALLOC)() {
 
 // Test RBTree
 void rbTreeTest(ALLOC)() {
-	logTrace("rbTreeTest ",  ALLOC.stringof);
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
 	{
 		RBTree!(int, "a < b", true, ALLOC) rbtree;
@@ -79,8 +75,6 @@ void rbTreeTest(ALLOC)() {
 
 // Test Unique
 void uniqueTest(ALLOC)() {
-	logTrace("uniqueTest ",  ALLOC.stringof);
-
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
 	{
 		class A { int a; }
@@ -100,7 +94,6 @@ void uniqueTest(ALLOC)() {
 
 // Test FreeList casting
 void refCountedCastTest(ALLOC)() {
-	logTrace("refCountedCastTest ",  ALLOC.stringof);
 	class A {
 		this() { a=0; }
 		protected int a;
@@ -149,60 +142,88 @@ void refCountedCastTest(ALLOC)() {
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
 }
 
+/// test Circular buffer
+void circularBufferTest(ALLOC)() {
+	auto buf1 = CircularBuffer!(ubyte, 0, ALLOC)(65536);
+	ubyte[] data = new ubyte[150];
+	data[50] = 'b';
+	buf1.put(data);
+	assert(buf1.length == 150);
+	assert(buf1[50] == 'b');
 
+	// pulled from vibe.d - vibe.utils.array
+	auto buf = CircularBuffer!(int, 0, ALLOC)(5);
+	assert(buf.length == 0 && buf.freeSpace == 5); buf.put(1); // |1 . . . .
+	assert(buf.length == 1 && buf.freeSpace == 4); buf.put(2); // |1 2 . . .
+	assert(buf.length == 2 && buf.freeSpace == 3); buf.put(3); // |1 2 3 . .
+	assert(buf.length == 3 && buf.freeSpace == 2); buf.put(4); // |1 2 3 4 .
+	assert(buf.length == 4 && buf.freeSpace == 1); buf.put(5); // |1 2 3 4 5
+	assert(buf.length == 5 && buf.freeSpace == 0);
+	assert(buf.front == 1);
+	buf.popFront(); // .|2 3 4 5
+	assert(buf.front == 2);
+	buf.popFrontN(2); // . . .|4 5
+	assert(buf.front == 4);
+	assert(buf.length == 2 && buf.freeSpace == 3);
+	buf.put([6, 7, 8]); // 6 7 8|4 5
+	assert(buf.length == 5 && buf.freeSpace == 0);
+	int[5] dst;
+	buf.read(dst); // . . .|. .
+	assert(dst == [4, 5, 6, 7, 8]);
+	assert(buf.length == 0 && buf.freeSpace == 5);
+	buf.put([1, 2]); // . . .|1 2
+	assert(buf.length == 2 && buf.freeSpace == 3);
+	buf.read(dst[0 .. 2]); //|. . . . .
+	assert(dst[0 .. 2] == [1, 2]);
+}
 
-// todo: test FiberPool, Circular buffer, Scoped
+void dictionaryListTest(ALLOC)()
+{
+	DictionaryList!(string, int, ALLOC) a;
+	a.insert("a", 1);
+	a.insert("a", 2);
+	assert(a["a"] == 1);
+	assert(a.getValuesAt("a") == [1, 2]);
+	a["a"] = 3;
+	assert(a["a"] == 3);
+	assert(a.getValuesAt("a") == [3, 2]);
+	a.removeAll("a");
+	assert(a.getValuesAt("a").length == 0);
+	assert(a.get("a", 4) == 4);
+	a.insert("b", 2);
+	a.insert("b", 1);
+	a.remove("b");
+	assert(a.getValuesAt("b") == [1]);
+	
+	DictionaryList!(string, int, ALLOC, false) b;
+	b.insert("a", 1);
+	b.insert("A", 2);
+	assert(b["A"] == 1);
+	assert(b.getValuesAt("a") == [1, 2]);
+	logTrace("Done");
+}
 
-unittest {
-	import core.thread;
-	hashmapFreeListTest!GC();
-	hashmapFreeListTest!SecureMem();
-	hashmapFreeListTest!ThisThread();
+void propagateTests(alias fct)() {
+	logTrace("Testing ", fct.stringof);
+	fct!GC();
+	fct!SecureMem();
+	fct!ThisThread();
 	Fiber f;
-	f = new Fiber(delegate { hashmapFreeListTest!ThisFiber(); });
+	f = new Fiber(delegate { fct!ThisFiber(); });
 	f.call();
 	destroyFiberPool(f);
+}
 
-	vectorArrayTest!GC();
-	vectorArrayTest!SecureMem();
-	vectorArrayTest!ThisThread();
-
-	f = new Fiber(delegate { vectorArrayTest!ThisFiber(); });
-	f.call();
-	destroyFiberPool(f);
-
-	hashmapComplexTest!GC();
-	hashmapComplexTest!SecureMem();
-	hashmapComplexTest!ThisThread();
-
-	f = new Fiber(delegate { hashmapComplexTest!ThisFiber(); });
-	f.call();
-	destroyFiberPool(f);
-
-	rbTreeTest!GC();
-	rbTreeTest!SecureMem();
-	rbTreeTest!ThisThread();
-
-	f = new Fiber(delegate { rbTreeTest!ThisFiber(); });
-	f.call();
-	destroyFiberPool(f);
-
-	uniqueTest!GC();
-	uniqueTest!SecureMem();
-	uniqueTest!ThisThread();
-
-	f = new Fiber(delegate { uniqueTest!ThisFiber(); });
-	f.call();
-	destroyFiberPool(f);
-
-	refCountedCastTest!GC();
-	refCountedCastTest!SecureMem();
-	refCountedCastTest!ThisThread();
-
-	f = new Fiber(delegate { refCountedCastTest!ThisFiber(); });
-	f.call();
-	destroyFiberPool(f);
-
+// TODO: test FiberPool, Circular buffer, Scoped
+unittest {
+	propagateTests!hashmapFreeListTest();
+	propagateTests!vectorArrayTest();
+	propagateTests!hashmapComplexTest();
+	propagateTests!rbTreeTest();
+	propagateTests!uniqueTest();
+	propagateTests!refCountedCastTest();
+	propagateTests!circularBufferTest();
+	propagateTests!dictionaryListTest();
 }
 
 version(unittest) static this() 

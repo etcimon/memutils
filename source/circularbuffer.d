@@ -1,4 +1,10 @@
-﻿module memutils.circularbuffer;
+﻿/**
+	Utility functions for circular array processing
+	Copyright: © 2012 RejectedSoftware e.K., © 2014-2015 Etienne Cimon
+	License: Subject to the terms of the MIT license, as written in the included LICENSE file.
+	Authors: Sönke Ludwig, Etienne Cimon
+*/
+module memutils.circularbuffer;
 
 import memutils.allocators;
 import memutils.constants;
@@ -16,15 +22,15 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThisThread) {
 		size_t m_fill = 0;
 	}
 	static if( N == 0 ){
-		this(size_t capacity) { m_buffer = new T[capacity]; }
-		~this() { if (m_buffer) delete m_buffer; }
+		this(size_t capacity) { m_buffer = allocArray!(T, ALLOC)(capacity); }
+		~this() { if (m_buffer) freeArray!(T, ALLOC)(m_buffer); }
 	} 
 	else {
 		// clear ring buffer static fields upon removal (to run struct destructors, if T is a struct)
 		~this() 
 		{ 
-			//fixme: Test this
-			//destroy(m_buffer[m_start .. m_fill]); 
+			// TODO: Test this
+			// destroy(m_buffer[m_start .. m_fill]); 
 		}
 	}
 	@property bool empty() const { return m_fill == 0; }
@@ -36,14 +42,11 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThisThread) {
 		@property void capacity(size_t new_size)
 		{
 			if( m_buffer.length ){
-				auto newbuffer = new T[new_size];
-				auto dst = newbuffer;
+				m_buffer = reallocArray!(T, ALLOC)(m_buffer, new_size);
 				auto newfill = min(m_fill, new_size);
-				read(dst[0 .. newfill]);
-				m_buffer = newbuffer;
 				m_start = 0;
 				m_fill = newfill;
-			} else m_buffer = new T[new_size];
+			} else m_buffer = allocArray!(T, ALLOC)(new_size);
 		}
 	}
 	@property ref inout(T) front() inout { assert(!empty); return m_buffer[m_start]; }
@@ -181,4 +184,34 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThisThread) {
 				m_start = 0;
 		}
 	}
+}
+
+unittest {
+	import std.range : isInputRange, isOutputRange;
+	static assert(isInputRange!(CircularBuffer!int) && isOutputRange!(CircularBuffer!int, int));
+
+	// test static buffer
+	CircularBuffer!(int, 5) buf;
+	assert(buf.length == 0 && buf.freeSpace == 5); buf.put(1); // |1 . . . .
+	assert(buf.length == 1 && buf.freeSpace == 4); buf.put(2); // |1 2 . . .
+	assert(buf.length == 2 && buf.freeSpace == 3); buf.put(3); // |1 2 3 . .
+	assert(buf.length == 3 && buf.freeSpace == 2); buf.put(4); // |1 2 3 4 .
+	assert(buf.length == 4 && buf.freeSpace == 1); buf.put(5); // |1 2 3 4 5
+	assert(buf.length == 5 && buf.freeSpace == 0);
+	assert(buf.front == 1);
+	buf.popFront(); // .|2 3 4 5
+	assert(buf.front == 2);
+	buf.popFrontN(2); // . . .|4 5
+	assert(buf.front == 4);
+	assert(buf.length == 2 && buf.freeSpace == 3);
+	buf.put([6, 7, 8]); // 6 7 8|4 5
+	assert(buf.length == 5 && buf.freeSpace == 0);
+	int[5] dst;
+	buf.read(dst); // . . .|. .
+	assert(dst == [4, 5, 6, 7, 8]);
+	assert(buf.length == 0 && buf.freeSpace == 5);
+	buf.put([1, 2]); // . . .|1 2
+	assert(buf.length == 2 && buf.freeSpace == 3);
+	buf.read(dst[0 .. 2]); //|. . . . .
+	assert(dst[0 .. 2] == [1, 2]);
 }

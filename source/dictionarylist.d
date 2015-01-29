@@ -2,7 +2,7 @@
     Defines a string based dictionary list with conserved insertion order.
 
     Copyright: © 2012-2014 RejectedSoftware e.K.
-    License: Subject to the terms of the MIT license, as written in the included LICENSE.txt file.
+    License: Subject to the terms of the MIT license, as written in the included LICENSE file.
     Authors: Sönke Ludwig
 */
 module memutils.dictionarylist;
@@ -10,10 +10,12 @@ module memutils.dictionarylist;
 import memutils.helpers;
 import memutils.allocators;
 import memutils.refcounted;
+import memutils.utils;
+import memutils.vector;
 import std.conv : to;
 import std.exception : enforce;
 
-alias DictionaryListRef(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, case_sensitive, NUM_STATIC_FIELDS), ALLOC);
+alias DictionaryListRef(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, ALLOC, case_sensitive, NUM_STATIC_FIELDS), ALLOC);
 
 /**
  * 
@@ -25,7 +27,7 @@ alias DictionaryListRef(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NU
 
     Insertion and lookup has O(n) complexity.
 */
-struct DictionaryList(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) {
+struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) {
 	@disable this(this);
 
 	import std.typecons : Tuple;
@@ -35,9 +37,12 @@ struct DictionaryList(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NUM_
 		Field[NUM_STATIC_FIELDS] m_fields;
 		size_t m_fieldCount = 0;
 		Field[] m_extendedFields;
-		static char[256] s_keyBuffer;
 	}
 
+	~this() {
+		if (m_extendedFields)
+			freeArray!(Field, ALLOC)(m_extendedFields);
+	}
 	
 	alias KeyType = KEY;
 	alias ValueType = VALUE;
@@ -94,9 +99,16 @@ struct DictionaryList(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NUM_
 	void insert(in KeyType key, ValueType value)
 	{
 		auto keysum = computeCheckSumI(key);
-		if (m_fieldCount < m_fields.length)
+		if (m_fieldCount < m_fields.length) {
+			logTrace("Appending: ", value);
 			m_fields[m_fieldCount++] = Field(keysum, *cast(KeyType*) &key, value);
-		else m_extendedFields ~= Field(keysum, *cast(KeyType*) &key, value);
+			logTrace("Now have: ", m_fields, " with ", m_fieldCount);
+		}
+		else {
+			logTrace("Growing");
+			grow(1);
+			m_extendedFields[$-1] = Field(keysum, *cast(KeyType*) &key, value);
+		}
 	}
 	
 	/** Returns the first field that matches the given key.
@@ -116,22 +128,27 @@ struct DictionaryList(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NUM_
 	
 	/** Returns all values matching the given key.
 
-        Note that the version returning an array will allocate for each call.
+        Note that the version returning an array will allocate using the same allocator for each call.
     */
-	const(ValueType)[] equalRange(const ref KeyType key)
+	auto getValuesAt()(auto const ref KeyType key)
 	const {
 		import std.array;
-		auto ret = appender!(const(ValueType)[])();
+		auto ret = Vector!(ValueType, ALLOC)();
 		this.opApply( (k, const ref v) {
-				if (key == k)
+				logTrace("Looping ", k, " => ", v);
+				if (matches(key, k)) {
+					logTrace("Appending: ", v);
 					ret ~= v;
+					return 0;
+				}
 				return 1;
 			});
-		return ret.data;
+		logTrace("Finished getValuesat with: ", ret[]);
+		return ret.move();
 	}
 	
 	/// ditto
-	void equalRange(in KeyType key, scope void delegate(const(ValueType)) del)
+	void getValuesAt(in KeyType key, scope void delegate(const(ValueType)) del)
 	const {
 		uint keysum = computeCheckSumI(key);
 		foreach (ref f; m_fields[0 .. m_fieldCount]) {
@@ -159,7 +176,10 @@ struct DictionaryList(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NUM_
 		auto pitm = key in this;
 		if( pitm ) *pitm = val;
 		else if( m_fieldCount < m_fields.length ) m_fields[m_fieldCount++] = Field(computeCheckSumI(key), key, val);
-		else m_extendedFields ~= Field(computeCheckSumI(key), key, val);
+		else {
+			grow(1);
+			m_extendedFields[$-1] = Field(computeCheckSumI(key), key, val);
+		}
 		return val;
 	}
 	
@@ -189,6 +209,7 @@ struct DictionaryList(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NUM_
 	int opApply(int delegate(KeyType key, ref ValueType val) del)
 	{
 		foreach (ref kv; m_fields[0 .. m_fieldCount]) {
+			logTrace("Looping: ", kv, " 0 .. ", m_fieldCount);
 			if (auto ret = del(kv.key, kv.value))
 				return ret;
 		}
@@ -229,17 +250,13 @@ struct DictionaryList(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NUM_
 	{
 		return (cast() this).opApply(cast(int delegate(ref ValueType)) del);
 	}
-	
-	bool opEquals(in RefCounted!(DictionaryList!(KEY, VALUE, ALLOC), ALLOC) other) const
+
+	bool opEquals(in DictionaryList!(KEY, VALUE, ALLOC) other) const
 	{
-		if (*other is null)
-			return false;
-		if (length != other.length)
-			return false;
 		foreach (const ref KeyType key, const ref ValueType val; this)
 		{
 			bool found;
-			other.equalRange(key, (const ValueType oval) {
+			other.getValuesAt(key, (const ValueType oval) {
 					if (oval == val) {
 						found = true;
 						return;
@@ -251,7 +268,14 @@ struct DictionaryList(KEY, VALUE, ALLOC, bool case_sensitive = true, size_t NUM_
 		
 		return true;
 	}
-	
+
+	private void grow(size_t n) {
+		if (m_extendedFields)
+			reallocArray!(Field, ALLOC)(m_extendedFields, m_extendedFields.length + n);
+		else
+			m_extendedFields = allocArray!(Field, ALLOC)(16);
+	}
+
 	private ptrdiff_t getIndex(in Field[] map, in KeyType key, uint keysum)
 	const {
 		foreach (i, ref const(Field) entry; map) {

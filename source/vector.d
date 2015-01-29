@@ -129,7 +129,7 @@ struct Vector(T, ALLOC = ThisThread)
 		void reserve(size_t elements)
 		{
 			if (elements <= capacity) return;
-			// todo: allow vector to become smaller?
+			// TODO: allow vector to become smaller?
 
 			TRACE("Reserve ", length, " => ", elements, " elements.");
 
@@ -763,6 +763,11 @@ struct Vector(T, ALLOC = ThisThread)
 			}
 		}
 		return true;
+	}
+
+	bool opEquals()(auto const ref T[] other) {
+		logTrace("other: ", other, " this: ", _data._payload);
+		return other == _data._payload;
 	}
 	
 }

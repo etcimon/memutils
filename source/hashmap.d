@@ -2,7 +2,7 @@
     Internal hash map implementation.
 
     Copyright: Â© 2013 RejectedSoftware e.K.
-    License: Subject to the terms of the MIT license, as written in the included LICENSE.txt file.
+    License: Subject to the terms of the MIT license, as written in the included LICENSE file.
     Authors: SÃ¶nke Ludwig
 */
 module memutils.hashmap;
@@ -231,7 +231,7 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 		while (new_size > 1) pot++, new_size /= 2;
 		new_size = 1 << pot;
 		auto old_size = m_table.length;
-		assert(new_size > old_size); // todo: Allow hashmap to become smaller?
+		assert(new_size > old_size); // TODO: Allow hashmap to become smaller?
 		if (m_table)
 			m_table = reallocArray!(TableEntry, ALLOC)(m_table, new_size);
 		else
