@@ -37,9 +37,9 @@ public:
 	void[] alloc(size_t n)
 	{
 		static if (HasBotan || HasSecurePool) {
-			//logTrace("CryptoSafe alloc ", n);
+			logTrace("CryptoSafe alloc ", n);
 			if (void[] p = ms_zeroise.alloc(n)) {
-				//logTrace("P: ", p.length, " & ", p.ptr);
+				logTrace("P: ", p.length, " & ", p.ptr);
 				return p;
 			}
 		}

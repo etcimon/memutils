@@ -31,7 +31,7 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 	
 	void[] alloc(size_t sz)
 	{
-		//logTrace("AFL alloc ", sz);
+		logTrace("AFL alloc ", sz);
 		if (sz > nthFreeListSize!(freeListCount-1)) return m_baseAlloc.alloc(sz);
 		foreach (i; iotaTuple!freeListCount)
 			if (sz <= nthFreeListSize!(i))
@@ -62,7 +62,7 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 
 	void free(void[] data)
 	{
-		//logTrace("AFL free ", data.length);
+		logTrace("AFL free ", data.length);
 		if (data.length > nthFreeListSize!(freeListCount-1)) {
 			m_baseAlloc.free(data);
 			return;

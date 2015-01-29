@@ -35,7 +35,14 @@ version(linux) {
 version(Windows) {
 	private nothrow @nogc pure:
 	import core.sys.windows.windows;
-	
+
+	enum PROT_READ = 0;
+	enum PROT_WRITE = 0;
+	enum MAP_ANON = 0;
+	enum MAP_SHARED = 0;
+	enum MAP_LOCKED = 0;
+	void* MAP_FAILED = null;
+
 	extern(Windows) {
 		BOOL VirtualLock(LPVOID lpAddress, SIZE_T dwSize);
 		BOOL VirtualUnlock(LPVOID lpAddress, SIZE_T dwSize);
@@ -56,7 +63,7 @@ version(Windows) {
 		enum MEM_RESERVE     = 0x00002000;
 		enum MEM_COMMIT     = 0x00001000;
 		enum PAGE_READWRITE = 0x04;
-		return cast(void*) VirtualAlloc(cast(LPVOID) null, cast(SIZE_T) dwSize, cast(DWORD) (MEM_RESERVE | MEM_COMMIT), cast(DWORD) PAGE_READWRITE);
+		return cast(void*) VirtualAlloc(cast(LPVOID) null, cast(SIZE_T) length, cast(DWORD) (MEM_RESERVE | MEM_COMMIT), cast(DWORD) PAGE_READWRITE);
 	}
 	
 	void munmap(void* ptr, size_t sz)
@@ -152,7 +159,7 @@ public:
 			if (!upper_range.empty && upper_range.front().ptr > (mem.ptr + mem.length) && (upper_range.front().ptr - alignment) < (mem.ptr + mem.length))
 			{
 				//import std.stdio : writeln;
-				//logTrace("Pool item (>): ", upper_range.front().ptr, " .. ", upper_range.front().ptr + upper_range.front().length, " <==> ", mem.ptr, " .. ", mem.ptr + mem.length);
+				logTrace("Pool item (>): ", upper_range.front().ptr, " .. ", upper_range.front().ptr + upper_range.front().length, " <==> ", mem.ptr, " .. ", mem.ptr + mem.length);
 				
 				// we can merge with the next block
 				void[] upper_elem = upper_range.front();
@@ -168,7 +175,7 @@ public:
 			if (!lower_range.empty && (lower_range.back().ptr + lower_range.back().length) < mem.ptr && (lower_range.back().ptr + lower_range.back().length + alignment) > mem.ptr)
 			{
 				// import std.stdio : writeln;
-				// logTrace("Pool item (<): ", lower_range.back().ptr, " .. ", lower_range.back().ptr + lower_range.back().length, " <==> ", mem.ptr, " .. ", mem.ptr + mem.length);
+				logTrace("Pool item (<): ", lower_range.back().ptr, " .. ", lower_range.back().ptr + lower_range.back().length, " <==> ", mem.ptr, " .. ", mem.ptr + mem.length);
 				// we can merge with the next block
 				void[] lower_elem = lower_range.back();
 				size_t alignment_padding = mem.ptr - ( lower_range.back().ptr + lower_range.back().length );
@@ -184,7 +191,7 @@ public:
 package:
 	this()
 	{
-		// logTrace("Loading SecurePool instance ...");
+		logTrace("Loading SecurePool instance ...");
 		m_mtx = new Mutex;
 		
 		auto pool_size = mlock_limit();
@@ -211,7 +218,7 @@ package:
 			{
 				munmap(m_pool_unaligned.ptr, m_pool_unaligned.length);
 				m_pool_unaligned = null;
-				logError("Could not mlock " ~ to!string(m_pool.length) ~ " bytes");
+				logError("Could not mlock " ~ to!string(pool_size) ~ " bytes");
 				return;
 			}
 			
@@ -271,7 +278,7 @@ size_t mlock_limit()
 		return std.algorithm.min(limits.rlim_cur, MLOCK_UPPER_BOUND);
 	}
 	version(Windows) {
-		BOOL success = SetProcessWorkingSetSize(GetCurrentProcessId(), 512*1024, 315*4096);
+		BOOL success = SetProcessWorkingSetSize(cast(void*)GetCurrentProcessId(), 512*1024, 315*4096);
 		if (success == 0)
 			return 0;
 		return MLOCK_UPPER_BOUND;

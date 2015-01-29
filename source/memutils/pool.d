@@ -55,9 +55,9 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 			m_pools++;
 			pprev = null;
 		}
-		// logTrace("0 .. ", aligned_sz, " but remaining: ", p.remaining.length);
+		logTrace("0 .. ", aligned_sz, " but remaining: ", p.remaining.length);
 		auto ret = p.remaining[0 .. aligned_sz];
-		// logTrace("p.remaining: ", aligned_sz, " .. ", p.remaining.length);
+		logTrace("p.remaining: ", aligned_sz, " .. ", p.remaining.length);
 		p.remaining = p.remaining[aligned_sz .. $];
 		if( !p.remaining.length ){
 			if( pprev ) {
@@ -76,7 +76,7 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 	{
 		auto aligned_sz = alignedSize(arr.length);
 		auto aligned_newsz = alignedSize(newsize);
-		// logTrace("realloc: ", arr.ptr, " sz ", arr.length, " aligned: ", aligned_sz, " => ", newsize, " aligned: ", aligned_newsz);
+		logTrace("realloc: ", arr.ptr, " sz ", arr.length, " aligned: ", aligned_sz, " => ", newsize, " aligned: ", aligned_newsz);
 		if( aligned_newsz <= aligned_sz ) return arr.ptr[0 .. newsize];
 		
 		auto pool = m_freePools;
@@ -101,7 +101,7 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 	
 	void freeAll()
 	{
-		//logTrace("Destroying ", totalSize(), " of data, allocated: ", allocatedSize());
+		logTrace("Destroying ", totalSize(), " of data, allocated: ", allocatedSize());
 		// destroy all initialized objects
 		foreach (ref dtor; m_destructors)
 			dtor();

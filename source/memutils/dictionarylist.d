@@ -100,12 +100,11 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 	{
 		auto keysum = computeCheckSumI(key);
 		if (m_fieldCount < m_fields.length) {
-			// logTrace("Appending: ", value);
+			logTrace("Appending: ", value);
 			m_fields[m_fieldCount++] = Field(keysum, *cast(KeyType*) &key, value);
-			// logTrace("Now have: ", m_fields, " with ", m_fieldCount);
+			logTrace("Now have: ", m_fields, " with ", m_fieldCount);
 		}
 		else {
-			// logTrace("Growing");
 			grow(1);
 			m_extendedFields[$-1] = Field(keysum, *cast(KeyType*) &key, value);
 		}
@@ -135,15 +134,15 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 		import std.array;
 		auto ret = Vector!(ValueType, ALLOC)();
 		this.opApply( (k, const ref v) {
-				// logTrace("Looping ", k, " => ", v);
+				logTrace("Looping ", k, " => ", v);
 				if (matches(key, k)) {
-					// logTrace("Appending: ", v);
+					logTrace("Appending: ", v);
 					ret ~= v;
 					return 0;
 				}
 				return 1;
 			});
-		// logTrace("Finished getValuesat with: ", ret[]);
+		logTrace("Finished getValuesAt with: ", ret[]);
 		return ret.move();
 	}
 	
@@ -209,7 +208,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 	int opApply(int delegate(KeyType key, ref ValueType val) del)
 	{
 		foreach (ref kv; m_fields[0 .. m_fieldCount]) {
-			// logTrace("Looping: ", kv, " 0 .. ", m_fieldCount);
+			logTrace("Looping: ", kv, " 0 .. ", m_fieldCount);
 			if (auto ret = del(kv.key, kv.value))
 				return ret;
 		}
@@ -279,7 +278,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 			size_t oldsz = m_extendedFields.length;
 			m_extendedFields = m_extendedFields.ptr[0 .. m_extendedFieldCount];
 			m_extendedFieldCount = (m_extendedFieldCount + n)*3/2;
-			// logTrace("Extended field count: ", m_extendedFieldCount);
+			logTrace("Extended field count: ", m_extendedFieldCount);
 			m_extendedFields = reallocArray!(Field, ALLOC)(m_extendedFields, m_extendedFieldCount)[0 .. oldsz + n];
 		}
 		else {

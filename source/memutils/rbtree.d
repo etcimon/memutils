@@ -164,7 +164,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC)
 	static private Node allocate(Elem v)
 	{
 		auto result = allocate();
-		//logTrace("Allocating node ", cast(void*)result);
+		logTrace("Allocating node ", cast(void*)result);
 		result.value = v;
 		return result;
 	}
@@ -280,10 +280,10 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC)
      */
 	void clear()
 	{
-		//logTrace("Clearing rbtree");
+		logTrace("Clearing rbtree");
 		while (length > 0)
 			removeAny();
-		//logTrace(length, " items left");
+		logTrace(length, " items left");
 		return;
 	}
 	
@@ -1081,7 +1081,7 @@ struct RBNode(V, ALLOC)
 		_left = _right = _parent = null;
 		
 		/// this node object can now be safely deleted
-		//logTrace("Freeing node ", cast(void*)&this);
+		logTrace("Freeing node ", cast(void*)&this);
 		ObjectAllocator!(RBNode!(V, ALLOC), ALLOC).free(cast(RBNode!(V, ALLOC)*)&this);
 		
 		return ret;
@@ -1150,7 +1150,7 @@ struct RBNode(V, ALLOC)
 	@property Node dup() const
 	{
 		Node copy = ObjectAllocator!(RBNode!(V, ALLOC), ALLOC).alloc();
-		//logTrace("Allocating node ", cast(void*)copy);
+		logTrace("Allocating node ", cast(void*)copy);
 		copy.value = cast(V)value;
 		copy.color = color;
 		if(_left !is null)

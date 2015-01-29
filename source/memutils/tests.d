@@ -207,11 +207,11 @@ void dictionaryListTest(ALLOC)()
 
 	assert(b.getValuesAt("a").length == 15_002);
 
-	//logTrace("Done");
+	logTrace("Done");
 }
 
 void propagateTests(alias fct)() {
-	logTrace("Testing ", fct.stringof);
+	logDebug("Testing ", fct.stringof);
 	fct!GC();
 	fct!SecureMem();
 	fct!ThisThread();
@@ -222,6 +222,7 @@ void propagateTests(alias fct)() {
 }
 
 void highLevelAllocTest() {
+	logDebug("Testing highLevelAllocTest()");
 	class A {
 		int a;
 	}
@@ -267,11 +268,4 @@ unittest {
 	propagateTests!dictionaryListTest();
 
 	highLevelAllocTest();
-}
-
-version(unittest) static this() 
-{
-	import backtrace.backtrace;
-	import std.stdio : stdout;
-	install(stdout, PrintOptions.init, 0); 
 }

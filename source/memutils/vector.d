@@ -165,7 +165,7 @@ struct Vector(T, ALLOC = ThisThread)
 			if (isImplicitlyConvertible!(T, T) && isImplicitlyConvertible!(Stuff, T))
 		{
 			TRACE("Vector.append");
-			//logTrace("Capacity: ", _capacity, " length: ", length);
+			logTrace("Capacity: ", _capacity, " length: ", length);
 			if (_capacity == length)
 			{
 				reserve(1 + capacity * 3 / 2);
@@ -766,7 +766,7 @@ struct Vector(T, ALLOC = ThisThread)
 	}
 
 	bool opEquals()(auto const ref T[] other) {
-		//logTrace("other: ", other, " this: ", _data._payload);
+		logTrace("other: ", other, " this: ", _data._payload);
 		return other == _data._payload;
 	}
 	
