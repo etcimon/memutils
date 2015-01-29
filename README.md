@@ -25,23 +25,25 @@ The allocator-friendly lifetime management objects are:
  with `.free` or by letting it go out of scope.
 
 
- ### Examples:
+### Examples:
 
- You can use `GC`, `ThisThread`, `ThisFiber`, `SecureMem` for array or object allocations!
 
- ```D
+You can use `GC`, `ThisThread`, `ThisFiber`, `SecureMem` for array or object allocations!
+
+```D
  A a = ThisThread.alloc!A();
  // do something with "a"
  ThisThread.free(a);
 
  ubyte[] ub = GC.alloc!(ubyte[])(150);
  assert(ub.length == 150);
- ```
- --------------
+```
 
- The `Vector` container, like every other container, takes ownership of the underlying data.
+--------------
 
- ```D
+The `Vector` container, like every other container, takes ownership of the underlying data.
+
+```D
  string val;
  string gcVal;
  {
@@ -52,8 +54,8 @@ The allocator-friendly lifetime management objects are:
  }
  assert(gcVal == "Hello there");
  writeln(val); // SEGMENTATION FAULT: The data was collected! (this is a good thing).
- ```
- --------------
+```
+--------------
 
 The Array type is a RefCounted!(Vector), it allows a hash map to take partial
 ownership, because objects marked @disable this(this) are not compatible with the containers.
