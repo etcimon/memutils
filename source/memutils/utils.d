@@ -141,11 +141,10 @@ void freeArray(T, ALLOC = ThisThread)(auto ref T[] array, size_t max_destroy = s
 		GC.removeRange(array.ptr);
 	}
 
-	static if (hasElaborateDestructor!T) { // calls destructors
+	static if (hasElaborateDestructor!T) { // calls destructors, but not for indirections...
 		size_t i;
 		foreach (ref e; array) {
-			static if (is(T == struct) && isPointer!T) .destroy(*e);
-			else .destroy(e);
+			static if (is(T == struct) && !isPointer!T) .destroy(e);
 			if (++i == max_destroy) break;
 		}
 	}

@@ -19,7 +19,7 @@ import memutils.vector;
 import memutils.constants;
 import memutils.utils;
 
-alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, ALLOC = ThisThread) = RefCounted!(RBTree!(T, less, ALLOC));
+alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, ALLOC = ThisThread) = RefCounted!(RBTree!(T, less, allowDuplicates, ALLOC));
 
 /**
  * All inserts, removes, searches, and any function in general has complexity

@@ -11,7 +11,7 @@ import memutils.helpers;
 import memutils.utils;
 import memutils.refcounted;
 
-alias SecureArray(T) = Array!(T, CryptoSafeAllocator);
+public alias SecureArray(T) = Array!(T, SecureMem);
 
 template Array(T, ALLOC = ThisThread) 
 	if (!is (T == RefCounted!(Vector!(T, ALLOC), ALLOC)))
@@ -19,7 +19,7 @@ template Array(T, ALLOC = ThisThread)
 	alias Array = RefCounted!(Vector!(T, ALLOC), ALLOC);
 }
 
-alias SecureVector(T) = Vector!(T, CryptoSafeAllocator);
+public alias SecureVector(T) = Vector!(T, SecureMem);
 
 /// An array that uses a custom allocator.
 struct Vector(T, ALLOC = ThisThread)
@@ -89,9 +89,7 @@ struct Vector(T, ALLOC = ThisThread)
 				// shorten
 				static if (hasElaborateDestructor!T) {
 					foreach (ref e; _payload.ptr[newLength .. _payload.length]) {
-						static if (is(T == struct) && isPointer!T)
-							.destroy(*e);
-						else
+						static if (is(T == struct) && !isPointer!T) // call destructors but not for indirections...
 							.destroy(e);
 					}
 					
