@@ -103,8 +103,9 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 	{
 		logTrace("Destroying ", totalSize(), " of data, allocated: ", allocatedSize());
 		// destroy all initialized objects
-		foreach (ref dtor; m_destructors)
+		foreach (ref dtor; m_destructors) {
 			dtor();
+		}
 		destroy(m_destructors);
 
 		size_t i;

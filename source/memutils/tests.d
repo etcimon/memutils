@@ -207,7 +207,6 @@ void dictionaryListTest(ALLOC)()
 
 	assert(b.getValuesAt("a").length == 15_002);
 
-	logTrace("Done");
 }
 
 void propagateTests(alias fct)() {
@@ -222,9 +221,12 @@ void propagateTests(alias fct)() {
 }
 
 void highLevelAllocTest() {
-	logDebug("Testing highLevelAllocTest()");
 	class A {
 		int a;
+
+		~this() {
+			a = 0;
+		}
 	}
 	A a = ThisThread.alloc!A();
 	a.a = 10;
@@ -235,7 +237,8 @@ void highLevelAllocTest() {
 	f = new Fiber(delegate { 
 			A b = ThisFiber.alloc!A();
 			b.a = 10;
-			ThisFiber.free(b);
+			// freeing is not needed, this allocator is scoped on the fiber
+			// ThisFiber.free(b);
 		});
 	f.call();
 	destroyFiberPool(f);

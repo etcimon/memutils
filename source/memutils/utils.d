@@ -160,7 +160,13 @@ static:
 	auto alloc(T, ARGS...)(auto ref ARGS args) 
 		if (!isArray!T)
 	{
-		return ObjectAllocator!(T, THIS).alloc(args);
+		auto ret = ObjectAllocator!(T, THIS).alloc(args);
+		static if ((hasElaborateDestructor!T || __traits(hasMember, T, "__dtor") ) && THIS.stringof == "ThisFiber") {
+			auto allocator = getAllocator!ScopedFiberPool();
+			version(unittest) allocator.m_baseAlloc.onDestroy(&ret.__dtor);
+			else allocator.onDestroy(&ret.__dtor);
+		}
+		return ret;
 	}
 	
 	void free(T)(ref T* obj)
