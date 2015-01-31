@@ -44,8 +44,8 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC)
 {
 	@disable this(this);
 
-	enum NOGC = true;
-	
+	static if (ALLOC.stringof != "GC") enum NOGC = true;
+
 	import std.range : Take;
 	import std.typetuple : allSatisfy;
 	import std.traits;
@@ -269,7 +269,6 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC)
      +/
 	bool opBinaryRight(string op)(Elem e) const if (op == "in") 
 	{
-		_defaultInitialize();
 		return _find(e) !is null;
 	}
 	
@@ -544,7 +543,7 @@ assert(equal(rbt[], [5]));
      *
      * Complexity: $(BIGOH log(n))
      */
-	auto equalRange(Elem e)
+	auto getValuesAt(Elem e)
 	{
 		_defaultInitialize();
 		auto beg = _firstGreaterEqual(e);

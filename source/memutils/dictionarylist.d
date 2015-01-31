@@ -250,7 +250,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 		return (cast() this).opApply(cast(int delegate(ref ValueType)) del);
 	}
 
-	bool opEquals(in DictionaryList!(KEY, VALUE, ALLOC) other) const
+	bool opEquals(const ref DictionaryList!(KEY, VALUE, ALLOC) other) const
 	{
 		foreach (const ref KeyType key, const ref ValueType val; this)
 		{

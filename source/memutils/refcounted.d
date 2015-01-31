@@ -5,15 +5,11 @@ import memutils.helpers;
 import std.conv : to, emplace;
 import std.traits : hasIndirections, Unqual, isImplicitlyConvertible;
 import memutils.utils;
+import std.algorithm : countUntil;
 
 struct RefCounted(T, ALLOC = ThisThread)
 {
 	import core.memory : GC;
-	static if (__traits(hasMember, T, "NOGC")) 
-		enum NOGC = T.NOGC;
-	else 
-		enum NOGC = false;
-
 	mixin Embed!m_object;
 
 	enum isRefCounted = true;
@@ -28,11 +24,10 @@ struct RefCounted(T, ALLOC = ThisThread)
 	static RefCounted opCall(ARGS...)(auto ref ARGS args)
 	{
 		RefCounted ret;
-		auto mem = getAllocator!(ALLOC.ident)().alloc(ElemSize);
-		ret.m_refCount = cast(ulong*)getAllocator!(ALLOC.ident)().alloc(ulong.sizeof).ptr;
+		ret.m_object = ObjectAllocator!(T, ALLOC).alloc(args);
+		ret.m_refCount = ObjectAllocator!(ulong, ALLOC).alloc();
 		(*ret.m_refCount) = 1;
-		static if( hasIndirections!T && !NOGC) GC.addRange(mem.ptr, ElemSize);
-		ret.m_object = cast(TR)emplace!(Unqual!T)(mem, args);
+		logTrace("Allocating: ", cast(void*)ret.m_object, " of ", T.stringof, " sz: ", ElemSize, " allocator: ", ALLOC.stringof);
 		return ret;
 	}
 	
@@ -60,8 +55,14 @@ struct RefCounted(T, ALLOC = ThisThread)
 	
 	void copyctor() {
 		
-		if (!m_object) 
+		if (!m_object) {
+			import backtrace.backtrace;
+			import std.stdio : stdout;
+			static if (T.stringof.countUntil("OIDImpl") == -1 &&
+				T.stringof.countUntil("HashMap!(string,") == -1)
+				printPrettyTrace(stdout, PrintOptions.init, 3); 
 			defaultInit();
+		}
 		checkInvariants();
 		if (m_object) (*m_refCount)++; 
 		
@@ -102,6 +103,7 @@ struct RefCounted(T, ALLOC = ThisThread)
 		checkInvariants();
 		if( m_object ){
 			if( --(*m_refCount) == 0 ){
+				logTrace("Clearing Object: ", cast(void*)m_object);
 				if (m_free)
 					m_free(cast(void*)&this);
 				else {
@@ -116,7 +118,7 @@ struct RefCounted(T, ALLOC = ThisThread)
 		m_magic = 0x1EE75817;
 	}
 
-	U opCast(U : bool)() const nothrow
+	bool opCast(U : bool)() const nothrow
 	{
 		return !(m_object is null && !m_refCount && !m_free);
 	}
@@ -149,12 +151,10 @@ struct RefCounted(T, ALLOC = ThisThread)
 	}
 
 	private void _deinit() {
-		auto objc = m_object;
-		static if (is(TR == T*)) .destroy(*objc);
-		else .destroy(objc);
-		static if( hasIndirections!T && !NOGC ) GC.removeRange(cast(void*)m_object);
-		getAllocator!(ALLOC.ident)().free((cast(void*)m_object)[0 .. ElemSize]);
-		getAllocator!(ALLOC.ident)().free((cast(void*)m_refCount)[0 .. ulong.sizeof]);
+		//logDebug("Freeing: ", T.stringof, " ptr ", cast(void*) m_object, " sz: ", ElemSize, " allocator: ", ALLOC.stringof);
+		ObjectAllocator!(T, ALLOC).free(m_object);
+		//logDebug("Freeing refCount: ", cast(void*)m_refCount);
+		ObjectAllocator!(ulong, ALLOC).free(m_refCount);
 	}
 
 
@@ -178,7 +178,7 @@ struct RefCounted(T, ALLOC = ThisThread)
 	
 	private void checkInvariants()
 	const {
-		assert(m_magic == 0x1EE75817, "Magic number of " ~ T.stringof ~ " expected 0x1EE75817, set to: " ~ m_magic.to!string);
+		assert(m_magic == 0x1EE75817, "Magic number of " ~ T.stringof ~ " expected 0x1EE75817, set to: " ~ (cast(void*)m_magic).to!string);
 		assert(!m_object || refCount > 0, (!m_object) ? "No m_object" : "Zero Refcount: " ~ refCount.to!string);
 	}
 }

@@ -16,7 +16,7 @@ import memutils.allocators;
 import memutils.constants;
 import memutils.utils;
 
-struct Unique(T, ALLOC = GC)
+struct Unique(T, ALLOC = void)
 {
 	/** Represents a reference to $(D T). Resolves to $(D T*) if $(D T) is a value type. */
 	alias TR = RefTypeOf!T;
@@ -76,7 +76,7 @@ public:
 		opAssign(p);
 	}
 	
-	void opAssign(ref TR p)
+	void opAssign()(auto ref TR p)
 	{
 		destroy(this);
 		_p = p;
@@ -107,8 +107,14 @@ public:
 	~this()
 	{
 		debug(Unique) logTrace("Unique destructor of ", (_p is null)? null: _p);
-		if (_p !is null)
-			ObjectAllocator!(T, ALLOC).free(_p);
+		static if (ALLOC.stringof != "void") {
+			if (_p !is null)
+				ObjectAllocator!(T, ALLOC).free(_p);
+		}
+		else {
+			if (_p !is null)
+				delete _p;
+		}
 		_p = null;
 	}
 	/** Returns whether the resource exists. */

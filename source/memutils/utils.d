@@ -6,7 +6,7 @@ import std.conv : emplace;
 import std.c.string : memset;
 import memutils.allocators;
 import std.algorithm : startsWith;
-public import memutils.constants;
+import memutils.constants;
 
 // TODO: Do I need this?
 /*FiberPool getFiberPool(Fiber f) {
@@ -68,11 +68,11 @@ template ObjectAllocator(T, ALLOC)
 
 	alias TR = RefTypeOf!T;
 	
-	TR alloc(ARGS...)(ARGS args)
+	TR alloc(ARGS...)(auto ref ARGS args)
 	{
 		//logInfo("alloc %s/%d", T.stringof, ElemSize);
 		auto mem = getAllocator!(ALLOC.ident)().alloc(ElemSize);
-		static if ( hasIndirections!T && !NOGC ) GC.addRange(mem.ptr, ElemSize, typeid(T));
+		static if ( ALLOC.stringof != "GC" && hasIndirections!T ) GC.addRange(mem.ptr, ElemSize, typeid(T));
 		return emplace!T(mem, args);
 	}
 	
@@ -82,8 +82,9 @@ template ObjectAllocator(T, ALLOC)
 		static if (is(TR == T*)) .destroy(*objc);
 		else .destroy(objc);
 
-		static if( hasIndirections!T && !NOGC ) GC.removeRange(cast(void*)obj);
+		static if( ALLOC.stringof != "GC" && hasIndirections!T ) GC.removeRange(cast(void*)obj);
 		getAllocator!(ALLOC.ident)().free((cast(void*)obj)[0 .. ElemSize]);
+
 	}
 }
 
@@ -99,8 +100,9 @@ T[] allocArray(T, ALLOC = ThisThread)(size_t n)
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
-	static if( hasIndirections!T && !NOGC )
+	static if( ALLOC.stringof != "GC" && hasIndirections!T) {
 		GC.addRange(mem.ptr, mem.length, typeid(T));
+	}
 	// don't touch the memory - all practical uses of this function will handle initialization.
 	return ret;
 }
@@ -110,19 +112,23 @@ T[] reallocArray(T, ALLOC = ThisThread)(T[] array, size_t n) {
 	assert(n > array.length, "Cannot reallocate to smaller sizes");
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
+	static if (T.stringof == "Engine") {
+		logDebug("before: ", cast(void[])array);
+	}
 	auto mem = allocator.realloc(cast(void[]) array, T.sizeof * n);
+	static if (T.stringof == "Engine") {
+		logDebug("after: ", mem);
+	}
 	auto ret = cast(T[])mem;
 	
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
-	static if (hasIndirections!T && !NOGC) {
-		if (ret.ptr != array.ptr) {
-			GC.removeRange(array.ptr);
-			GC.addRange(ret.ptr, ret.length, typeid(T));
-		}
+	static if (ALLOC.stringof != "GC" && hasIndirections!T) {
+		GC.removeRange(array.ptr);
+		GC.addRange(mem.ptr, mem.length, typeid(T));
 		// Zero out unused capacity to prevent gc from seeing false pointers
-		memset(ret.ptr + array.length, 0, (n - array.length) * T.sizeof);
+		memset(mem.ptr + (array.length * T.sizeof), 0, (n - array.length) * T.sizeof);
 	}
 	
 	return ret;
@@ -137,15 +143,16 @@ void freeArray(T, ALLOC = ThisThread)(auto ref T[] array, size_t max_destroy = s
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
-	static if (hasIndirections!T && !NOGC) {
+	static if (ALLOC.stringof != "GC" && hasIndirections!T) {
 		GC.removeRange(array.ptr);
 	}
 
 	static if (hasElaborateDestructor!T) { // calls destructors, but not for indirections...
 		size_t i;
 		foreach (ref e; array) {
+			if (i == max_destroy) break;
 			static if (is(T == struct) && !isPointer!T) .destroy(e);
-			if (++i == max_destroy) break;
+			i++;
 		}
 	}
 	allocator.free(cast(void[])array);

@@ -25,8 +25,9 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	
 	void[] alloc(size_t sz)
 	{
+		//logDebug("Bytes allocated in ", Base.stringof, ": ", bytesAllocated());
 		auto ret = m_baseAlloc.alloc(sz);
-		synchronized(this) {
+		static if (Base.stringof != "GCAllocator") synchronized(this) {
 			assert(ret.length == sz, "base.alloc() returned block with wrong size.");
 			assert(m_blocks.get(cast(const)ret.ptr, size_t.max) == size_t.max, "base.alloc() returned block that is already allocated.");
 			m_blocks[ret.ptr] = sz;
@@ -43,13 +44,13 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	{
 		void[] ret;
 		size_t sz;
-		synchronized(this) {
+		static if (Base.stringof != "GCAllocator") synchronized(this) {
 			sz = m_blocks.get(mem.ptr, size_t.max);
 			assert(sz != size_t.max, "realloc() called with non-allocated pointer.");
 			assert(sz == mem.length, "realloc() called with block of wrong size.");
 		}
 		ret = m_baseAlloc.realloc(mem, new_size);
-		synchronized(this) {
+		static if (Base.stringof != "GCAllocator") synchronized(this) {
 			assert(ret.length == new_size, "base.realloc() returned block with wrong size.");
 			assert(ret.ptr is mem.ptr || m_blocks.get(ret.ptr, size_t.max) == size_t.max, "base.realloc() returned block that is already allocated.");
 			m_bytes -= sz;
@@ -62,16 +63,22 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	
 	void free(void[] mem)
 	{
+		scope(failure) {
+
+			import backtrace.backtrace;
+			import std.stdio : stdout;
+			printPrettyTrace(stdout, PrintOptions.init, 3); 
+		}
 		size_t sz;
-		synchronized(this) {
+		static if (Base.stringof != "GCAllocator") synchronized(this) {
 			sz = m_blocks.get(cast(const)mem.ptr, size_t.max);
-			assert(sz != size_t.max, "free() called with non-allocated object.");
+			assert(sz != size_t.max, "free() called with non-allocated object. "~ mem.ptr.to!string~ " m_blocks len: "~ m_blocks.length.to!string);
 			assert(sz == mem.length, "free() called with block of wrong size.");
 		}
 		
 		m_baseAlloc.free(mem);
 		
-		synchronized(this) {
+		static if (Base.stringof != "GCAllocator") synchronized(this) {
 			m_bytes -= sz;
 			m_blocks.remove(mem.ptr);
 		}

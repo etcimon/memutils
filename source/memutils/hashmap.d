@@ -23,7 +23,8 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 {
 	@disable this(this);
 
-	enum NOGC = true;
+	//static if (ALLOC.stringof != "GC" || !hasIndirections!TableEntry) enum NOGC = true;
+
 	alias Traits = DefaultHashMapTraits!Key;
 	struct TableEntry {
 		UnConst!Key key;
@@ -48,6 +49,7 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 	
 	void remove(Key key)
 	{
+		static if (Key.stringof.countUntil("OIDImpl") != -1) logError("Removing: ", key.toString());
 		auto idx = findIndex(key);
 		assert (idx != size_t.max, "Removing non-existent element.");
 		auto i = idx;
@@ -75,7 +77,7 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 		const Value ret = m_table[idx].value;
 		return *cast(Value*)&ret;
 	}
-		
+	/*	
 	static if (!is(typeof({ Value v; const(Value) vc; v = vc; }))) {
 		const(Value) get(Key key, lazy const(Value) default_value = Value.init)
 		{
@@ -83,7 +85,7 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 			if (idx == size_t.max) return default_value;
 			return m_table[idx].value;
 		}
-	}
+	}*/
 	
 	void clear()
 	{
@@ -98,17 +100,9 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 	void set(Key key, Value value) {
 		opIndexAssign(value, key);
 	}
+
 	
-	void opIndexAssign(Value value, Key key)
-	{
-		assert(!Traits.equals(key, Traits.clearValue), "Inserting clear value into hash map.");
-		grow(1);
-		auto i = findInsertIndex(key);
-		if (!Traits.equals(m_table[i].key, key)) m_length++;
-		m_table[i] = TableEntry(key, value);
-	}
-	
-	void opIndexAssign(in Value value, in Key key)
+	void opIndexAssign(inout Value value, in Key key)
 	{
 		assert(!Traits.equals(key, Traits.clearValue), "Inserting clear value into hash map.");
 		grow(1);
@@ -184,7 +178,6 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 	
 	private size_t findIndex(in Key key)
 	const {
-		
 		if (m_length == 0) return size_t.max;
 		size_t start = m_hasher(*cast(Key*) &key) & (m_table.length-1);
 		auto i = start;
@@ -226,20 +219,20 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 		if (!m_hasher) {
 			setupHasher();
 		}
-		
+
+		logDebug("Resizing ", Key.stringof, " : ", Value.stringof, " : ", cast(void*)&this, " from ", m_table.length, " to: ", new_size);
+
 		uint pot = 0;
 		while (new_size > 1) pot++, new_size /= 2;
 		new_size = 1 << pot;
 		auto old_size = m_table.length;
 		assert(new_size > old_size); // TODO: Allow hashmap to become smaller?
-		if (m_table)
-			m_table = reallocArray!(TableEntry, ALLOC)(m_table, new_size);
-		else
-			m_table = allocArray!(TableEntry, ALLOC)(new_size);
-
+		auto oldtable = m_table;
+		m_table = allocArray!(TableEntry, ALLOC)(new_size);
 
 		/// fixme: Use initializeAll ?
-		foreach (ref el; m_table[old_size .. new_size]) {
+		/// 
+		foreach (ref el; m_table) {
 			static if (is(Key == struct)) {
 				emplace(cast(UnConst!Key*)&el.key);
 				static if (Traits.clearValue !is Key.init)
@@ -247,6 +240,14 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 			} else el.key = cast(UnConst!Key)Traits.clearValue;
 			emplace(&el.value);
 		}
+		foreach (ref el; oldtable)
+		if (!Traits.equals(el.key, Traits.clearValue)) {
+			auto idx = findInsertIndex(el.key);
+			(cast(ubyte[])(&m_table[idx])[0 .. 1])[] = (cast(ubyte[])(&el)[0 .. 1])[];
+		}
+
+		if (oldtable) freeArray!(TableEntry, ALLOC)(oldtable, 0);
+		logTrace("Now have ", m_table.length);
 	}
 
 	void setupHasher() {
@@ -268,7 +269,7 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 		{
 			m_hasher = (Key k) {
 				import std.typecons : scoped;
-				import memutils.vector : Array;
+				import memutils.vector : Vector;
 				Vector!ubyte s = k.toVector();
 				size_t hash = hashOf(s[], 0);
 				return hash;
@@ -280,6 +281,7 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 			m_hasher = (Key k) {
 				string s = k.toString();
 				size_t hash = typeid(string).getHash(&s);
+				// logDebug("string ", s, " hash:" , hash);
 				return hash;
 			};
 		}
@@ -292,13 +294,10 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 			else m_hasher = k => k.toHashShared();
 		} 
 		else static if (__traits(hasMember, Key, "isRefCounted")) {
-			
-			auto typeinfo = typeid(typeof(*(Key())));
-			m_hasher = k => typeinfo.getHash(&k);
+			m_hasher = (k) { return typeid(typeof(*(Key()))).getHash(&k); };
 		}
 		else {
-			auto typeinfo = typeid(Key);
-			m_hasher = k => typeinfo.getHash(&k);
+			m_hasher = (k) { return typeid(Key).getHash(&k); };
 		}
 	}
 }
@@ -310,18 +309,17 @@ struct DefaultHashMapTraits(Key) {
 	{
 		static if (__traits(hasMember, Key, "isRefCounted") && 
 			is (typeof(*(Key())) == class) && 
-			__traits(compiles, "bool c = a.opEquals(b);"))
+			__traits(compiles, "bool c = a.opEquals(*b);"))
 		{
-			if (a is null && b !is null) {
-				return b.opEquals(a);
+			if (!a && b) {
+				return b.opEquals(*a);
 			}
-			else if (a !is null && b is null) {
-				return a.opEquals(b);
+			else if (a && !b) {
+				return a.opEquals(*b);
 			}
-			else if (a !is null && b !is null) // both are equally null
+			else if (a && b)
 			{
-				
-				return a.opEquals(b);
+				return a.opEquals(*b);
 			}
 			else {
 				return true;
@@ -329,6 +327,9 @@ struct DefaultHashMapTraits(Key) {
 		}
 		else static if (__traits(hasMember, Key, "isRefCounted") && is (typeof(*(Key())) == class)) {
 			return *a is *b;
+		}
+		else static if (isPointer!Key) {
+			return a is b;
 		}
 		else {
 			return a == b;

@@ -3,7 +3,7 @@
 import std.algorithm : swap, initializeAll, empty;
 import std.traits;
 import std.c.string;
-import std.range : isInputRange, isForwardRange, ElementType, refRange, RefRange, hasLength;
+import std.range : isInputRange, isForwardRange, isRandomAccessRange, ElementType, refRange, RefRange, hasLength;
 import core.exception : RangeError;
 import std.exception : enforce;
 import memutils.allocators;
@@ -24,7 +24,7 @@ public alias SecureVector(T) = Vector!(T, SecureMem);
 /// An array that uses a custom allocator.
 struct Vector(T, ALLOC = ThisThread)
 {
-	enum NOGC = true;
+	static if (ALLOC.stringof != "GC" || !hasIndirections!T) enum NOGC = true;
 	
 	@disable this(this);
 	
@@ -96,7 +96,7 @@ struct Vector(T, ALLOC = ThisThread)
 					// Zero out unused capacity to prevent gc from seeing
 					// false pointers
 					static if (hasIndirections!T)
-						memset(_payload.ptr + newLength, 0, (_payload.length - newLength) * T.sizeof);
+						memset(_payload.ptr + (newLength*T.sizeof), 0, (_payload.length - newLength) * T.sizeof);
 				}
 				_payload = _payload.ptr[0 .. newLength];
 				return;
@@ -132,10 +132,13 @@ struct Vector(T, ALLOC = ThisThread)
 			TRACE("Reserve ", length, " => ", elements, " elements.");
 
 			if (_payload) {
-				_payload = reallocArray!(T, ALLOC)(_payload, elements)[0 .. _payload.length];
+				size_t len = _payload.length;
+				_payload = _payload.ptr[0 .. _capacity];
+				_payload = reallocArray!(T, ALLOC)(_payload, elements)[0 .. len];
 			}
 			else
 				_payload = allocArray!(T, ALLOC)(elements)[0 .. _payload.length];
+
 			_capacity = elements;
 		}
 		
@@ -338,9 +341,12 @@ struct Vector(T, ALLOC = ThisThread)
 
         Complexity: $(BIGOH 1)
      */
-	const(T[]) opSlice() const
+	auto opSlice() inout
 	{
-		return _data._payload;
+		static if (is(T[] == ubyte[]))
+			return cast(string) _data._payload;
+		else
+			return *cast(T[]*)&_data._payload;
 	}
 	
 	/**
@@ -380,10 +386,10 @@ struct Vector(T, ALLOC = ThisThread)
         Precondition: $(D i < length)
 
         Complexity: $(BIGOH 1)
-     */
-	ref T opIndex(size_t i)
+     */	
+	ref T opIndex(size_t i) const
 	{
-		return _data._payload[i];
+		return *cast(T*)&_data._payload[i];
 	}
 	
 	void opIndexAssign(U)(auto ref U val, size_t i)
@@ -394,11 +400,6 @@ struct Vector(T, ALLOC = ThisThread)
 			memcpy(_data._payload.ptr + i, &val, U.sizeof);
 			memset(&val, 0, U.sizeof);
 		}
-	}
-	
-	ref const(T) opIndex(size_t i) const
-	{
-		return _data._payload[i];
 	}
 	/**
         Slicing operations execute an operation on an entire slice.
@@ -413,7 +414,7 @@ struct Vector(T, ALLOC = ThisThread)
 		{
 			_data.length = value.length;
 			_data._payload.ptr[0 .. value.length] = value[0 .. $];
-		} else static if (is (Stuff == Vector!(T, ALLOC))) {
+		} else static if (is(UnConst!Stuff == Vector!(T, ALLOC))) {
 			_data.length = value._data.length;
 			_data._payload[] = value._data._payload[];
 		}
@@ -553,7 +554,7 @@ struct Vector(T, ALLOC = ThisThread)
 	
 	import std.traits : isNumeric;
 	
-	int opCmp(int Alloc)(const ref Vector!(T, Alloc) other) const 
+	int opCmp(Alloc)(auto const ref Vector!(T, Alloc) other) const 
 	{
 		if (this[] == other[])
 			return 0;
@@ -562,17 +563,7 @@ struct Vector(T, ALLOC = ThisThread)
 		else
 			return 0;
 	}
-	
-	int opCmp(int Alloc)(const RefCounted!(Vector!(T, Alloc), ALLOC) other) const 
-	{
-		if (this[] == other[])
-			return 0;
-		else if (this[] < other[])
-			return -1;
-		else
-			return 0;
-	}
-	
+
 	size_t pushBack(Stuff...)(Stuff stuff) 
 		if (!isNumeric!Stuff || !is ( T == ubyte ))
 	{
@@ -602,10 +593,15 @@ struct Vector(T, ALLOC = ThisThread)
     */
 	size_t insertBack(Stuff)(auto ref Stuff stuff)
 	{
+		import std.traits : isImplicitlyConvertible;
 		static if (isImplicitlyConvertible!(Stuff, T[]))
 			return _data.pushBack(cast(T[])stuff);
-		else static if (isSomeString!(Stuff))
+		else static if (isSomeString!(Stuff) && !isImplicitlyConvertible!(Stuff, T)) {
 			return _data.pushBack(cast(T[])stuff);
+		}
+		else static if (isSomeString!(Stuff) && isImplicitlyConvertible!(Stuff, T)) {
+			return _data.pushBack(cast(T)stuff);
+		}
 		else static if (isInputRange!(Stuff) && isImplicitlyConvertible!(ForeachType!Stuff, T)) {
 			size_t i;
 			foreach (ref el; stuff) {
@@ -781,6 +777,6 @@ auto vector(T)(T[] val)
 }
 
 void TRACE(T...)(T t) {
-	//import std.stdio : writeln;
-	//writeln(t);
+	import std.stdio : writeln;
+	writeln(t);
 }

@@ -20,7 +20,7 @@ mixin template Embed(alias OBJ)
 
 	@property ref const(T) opStar() const
 	{
-		(cast(RefCounted*)&this).defaultInit();
+		(cast(typeof(this)*)&this).defaultInit();
 		checkInvariants();
 		static if (is(TR == T*)) return *OBJ;
 		else return OBJ;
@@ -44,10 +44,7 @@ mixin template Embed(alias OBJ)
 	bool opEquals(U)(auto ref U other) const
 	{
 		defaultInit();
-		static if (__traits(compiles, (cast(TR)OBJ).opEquals(cast(T) other.OBJ)))
-			return opStar().opEquals(cast(T) other.OBJ);
-		else
-			return opStar().opEquals(other);
+		return opStar().opEquals(other);
 	}
 	
 	int opCmp(U)(auto ref U other) const
