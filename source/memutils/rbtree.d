@@ -44,7 +44,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC)
 {
 	@disable this(this);
 
-	static if (ALLOC.stringof != "GC") enum NOGC = true;
+	static if (ALLOC.stringof != "AppMem") enum NOGC = true;
 
 	import std.range : Take;
 	import std.typetuple : allSatisfy;

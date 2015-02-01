@@ -23,7 +23,7 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 {
 	@disable this(this);
 
-	//static if (ALLOC.stringof != "GC" || !hasIndirections!TableEntry) enum NOGC = true;
+	static if (ALLOC.stringof != "AppMem" && !hasIndirections!TableEntry) enum NOGC = true;
 
 	alias Traits = DefaultHashMapTraits!Key;
 	struct TableEntry {
@@ -220,7 +220,7 @@ struct HashMap(Key, Value, ALLOC = ThisThread)
 			setupHasher();
 		}
 
-		logDebug("Resizing ", Key.stringof, " : ", Value.stringof, " : ", cast(void*)&this, " from ", m_table.length, " to: ", new_size);
+		// logDebug("Resizing ", Key.stringof, " : ", Value.stringof, " : ", cast(void*)&this, " from ", m_table.length, " to: ", new_size);
 
 		uint pot = 0;
 		while (new_size > 1) pot++, new_size /= 2;

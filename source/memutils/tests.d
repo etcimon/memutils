@@ -184,6 +184,7 @@ void dictionaryListTest(ALLOC)()
 	a.insert("a", 2);
 	assert(a["a"] == 1);
 	assert(a.getValuesAt("a") == [1, 2]);
+	//logDebug("Done getValuesAt");
 	a["a"] = 3;
 	assert(a["a"] == 3);
 	assert(a.getValuesAt("a") == [3, 2]);
@@ -211,7 +212,7 @@ void dictionaryListTest(ALLOC)()
 
 void propagateTests(alias fct)() {
 	logDebug("Testing ", fct.stringof);
-	fct!GC();
+	fct!AppMem();
 	fct!SecureMem();
 	fct!ThisThread();
 	Fiber f;
@@ -243,13 +244,13 @@ void highLevelAllocTest() {
 	f.call();
 	destroyFiberPool(f);
 
-	A gcAllocated() {
-		A c = GC.alloc!A();
+	A appAllocated() {
+		A c = AppMem.alloc!A();
 		c.a = 10;
 		return c;
 	}
 
-	assert(gcAllocated().a == 10);
+	assert(appAllocated().a == 10);
 
 	ubyte[] ub = ThisThread.alloc!(ubyte[])(150);
 	

@@ -24,7 +24,7 @@ public alias SecureVector(T) = Vector!(T, SecureMem);
 /// An array that uses a custom allocator.
 struct Vector(T, ALLOC = ThisThread)
 {
-	static if (ALLOC.stringof != "GC" || !hasIndirections!T) enum NOGC = true;
+	static if (ALLOC.stringof != "AppMem") enum NOGC = true;
 	
 	@disable this(this);
 	
@@ -55,9 +55,10 @@ struct Vector(T, ALLOC = ThisThread)
 		// Destructor releases array memory
 		~this() const
 		{
-			T[] data = cast(T[])_payload.ptr[0 .. capacity];
-			if (data.ptr !is null )
-				freeArray!(T, ALLOC)(data, length); // calls destructors and frees memory
+			if (_capacity == 0)
+				return;
+			T[] data = cast(T[]) _payload.ptr[0 .. _capacity];
+			freeArray!(T, ALLOC)(data, _payload.length); // calls destructors and frees memory
 		}
 		
 		void opAssign(Payload rhs)
@@ -777,6 +778,6 @@ auto vector(T)(T[] val)
 }
 
 void TRACE(T...)(T t) {
-	import std.stdio : writeln;
-	writeln(t);
+	//import std.stdio : writeln;
+	//writeln(t);
 }

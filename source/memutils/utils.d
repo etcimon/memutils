@@ -36,7 +36,7 @@ void destroyFiberPool(Fiber f = Fiber.getThis()) {
 }
 import std.traits : isArray;
 
-struct GC {
+struct AppMem {
 	mixin ConvenienceAllocators!(NativeGC, typeof(this));
 }
 
@@ -72,7 +72,7 @@ template ObjectAllocator(T, ALLOC)
 	{
 		//logInfo("alloc %s/%d", T.stringof, ElemSize);
 		auto mem = getAllocator!(ALLOC.ident)().alloc(ElemSize);
-		static if ( ALLOC.stringof != "GC" && hasIndirections!T ) GC.addRange(mem.ptr, ElemSize, typeid(T));
+		static if ( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) GC.addRange(mem.ptr, ElemSize, typeid(T));
 		return emplace!T(mem, args);
 	}
 	
@@ -82,7 +82,7 @@ template ObjectAllocator(T, ALLOC)
 		static if (is(TR == T*)) .destroy(*objc);
 		else .destroy(objc);
 
-		static if( ALLOC.stringof != "GC" && hasIndirections!T ) GC.removeRange(cast(void*)obj);
+		static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) GC.removeRange(cast(void*)obj);
 		getAllocator!(ALLOC.ident)().free((cast(void*)obj)[0 .. ElemSize]);
 
 	}
@@ -100,7 +100,8 @@ T[] allocArray(T, ALLOC = ThisThread)(size_t n)
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
-	static if( ALLOC.stringof != "GC" && hasIndirections!T) {
+	static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
+		// TODO: Do I need to add range for GC.malloc too?
 		GC.addRange(mem.ptr, mem.length, typeid(T));
 	}
 	// don't touch the memory - all practical uses of this function will handle initialization.
@@ -112,19 +113,13 @@ T[] reallocArray(T, ALLOC = ThisThread)(T[] array, size_t n) {
 	assert(n > array.length, "Cannot reallocate to smaller sizes");
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
-	static if (T.stringof == "Engine") {
-		logDebug("before: ", cast(void[])array);
-	}
 	auto mem = allocator.realloc(cast(void[]) array, T.sizeof * n);
-	static if (T.stringof == "Engine") {
-		logDebug("after: ", mem);
-	}
 	auto ret = cast(T[])mem;
 	
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
-	static if (ALLOC.stringof != "GC" && hasIndirections!T) {
+	static if (hasIndirections!T && !NOGC) {
 		GC.removeRange(array.ptr);
 		GC.addRange(mem.ptr, mem.length, typeid(T));
 		// Zero out unused capacity to prevent gc from seeing false pointers
@@ -143,7 +138,7 @@ void freeArray(T, ALLOC = ThisThread)(auto ref T[] array, size_t max_destroy = s
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
-	static if (ALLOC.stringof != "GC" && hasIndirections!T) {
+	static if (ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
 		GC.removeRange(array.ptr);
 	}
 

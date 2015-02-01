@@ -30,6 +30,8 @@ alias DictionaryListRef(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = tr
 struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) {
 	@disable this(this);
 
+	static if (ALLOC.stringof != "AppMem") enum NOGC = true;
+
 	import std.typecons : Tuple;
 	
 	private {
@@ -41,7 +43,10 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 	}
 
 	~this() {
-		if (m_extendedFields) freeArray!(Field, ALLOC)(m_extendedFields.ptr[0 .. m_extendedFieldCount]);
+		if (m_extendedFields) {
+			auto sz = m_extendedFields.length;
+			freeArray!(Field, ALLOC)(m_extendedFields.ptr[0 .. m_extendedFieldCount], sz);
+		}
 	}
 	
 	alias KeyType = KEY;
@@ -129,20 +134,20 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 
         Note that the version returning an array will allocate using the same allocator for each call.
     */
-	auto getValuesAt()(auto const ref KeyType key)
+	Vector!(ValueType, ALLOC) getValuesAt()(auto const ref KeyType key)
 	const {
 		import std.array;
-		auto ret = Vector!(ValueType, ALLOC)();
+		auto ret = Vector!(ValueType, ALLOC)(0);
 		this.opApply( (k, const ref v) {
-				logTrace("Looping ", k, " => ", v);
+				//logTrace("Looping ", k, " => ", v);
 				if (matches(key, k)) {
-					logTrace("Appending: ", v);
+					//logDebug("Appending: ", v);
 					ret ~= v;
 					return 0;
 				}
 				return 1;
 			});
-		logTrace("Finished getValuesAt with: ", ret[]);
+		//logDebug("Finished getValuesAt with: ", ret[]);
 		return ret.move();
 	}
 	
