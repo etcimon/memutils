@@ -3,7 +3,7 @@
 The memutils library provides a set of 4 enhanced allocators tweaked for better performance depending on the scope.
 A new allocation syntax comes with many benefits, including the easy replacement of allocators.
 
-- GC : The GC Allocator pipes through the original garbage collection, but is integrated to support the new syntax.
+- AppMem : The AppMem Allocator pipes through the original garbage collection, but is integrated to support the new syntax and recommends manual management. If the `DebugAllocator` is disabled, automatic garbage collection works through this allocator but it will *not* call any explicit destructors.
 - ThisThread: This allocator is fine tuned for thread-local heap allocations and doesn't slow down due to locks or additional pressure on the GC.
 - ThisFiber: The Fiber Pool contains a list of destructors allocated through it and they are called when it goes out of scope. It is 
 best used in a Fiber (Task) to prevent locking, GC pressure, and to release memory in the fastest way possible. 
@@ -21,8 +21,7 @@ The allocator-friendly containers are:
 
 The allocator-friendly lifetime management objects are:
 - RefCounted: Similar to shared_ptr in C++, it's also compatible with interface casting.
-- Unique: Similar to unique_ptr in C++, it destroys an object pointer allocated from the same allocator
- with `.free` or by letting it go out of scope.
+- Unique: Similar to unique_ptr in C++, by default it will consider objects to have been created with `new`, but if a custom allocator is specified it will destroy an object pointer allocated from the same allocator with `.free`.
 
 
 ### Examples:
