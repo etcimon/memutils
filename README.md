@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/etcimon/memutils.svg)](https://travis-ci.org/etcimon/memutils)
 
-The memutils library provides a set of 4 enhanced allocators tweaked for better performance depending on the scope.
+The `memutils` library provides a set of 4 enhanced allocators tweaked for better performance depending on the scope.
 A new allocation syntax comes with many benefits, including the easy replacement of allocators.
 
 - `AppMem` : The AppMem Allocator pipes through the original garbage collection, but is integrated to support the new syntax and recommends manual management. If the `DebugAllocator` is disabled, automatic garbage collection works through this allocator but it will *not* call any explicit destructors.
