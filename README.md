@@ -12,22 +12,22 @@ enhances safety by zeroising the memory after being freed, and optionally it can
 that doesn't get dumped to disk on a crash or during OS sleep/hibernation.
 
 The allocator-friendly containers are:
-- Vector: An array.
-- Array: A RefCounted vector.
-- HashMap: A hash map.
-- HashMapRef: A RefCounted hashmap.
-- RBTree: A red black tree.
-- DictionaryList: Similar to a MultiMap in C++, but implemented as a linear search array
+- `Vector`: An array.
+- `Array`: A `RefCounted` vector (allows containers to share ownership).
+- `HashMap`: A hash map.
+- `HashMapRef`: A `RefCounted` hashmap (allows containers to share ownership).
+- `RBTree`: A red black tree.
+- `DictionaryList`: Similar to a MultiMap in C++, but implemented as a linear search array
 
 The allocator-friendly lifetime management objects are:
-- RefCounted: Similar to shared_ptr in C++, it's also compatible with interface casting.
-- Unique: Similar to unique_ptr in C++, by default it will consider objects to have been created with `new`, but if a custom allocator is specified it will destroy an object pointer allocated from the same allocator with `.free`.
+- `RefCounted`: Similar to shared_ptr in C++, it's also compatible with interface casting.
+- `Unique`: Similar to unique_ptr in C++, by default it will consider objects to have been created with `new`, but if a custom allocator is specified it will destroy an object pointer allocated from the same allocator with `.free`.
 
 
 ### Examples:
 
 
-You can use `GC`, `ThisThread`, `ThisFiber`, `SecureMem` for array or object allocations!
+You can use `AppMem`, `ThisThread`, `ThisFiber`, `SecureMem` for array or object allocations!
 
 ```D
  A a = ThisThread.alloc!A();
