@@ -34,7 +34,7 @@ You can use `GC`, `ThisThread`, `ThisFiber`, `SecureMem` for array or object all
  // do something with "a"
  ThisThread.free(a);
 
- ubyte[] ub = GC.alloc!(ubyte[])(150);
+ ubyte[] ub = AppMem.alloc!(ubyte[])(150);
  assert(ub.length == 150);
 ```
 
