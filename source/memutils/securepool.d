@@ -104,8 +104,6 @@ public:
 					return slot;
 				}
 				
-				// import string;
-				
 				if (slot.length >= (n + padding_for_alignment(cast(size_t)slot.ptr, alignment) ) &&
 					( !best_fit_ref || (best_fit.length > slot.length) ) )
 				{

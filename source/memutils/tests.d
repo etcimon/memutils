@@ -2,6 +2,7 @@
 import memutils.all;
 
 import std.stdio : writeln;
+static if (HasDebugAllocations):
 
 // Test hashmap, freelists
 void hashmapFreeListTest(ALLOC)() {

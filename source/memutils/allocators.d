@@ -27,6 +27,7 @@ import memutils.freelist;
 import memutils.utils : Malloc;
 
 static if (HasDebugAllocations) {
+	pragma(msg, "Memory debugger enabled");
 	alias LocklessAllocator = DebugAllocator!(AutoFreeListAllocator!(MallocAllocator));
 	static if (HasCryptoSafe)
 		alias CryptoSafeAllocator = DebugAllocator!(SecureAllocator!(AutoFreeListAllocator!(MallocAllocator)));

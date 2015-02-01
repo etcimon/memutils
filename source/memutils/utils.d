@@ -164,7 +164,7 @@ static:
 		auto ret = ObjectAllocator!(T, THIS).alloc(args);
 		static if ((hasElaborateDestructor!T || __traits(hasMember, T, "__dtor") ) && THIS.stringof == "ThisFiber") {
 			auto allocator = getAllocator!ScopedFiberPool();
-			version(unittest) allocator.m_baseAlloc.onDestroy(&ret.__dtor);
+			static if (HasDebugAllocations) allocator.m_baseAlloc.onDestroy(&ret.__dtor);
 			else allocator.onDestroy(&ret.__dtor);
 		}
 		return ret;

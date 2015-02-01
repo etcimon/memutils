@@ -1,7 +1,8 @@
 ﻿module memutils.constants;
 
 package:
-
+version(unittest) enum HasUnittests = true;
+else			  enum HasUnittests = false;
 enum { // overhead allocator definitions, lazily loaded
 	NativeGC = 0x01, // instances are freed automatically when no references exist in the program's threads
 	LocklessFreeList = 0x02, // instances are owned by the creating thread thus must be freed by it
@@ -25,8 +26,13 @@ const SecurePool_MLock_Max = 524_287;
 version(Have_Botan_d) 	const HasBotan = true; 
 else 					const HasBotan = false;
 
-version(DebugAllocations) const HasDebugAllocations = true;
-else version(unittest)	  const HasDebugAllocations = true;
+version(EnableDebugger) const HasDebuggerEnabled = true;
+else					  const HasDebuggerEnabled = false;
+version(DisableDebugger)   const DisableDebugAllocations = true;
+else					const DisableDebugAllocations = false;
+
+static if (HasDebuggerEnabled && !DisableDebugAllocations ) const HasDebugAllocations = true;
+else static if (!DisableDebugAllocations && HasUnittests) const HasDebugAllocations = true;
 else					  const HasDebugAllocations = false;
 
 enum { // LogLevel
