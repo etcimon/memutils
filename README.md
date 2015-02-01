@@ -3,11 +3,11 @@
 The memutils library provides a set of 4 enhanced allocators tweaked for better performance depending on the scope.
 A new allocation syntax comes with many benefits, including the easy replacement of allocators.
 
-- AppMem : The AppMem Allocator pipes through the original garbage collection, but is integrated to support the new syntax and recommends manual management. If the `DebugAllocator` is disabled, automatic garbage collection works through this allocator but it will *not* call any explicit destructors.
-- ThisThread: This allocator is fine tuned for thread-local heap allocations and doesn't slow down due to locks or additional pressure on the GC.
-- ThisFiber: The Fiber Pool contains a list of destructors allocated through it and they are called when it goes out of scope. It is 
+- `AppMem` : The AppMem Allocator pipes through the original garbage collection, but is integrated to support the new syntax and recommends manual management. If the `DebugAllocator` is disabled, automatic garbage collection works through this allocator but it will *not* call any explicit destructors.
+- `ThisThread`: This allocator is fine tuned for thread-local heap allocations and doesn't slow down due to locks or additional pressure on the GC.
+- `ThisFiber`: The Fiber Pool contains a list of destructors allocated through it and they are called when it goes out of scope. It is 
 best used in a Fiber (Task) to prevent locking, GC pressure, and to release memory in the fastest way possible. 
-- SecureMem: When storing sensitive data such as private certificates, passwords or keys, the CryptoSafe allocator
+- `SecureMem`: When storing sensitive data such as private certificates, passwords or keys, the CryptoSafe allocator
 enhances safety by zeroising the memory after being freed, and optionally it can use a memory pool (SecurePool) 
 that doesn't get dumped to disk on a crash or during OS sleep/hibernation.
 
