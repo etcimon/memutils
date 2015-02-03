@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/etcimon/memutils.svg)](https://travis-ci.org/etcimon/memutils)
-
+ 
 The `memutils` library provides a set of 4 enhanced allocators tweaked for better performance depending on the scope.
 A new allocation syntax comes with many benefits, including the easy replacement of allocators.
 
