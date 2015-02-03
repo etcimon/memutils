@@ -23,9 +23,28 @@ The allocator-friendly lifetime management objects are:
 - `RefCounted`: Similar to shared_ptr in C++, it's also compatible with interface casting.
 - `Unique`: Similar to unique_ptr in C++, by default it will consider objects to have been created with `new`, but if a custom allocator is specified it will destroy an object pointer allocated from the same allocator with `.free`.
 
+The `RefCounted` object makes use of a new `mixin template`, available to replace the `alias this m_obj;` idiom, it can be found in `memutils.helpers`. It enables the proxying of operators (including operator overloads) from the underlying object. Type inference will not work for callback delegates used in methods such as `opApply`, but essentially it allows the most similar experience to base interfaces. 
+
 
 ### Examples:
 
+```D
+struct MyString {
+ mixin Embed!m_obj; // This object impersonates a string!
+ string m_obj;
+ 
+ // Custom methods extend the features of the `string` base type!
+ void toInt() { }
+}
+void main() { 
+ string ms = MyString.init; // implicit casting also works
+ MyString ms2 = MyString("Hello");
+ 
+ // You can "dereference" the underlying object with `opStar()`
+ assert(is(typeof(*ms2) == string)); 
+}
+```
+---------------
 
 You can use `AppMem`, `ThisThread`, `ThisFiber`, `SecureMem` for array or object allocations!
 
@@ -77,7 +96,7 @@ ownership, because objects marked @disable this(this) are not compatible with th
  ```D
  string gcVal;
  {
- 	Vector!(char, GC) data;
+ 	Vector!(char, AppMem) data;
  	data ~= "Hello there";
  	gcVal = data[].idup;
  }
@@ -97,5 +116,7 @@ ownership, because objects marked @disable this(this) are not compatible with th
  { Unique!A = a; }
  assert(a is null);
  ```
+ 
+ -------------
 
  See source/tests.d for more examples.
