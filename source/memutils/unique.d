@@ -16,6 +16,7 @@ import memutils.allocators;
 import memutils.constants;
 import memutils.utils;
 
+// TODO: Move release() into Embed!, and add a releaseCheck() for refCounted (cannot release > 1 reference) 
 struct Unique(T, ALLOC = void)
 {
 	/** Represents a reference to $(D T). Resolves to $(D T*) if $(D T) is a value type. */
@@ -106,7 +107,7 @@ public:
 	
 	~this()
 	{
-		debug(Unique) logTrace("Unique destructor of ", (_p is null)? null: _p);
+		//logError("Unique destructor of ", T.stringof);
 		static if (ALLOC.stringof != "void") {
 			if (_p !is null)
 				ObjectAllocator!(T, ALLOC).free(_p);

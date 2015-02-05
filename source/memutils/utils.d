@@ -3,10 +3,33 @@
 import core.thread : Fiber;	
 import std.traits : isPointer, hasIndirections, hasElaborateDestructor;
 import std.conv : emplace;
-import std.c.string : memset;
+import std.c.string : memset, memcpy;
 import memutils.allocators;
 import std.algorithm : startsWith;
 import memutils.constants;
+
+/** Unregister your fiber with this when you're done! This is very important! **/
+void destroyFiberPool(Fiber f = Fiber.getThis()) {
+	if (auto ptr = (f in g_fiberAlloc)) {
+		static if (typeof(ptr).stringof.startsWith("DebugAllocator")) {
+			ptr.m_baseAlloc.freeAll();
+			delete *ptr;
+		}
+		else ptr.freeAll();
+		g_fiberAlloc.remove(f);
+	}
+	else logError("Fiber not found");
+}
+
+private void registerFiberArray(T)(ref T arr) {
+	import std.range : ElementType;
+	// Add destructors to fiber pool
+	static if ((hasElaborateDestructor!(ElementType!T) || __traits(hasMember, ElementType!T, "__dtor") )) {
+		foreach (ref el; arr)
+			ThisFiber.addDtor(&el.__dtor);
+	}
+	ThisFiber.ignore(arr.ptr); // debugger fix
+}
 
 // TODO: Do I need this?
 /*FiberPool getFiberPool(Fiber f) {
@@ -23,17 +46,6 @@ import memutils.constants;
 	}
 }*/
 
-void destroyFiberPool(Fiber f = Fiber.getThis()) {
-	if (auto ptr = (f in g_fiberAlloc)) {
-		static if (typeof(ptr).stringof.startsWith("DebugAllocator")) {
-			ptr.m_baseAlloc.freeAll();
-			delete *ptr;
-		}
-		else ptr.freeAll();
-		g_fiberAlloc.remove(f);
-	}
-	else logError("Fiber not found");
-}
 import std.traits : isArray;
 
 struct AppMem {
@@ -104,6 +116,9 @@ T[] allocArray(T, ALLOC = ThisThread)(size_t n)
 		// TODO: Do I need to add range for GC.malloc too?
 		GC.addRange(mem.ptr, mem.length, typeid(T));
 	}
+
+
+
 	// don't touch the memory - all practical uses of this function will handle initialization.
 	return ret;
 }
@@ -161,13 +176,7 @@ static:
 	auto alloc(T, ARGS...)(auto ref ARGS args) 
 		if (!isArray!T)
 	{
-		auto ret = ObjectAllocator!(T, THIS).alloc(args);
-		static if ((hasElaborateDestructor!T || __traits(hasMember, T, "__dtor") ) && THIS.stringof == "ThisFiber") {
-			auto allocator = getAllocator!ScopedFiberPool();
-			static if (HasDebugAllocations) allocator.m_baseAlloc.onDestroy(&ret.__dtor);
-			else allocator.onDestroy(&ret.__dtor);
-		}
-		return ret;
+		return ObjectAllocator!(T, THIS).alloc(args);
 	}
 	
 	void free(T)(ref T* obj)
@@ -207,6 +216,23 @@ static:
 		scope(exit) arr = null;
 		freeArray!(ElementType!T, THIS)(arr);
 	}
+
+static if (ident == ScopedFiberPool):
+package:
+	void ignore(void* ptr) {
+		static if( HasDebugAllocations) {
+			auto allocator = getAllocator!ident();
+			allocator.ignore(ptr);
+		}
+	}
+
+	void addDtor(void delegate() dtor) {
+		auto allocator = getAllocator!ScopedFiberPool();
+		static if (HasDebugAllocations) allocator.m_baseAlloc.onDestroy(dtor);
+		else allocator.onDestroy(dtor);
+	}
+	
+	
 
 }
 

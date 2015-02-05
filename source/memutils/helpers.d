@@ -10,6 +10,8 @@ template UnConst(T) {
 	} else alias UnConst = T;
 }
 
+/// TODO: Imitate Unique! for all objects (assume dtor) with release()
+/// TODO: implement @override on underlying type T, and check for shadowed members.
 mixin template Embed(alias OBJ)
 {
 	alias TR = typeof(OBJ);

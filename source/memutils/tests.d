@@ -261,6 +261,16 @@ void highLevelAllocTest() {
 	assert(ub is null);
 }
 
+version(none) void borrowTest() {
+	string borrowed;
+	{
+		Vector!char myChars = "hello"; // = "string"
+		logDebug(myChars[]);
+		myChars[].borrow();
+	}
+	writeln(borrowed);
+}
+
 // TODO: test FiberPool, Circular buffer, Scoped
 unittest {
 	propagateTests!hashmapFreeListTest();
@@ -271,6 +281,8 @@ unittest {
 	propagateTests!refCountedCastTest();
 	propagateTests!circularBufferTest();
 	propagateTests!dictionaryListTest();
+
+	version(none) borrowTest();
 
 	highLevelAllocTest();
 }

@@ -82,4 +82,12 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 			m_blocks.remove(mem.ptr);
 		}
 	}
+
+	package void ignore(void* ptr) {
+		synchronized(this) {
+			size_t sz = m_blocks.get(cast(const) ptr, size_t.max);
+			m_bytes -= sz;
+			m_blocks.remove(ptr);
+		}
+	}
 }

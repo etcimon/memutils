@@ -33,6 +33,7 @@ struct RefCounted(T, ALLOC = ThisThread)
 	
 	const ~this()
 	{
+		// if (m_magic == 0) return;
 		dtor((cast(RefCounted*)&this));
 		(cast(RefCounted*)&this).m_magic = 0;
 	}

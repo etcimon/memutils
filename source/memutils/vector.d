@@ -20,6 +20,7 @@ template Array(T, ALLOC = ThisThread)
 }
 
 public alias SecureVector(T) = Vector!(T, SecureMem);
+// TODO: Remove implicit string casting for Vector!ubyte! Encourage use of Vector!char [].idup instead.
 
 /// An array that uses a custom allocator.
 struct Vector(T, ALLOC = ThisThread)
@@ -30,6 +31,10 @@ struct Vector(T, ALLOC = ThisThread)
 	
 	void opAssign()(auto ref Vector!(T, ALLOC) other) {
 		this.swap(other);
+	}
+
+	void opAssign()(ref T[] other) {
+		this[] = other[];
 	}
 	
 	// Payload cannot be copied
@@ -633,7 +638,14 @@ struct Vector(T, ALLOC = ThisThread)
 		_data._payload = _data._payload[0 .. $ - 1];
 	}
 	
-	void removeFront() { this.length = this.length - 1; }
+	void removeFront() { 
+	
+		enforce(!empty);
+		static if (hasElaborateDestructor!T)
+			.destroy(_data._payload[0]);
+	
+		_data._payload = _data._payload[1 .. $];
+	}
 	
 	/**
         Removes $(D howMany) values at the front or back of the
