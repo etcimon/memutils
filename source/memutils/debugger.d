@@ -24,6 +24,8 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	
 	void[] alloc(size_t sz)
 	{
+		assert(sz > 0, "Cannot serve a zero-length allocation");
+
 		//logDebug("Bytes allocated in ", Base.stringof, ": ", bytesAllocated());
 		auto ret = m_baseAlloc.alloc(sz);
 		synchronized(this) {
@@ -41,6 +43,7 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	
 	void[] realloc(void[] mem, size_t new_size)
 	{
+		assert(new_size > 0 && mem.length > 0, "Cannot serve a zero-length reallocation");
 		void[] ret;
 		size_t sz;
 		synchronized(this) {
@@ -62,6 +65,8 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	
 	void free(void[] mem)
 	{
+		assert(mem.length > 0, "Cannot serve a zero-length deallocation");
+
 		scope(failure) {
 
 			import backtrace.backtrace;

@@ -46,6 +46,8 @@ struct Vector(T, ALLOC = ThisThread)
 		// Convenience constructor
 		this()(auto ref T[] p) 
 		{ 
+			if (p.length == 0) return;
+
 			_capacity = p.length;
 			_payload = allocArray!(T, ALLOC)(p.length);
 
@@ -146,7 +148,7 @@ struct Vector(T, ALLOC = ThisThread)
 				_payload = _payload.ptr[0 .. _capacity];
 				_payload = reallocArray!(T, ALLOC)(_payload, elements)[0 .. len];
 			}
-			else
+			else if (elements > 0)
 				_payload = allocArray!(T, ALLOC)(elements)[0 .. _payload.length];
 
 			_capacity = elements;
@@ -756,27 +758,19 @@ struct Vector(T, ALLOC = ThisThread)
 			return false;
 		if (other_.length != length)
 			return false;
-		foreach  (const size_t i, const ref T t; _data._payload) {
-			if (t != other_[i])
-			{
-				return false;
-			}
-		}
-		return true;
+		// TODO: use the true types
+		return _data._payload[0 .. length] == other_._data._payload[0 .. length];
 	}
-	
+
 	bool opEquals()(auto const ref Vector!(T, ALLOC) other_) const {
-		if (_data._payload.length == 0)
+		if (other_.empty && empty())
 			return true;
+		else if (other_.empty)
+			return false;
 		if (other_.length != length)
 			return false;
-		foreach  (const size_t i, const ref T t; _data._payload) {
-			if (t != other_[i])
-			{
-				return false;
-			}
-		}
-		return true;
+
+		return _data._payload[0 .. length] == other_._data._payload[0 .. length];
 	}
 
 	bool opEquals()(auto const ref T[] other) {

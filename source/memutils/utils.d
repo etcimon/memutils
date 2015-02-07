@@ -103,13 +103,14 @@ template ObjectAllocator(T, ALLOC)
 /// Allocates an array without touching the memory.
 T[] allocArray(T, ALLOC = ThisThread)(size_t n)
 {
+
 	import core.memory : GC;
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
 
 	auto mem = allocator.alloc(T.sizeof * n);
 	auto ret = cast(T[])mem;
-
+	// logDebug("alloc ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
@@ -117,8 +118,6 @@ T[] allocArray(T, ALLOC = ThisThread)(size_t n)
 		// TODO: Do I need to add range for GC.malloc too?
 		GC.addRange(mem.ptr, mem.length, typeid(T));
 	}
-
-
 
 	// don't touch the memory - all practical uses of this function will handle initialization.
 	return ret;
@@ -129,9 +128,11 @@ T[] reallocArray(T, ALLOC = ThisThread)(T[] array, size_t n) {
 	assert(n > array.length, "Cannot reallocate to smaller sizes");
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
+	// logDebug("realloc before ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
 
 	auto mem = allocator.realloc(cast(void[]) array, T.sizeof * n);
 	auto ret = cast(T[])mem;
+	// logDebug("realloc after ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
 	
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
@@ -152,6 +153,7 @@ void freeArray(T, ALLOC = ThisThread)(auto ref T[] array, size_t max_destroy = s
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
 
+	// logDebug("free ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
