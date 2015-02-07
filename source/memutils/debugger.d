@@ -28,7 +28,7 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 		auto ret = m_baseAlloc.alloc(sz);
 		synchronized(this) {
 			assert(ret.length == sz, "base.alloc() returned block with wrong size.");
-			assert(m_blocks.get(cast(const)ret.ptr, size_t.max) == size_t.max, "base.alloc() returned block that is already allocated.");
+			assert(m_blocks.get(cast(const)ret.ptr, size_t.max) == size_t.max, "base.alloc() returned block that is already allocated: " ~ ret.ptr.to!string);
 			m_blocks[ret.ptr] = sz;
 			m_bytes += sz;
 			if( m_bytes > m_maxBytes ){

@@ -44,13 +44,17 @@ struct Vector(T, ALLOC = ThisThread)
 		T[] _payload;
 		
 		// Convenience constructor
-		this(T[] p) 
+		this()(auto ref T[] p) 
 		{ 
-			_capacity = p.length; 
+			_capacity = p.length;
 			_payload = allocArray!(T, ALLOC)(p.length);
-			
-			static if (isImplicitlyConvertible!(T, T))
-				_payload[0 .. p.length] = p[0 .. $];
+
+			static if (isImplicitlyConvertible!(T, T)) {
+				if (_payload.ptr is p.ptr && _payload.length == p.length)
+					p = null;
+				else
+					_payload[0 .. p.length] = p[0 .. $];
+			}
 			else
 			{
 				memcpy(_payload.ptr, p.ptr, T.sizeof*p.length);
@@ -60,7 +64,7 @@ struct Vector(T, ALLOC = ThisThread)
 		// Destructor releases array memory
 		~this() const
 		{
-			if (_capacity == 0)
+			if (_capacity == 0 || _payload.ptr is null)
 				return;
 			T[] data = cast(T[]) _payload.ptr[0 .. _capacity];
 			freeArray!(T, ALLOC)(data, _payload.length); // calls destructors and frees memory
@@ -137,7 +141,7 @@ struct Vector(T, ALLOC = ThisThread)
 
 			TRACE("Reserve ", length, " => ", elements, " elements.");
 
-			if (_payload) {
+			if (_capacity > 0) {
 				size_t len = _payload.length;
 				_payload = _payload.ptr[0 .. _capacity];
 				_payload = reallocArray!(T, ALLOC)(_payload, elements)[0 .. len];
@@ -217,10 +221,13 @@ struct Vector(T, ALLOC = ThisThread)
 	/**
         Constructor taking a number of items
      */
-	this(U)(U[] values...) 
+	this(U)(U[] values...) // TODO: overlap issue
 		if (isImplicitlyConvertible!(U, T))
 	{
-		_data = Data(cast(T[])values);
+		static if (is(T == U))
+			_data = Data(values);
+		else
+			_data = Data(cast(T[])values);
 	}
 	
 	/**

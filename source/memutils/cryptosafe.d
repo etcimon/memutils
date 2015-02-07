@@ -15,6 +15,7 @@ pragma(msg, "Enhanced memory security is enabled.");
 
 import memutils.allocators;
 import memutils.securepool;
+import memutils.debugger;
 
 final class SecureAllocator(Base : Allocator) : Allocator
 {
@@ -25,7 +26,7 @@ private:
 
 		__gshared SecurePool ms_zeroise;	
 		shared static this() { 
-			if (!ms_zeroise) ms_zeroise = new SecurePool;
+			if (!ms_zeroise) ms_zeroise = new SecurePool();
 		}
 	}
 public:
@@ -49,15 +50,23 @@ public:
 
 	void[] realloc(void[] mem, size_t n)
 	{
+		if (n <= mem.length)
+			return mem;
+		import std.c.string : memcpy, memset;
+
 		static if (HasBotan || HasSecurePool) {
-			import std.c.string : memcpy;
-			void[] new_mem = alloc(n);
-			memcpy(new_mem.ptr, mem.ptr, mem.length);
-			free(mem);
-			return new_mem;
-		} else {
-			return m_secondary.realloc(mem, n);
+			if (ms_zeroise.has(mem)) {
+				void[] p = ms_zeroise.alloc(n);
+				if (!p) 
+					p = m_secondary.alloc(n);
+				memcpy(p.ptr, mem.ptr, mem.length);
+				memset(mem.ptr, 0, mem.length);
+				ms_zeroise.free(mem);
+				return p;
+			}
 		}
+
+		return m_secondary.realloc(mem, n);
 	}
 
 	void free(void[] mem)
@@ -69,5 +78,5 @@ public:
 				return;
 		m_secondary.free(mem);
 	}
-	
+
 }

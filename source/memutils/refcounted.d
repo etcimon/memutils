@@ -159,8 +159,8 @@ struct RefCounted(T, ALLOC = ThisThread)
 	}
 
 
-	private void defaultInit() inout {
-		static if (is(TR == T*)) {
+	private void defaultInit() const {
+		static if (__traits(compiles, { this.opCall(); }())) {
 			if (!m_object) {
 				auto newObj = this.opCall();
 				(cast(RefCounted*)&this).m_object = newObj.m_object;

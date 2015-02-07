@@ -106,6 +106,7 @@ T[] allocArray(T, ALLOC = ThisThread)(size_t n)
 	import core.memory : GC;
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
+
 	auto mem = allocator.alloc(T.sizeof * n);
 	auto ret = cast(T[])mem;
 
@@ -128,6 +129,7 @@ T[] reallocArray(T, ALLOC = ThisThread)(T[] array, size_t n) {
 	assert(n > array.length, "Cannot reallocate to smaller sizes");
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
+
 	auto mem = allocator.realloc(cast(void[]) array, T.sizeof * n);
 	auto ret = cast(T[])mem;
 	
@@ -149,7 +151,7 @@ void freeArray(T, ALLOC = ThisThread)(auto ref T[] array, size_t max_destroy = s
 	import core.memory : GC;
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
-	
+
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	

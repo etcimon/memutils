@@ -95,10 +95,7 @@ public:
 				// If we have a perfect fit, use it immediately
 				if (slot.length == n && (cast(size_t)slot.ptr % alignment) == 0)
 				{
-					m_freelist.remove(slot);
-					import std.c.string : memset;
-					memset(slot.ptr, 0, slot.length);
-					
+					m_freelist.remove(slot);					
 					assert(cast(size_t)(slot.ptr - m_pool.ptr) % alignment == 0, "Returning correctly aligned pointer");
 					
 					return slot;
@@ -124,8 +121,6 @@ public:
 				} else {
 					m_freelist.remove(best_fit);
 				}
-				import std.c.string : memset;
-				memset(best_fit.ptr + alignment_padding, 0, n);
 
 				size_t offset = best_fit.ptr - m_pool.ptr;
 				
@@ -137,19 +132,26 @@ public:
 			return null;
 		}
 	}
-	
-	bool free(void[] mem)
-	{
-		
+
+	bool has(void[] mem) {
 		synchronized(m_mtx) {
-			import std.range : front, empty;
-			
 			if (!m_pool)
 				return false;
 			
 			if (!ptr_in_pool(m_pool, mem.ptr, mem.length))
 				return false;
-			
+		}
+		return true;
+	}
+
+	bool free(void[] mem)
+	{
+		if (!has(mem)) return false;
+
+		synchronized(m_mtx) {
+			import std.range : front, empty;
+
+
 			bool is_merged;
 			void[] combined;
 			
