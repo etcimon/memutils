@@ -39,7 +39,7 @@ alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, ALLOC = T
  * ignored on insertion.  If duplicates are allowed, then new elements are
  * inserted after all existing duplicate elements.
  */
-struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC)
+struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = ThisThread)
 	if(is(typeof(binaryFun!less(T.init, T.init))))
 {
 	@disable this(this);
@@ -62,7 +62,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC)
 		Node result;
 		static if(!allowDuplicates)
 			bool added = true;
-		
+
 		if(!_end.left)
 		{
 			_end.left = _begin = result = allocate(n);
@@ -146,13 +146,11 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC)
 	private Node   _end;
 	private Node   _begin;
 	private size_t _length;
-	
+
 	private void _defaultInitialize()
 	{
-		static bool setup;
-		if (!setup) {
+		if (!_end) {
 			_begin = _end = _root = allocate();
-			setup = true;
 		}
 	}
 	
@@ -560,6 +558,10 @@ assert(equal(rbt[], [5]));
 			// so we just get the next node.
 			return range(beg, beg.next);
 		}
+	}
+
+	this(size_t elems = 0) {
+		_defaultInitialize();
 	}
 
 	/**
