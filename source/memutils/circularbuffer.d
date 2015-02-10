@@ -12,7 +12,7 @@ import std.algorithm;
 import std.traits : hasElaborateDestructor, isBasicType;
 import memutils.utils;
 
-struct CircularBuffer(T, size_t N = 0, ALLOC = ThisThread) {
+struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	@disable this(this);
 
 	private {

@@ -21,14 +21,20 @@ enum : ubyte {
 	DEEP_MOVE = 3
 }
 
-
-// TODO: 	Move: use .move() if available, or make a copy of each item recursively.
-///			copy: use opAssign if available, or fall back on .dup for each item recursively
-///			deep_move: call borrow(MOVE) on each item recursively
-///			deep_copy: use .borrow(DEEP_COPY) if available, fall back on borrow(COPY)
+// TODO: For value types, arrays, use (static or overriden) .borrow() or .dup() (if .dup is marked @borrow), 
+// or opAssign as last resort
+// For reference types, seek underyling object's .borrow or @borrowable .dup or else copy the reference.
 
 import std.traits : isImplicitlyConvertible;
-T borrow(T)(in T val = null, in BorrowType btype = COPY) 
+
+// TODO: This should behave like `new T()` but with behavior of .borrow(), allocating from the PoolStack
+struct New(T) {
+	TR opCall(ARGS)(ARGS args ...) {
+		// allocate in the PoolStack
+	}
+}
+
+T borrow(T)(in T val, in BorrowType btype = COPY) 
 	if (is(T == class) || is(T == interface) || __traits(isAbstractClass, T))
 {
 	T ret;
@@ -60,14 +66,14 @@ T borrow(T)(in T val = null, in BorrowType btype = COPY)
 	return ret;
 }
 
-T* borrow(T)(in T val = T.init, in BorrowType btype = COPY)
+T* borrow(T)(in T val, in BorrowType btype = COPY)
 	if (is(T == struct))
 {
 	T* ret;
 	return borrow(ret);
 }
 
-T* borrow(T)(in T* val = null, in BorrowType btype = COPY) 
+T* borrow(T)(in T* val, in BorrowType btype = COPY) 
 	if (is(T == struct))
 {
 	T* ret;

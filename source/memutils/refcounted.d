@@ -7,7 +7,7 @@ import std.traits : hasIndirections, Unqual, isImplicitlyConvertible;
 import memutils.utils;
 import std.algorithm : countUntil;
 
-struct RefCounted(T, ALLOC = ThisThread)
+struct RefCounted(T, ALLOC = ThreadMem)
 {
 	import core.memory : GC;
 	mixin Embed!m_object;

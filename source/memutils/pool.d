@@ -13,6 +13,11 @@ import std.conv : emplace;
 import std.algorithm : min, max;
 import memutils.vector;
 
+// TODO: Write a PoolStack allocator that uses GC as secondary
+// It should be possible to push/pop/freeze Pool Allocators in it,
+// This will allow a ScopedPool to exist and the `New!` operations to use them
+// ex: auto pool = ScopedPool();
+
 final class PoolAllocator(Base : Allocator) : Allocator {
 	static struct Pool { Pool* next; void[] data; void[] remaining; }
 

@@ -13,7 +13,7 @@ import memutils.refcounted;
 
 public alias SecureArray(T) = Array!(T, SecureMem);
 
-template Array(T, ALLOC = ThisThread) 
+template Array(T, ALLOC = ThreadMem) 
 	if (!is (T == RefCounted!(Vector!(T, ALLOC), ALLOC)))
 {
 	alias Array = RefCounted!(Vector!(T, ALLOC), ALLOC);
@@ -23,10 +23,8 @@ public alias SecureVector(T) = Vector!(T, SecureMem);
 // TODO: Remove implicit string casting for Vector!ubyte! Encourage use of Vector!char [].idup instead.
 
 /// An array that uses a custom allocator.
-struct Vector(T, ALLOC = ThisThread)
-{
-	static if (ALLOC.stringof != "AppMem") enum NOGC = true;
-	
+struct Vector(T, ALLOC = ThreadMem)
+{	
 	@disable this(this);
 	
 	void opAssign()(auto ref Vector!(T, ALLOC) other) {
@@ -224,12 +222,13 @@ struct Vector(T, ALLOC = ThisThread)
         Constructor taking a number of items
      */
 	this(U)(U[] values...) // TODO: overlap issue
-		if (isImplicitlyConvertible!(U, T))
+		if (isImplicitlyConvertible!(U, T) && !is(T == U))
 	{
-		static if (is(T == U))
-			_data = Data(values);
-		else
-			_data = Data(cast(T[])values);
+		_data = Data(cast(T[])values);
+	}
+
+	this()(auto ref T[] values) {
+		_data = Data(values);
 	}
 	
 	/**

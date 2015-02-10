@@ -8,6 +8,10 @@ import memutils.allocators;
 import std.algorithm : startsWith;
 import memutils.constants;
 
+// TODO: Remove ThisFiber and replace with a PoolStack.
+// TODO: Write a ScopedPool util implemented as a PoolStack
+
+
 /** Unregister your fiber with this when you're done! This is very important! **/
 void destroyFiberPool(Fiber f = Fiber.getThis()) {
 	if (auto ptr = (f in g_fiberAlloc)) {
@@ -56,7 +60,7 @@ struct ThisFiber {
 	mixin ConvenienceAllocators!(ScopedFiberPool, typeof(this));
 }
 
-struct ThisThread {
+struct ThreadMem {
 	mixin ConvenienceAllocators!(LocklessFreeList, typeof(this));
 }
 
@@ -101,7 +105,7 @@ template ObjectAllocator(T, ALLOC)
 }
 
 /// Allocates an array without touching the memory.
-T[] allocArray(T, ALLOC = ThisThread)(size_t n)
+T[] allocArray(T, ALLOC = ThreadMem)(size_t n)
 {
 
 	import core.memory : GC;
@@ -123,7 +127,7 @@ T[] allocArray(T, ALLOC = ThisThread)(size_t n)
 	return ret;
 }
 
-T[] reallocArray(T, ALLOC = ThisThread)(T[] array, size_t n) {
+T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	import core.memory : GC;
 	assert(n > array.length, "Cannot reallocate to smaller sizes");
 	mixin(translateAllocator());
@@ -147,7 +151,7 @@ T[] reallocArray(T, ALLOC = ThisThread)(T[] array, size_t n) {
 	return ret;
 }
 
-void freeArray(T, ALLOC = ThisThread)(auto ref T[] array, size_t max_destroy = size_t.max)
+void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = size_t.max)
 {
 	import core.memory : GC;
 	mixin(translateAllocator());

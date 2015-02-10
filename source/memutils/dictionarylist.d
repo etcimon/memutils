@@ -15,7 +15,7 @@ import memutils.vector;
 import std.conv : to;
 import std.exception : enforce;
 
-alias DictionaryListRef(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, ALLOC, case_sensitive, NUM_STATIC_FIELDS), ALLOC);
+alias DictionaryListRef(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, ALLOC, case_sensitive, NUM_STATIC_FIELDS), ALLOC);
 
 /**
  * 
@@ -27,10 +27,8 @@ alias DictionaryListRef(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = tr
 
     Insertion and lookup has O(n) complexity.
 */
-struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) {
+struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) {
 	@disable this(this);
-
-	static if (ALLOC.stringof != "AppMem") enum NOGC = true;
 
 	import std.typecons : Tuple;
 	
@@ -89,7 +87,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 		}
 		
 		for (size_t i = 0; i < m_extendedFields.length;) {
-			if (m_fields[i].keyCheckSum == keysum && matches(m_fields[i].key, key))
+			if (m_extendedFields[i].keyCheckSum == keysum && matches(m_extendedFields[i].key, key))
 				removeFromArrayIdx(m_extendedFields, i);
 			else i++;
 		}
@@ -139,13 +137,13 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 		import std.array;
 		auto ret = Vector!(ValueType, ALLOC)(0);
 		this.opApply( (k, const ref v) {
+				static if (is(ValueType == string)) logDebug("Checking field: ", v);
 				//logTrace("Looping ", k, " => ", v);
 				if (matches(key, k)) {
 					//logDebug("Appending: ", v);
 					ret ~= v;
-					return 0;
 				}
-				return 1;
+				return 0;
 			});
 		//logDebug("Finished getValuesAt with: ", ret[]);
 		return ret.move();
@@ -154,8 +152,10 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 	/// ditto
 	void getValuesAt(in KeyType key, scope void delegate(const(ValueType)) del)
 	const {
+		logDebug("Get values at 2");
 		uint keysum = computeCheckSumI(key);
 		foreach (ref f; m_fields[0 .. m_fieldCount]) {
+			if (f == Field.init) continue;
 			if (f.keyCheckSum != keysum) continue;
 			if (matches(f.key, key)) del(f.value);
 		}
@@ -213,7 +213,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 	int opApply(int delegate(KeyType key, ref ValueType val) del)
 	{
 		foreach (ref kv; m_fields[0 .. m_fieldCount]) {
-			logTrace("Looping: ", kv, " 0 .. ", m_fieldCount);
+			if (kv == Field.init) return 0;
 			if (auto ret = del(kv.key, kv.value))
 				return ret;
 		}
@@ -227,6 +227,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 	int opApply(int delegate(const ref KeyType key, const ref ValueType val) del) const
 	{
 		foreach (ref kv; m_fields[0 .. m_fieldCount]) {
+			if (kv == Field.init) return 0;
 			if (auto ret = del(kv.key, kv.value))
 				return ret;
 		}
@@ -278,7 +279,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThisThread, bool case_sensitive = true
 			m_extendedFields = m_extendedFields.ptr[0 .. m_extendedFields.length + n];
 			return;
 		}
-		if (m_extendedFields.ptr !is null)
+		if (m_extendedFields.length > 0)
 		{
 			size_t oldsz = m_extendedFields.length;
 			m_extendedFields = m_extendedFields.ptr[0 .. m_extendedFieldCount];

@@ -19,7 +19,7 @@ import memutils.vector;
 import memutils.constants;
 import memutils.utils;
 
-alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, ALLOC = ThisThread) = RefCounted!(RBTree!(T, less, allowDuplicates, ALLOC));
+alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, ALLOC = ThreadMem) = RefCounted!(RBTree!(T, less, allowDuplicates, ALLOC));
 
 /**
  * All inserts, removes, searches, and any function in general has complexity
@@ -39,12 +39,10 @@ alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, ALLOC = T
  * ignored on insertion.  If duplicates are allowed, then new elements are
  * inserted after all existing duplicate elements.
  */
-struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = ThisThread)
+struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = ThreadMem)
 	if(is(typeof(binaryFun!less(T.init, T.init))))
 {
 	@disable this(this);
-
-	static if (ALLOC.stringof != "AppMem") enum NOGC = true;
 
 	import std.range : Take;
 	import std.typetuple : allSatisfy;
@@ -588,6 +586,7 @@ assert(equal(rbt[], [5]));
 	}
 
 	~this() {
+		if (!_end) return;
 		clear();
 		ObjectAllocator!(RBNode!(Elem, ALLOC), ALLOC).free(_root);
 	}

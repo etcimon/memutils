@@ -17,9 +17,9 @@ import memutils.allocators;
 import memutils.utils;
 
 
-alias HashMapRef(Key, Value, ALLOC = ThisThread) = RefCounted!(HashMap!(Key, Value, ALLOC), ALLOC);
+alias HashMapRef(Key, Value, ALLOC = ThreadMem) = RefCounted!(HashMap!(Key, Value, ALLOC), ALLOC);
 
-struct HashMap(Key, Value, ALLOC = ThisThread)
+struct HashMap(Key, Value, ALLOC = ThreadMem)
 {
 	@disable this(this);
 

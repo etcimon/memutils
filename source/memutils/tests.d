@@ -214,7 +214,7 @@ void propagateTests(alias fct)() {
 	logDebug("Testing ", fct.stringof);
 	fct!AppMem();
 	fct!SecureMem();
-	fct!ThisThread();
+	fct!ThreadMem();
 	Fiber f;
 	f = new Fiber(delegate { fct!ThisFiber(); });
 	f.call();
@@ -229,9 +229,9 @@ void highLevelAllocTest() {
 			a = 0;
 		}
 	}
-	A a = ThisThread.alloc!A();
+	A a = ThreadMem.alloc!A();
 	a.a = 10;
-	ThisThread.free(a);
+	ThreadMem.free(a);
 	assert(!a);
 
 	Fiber f;
@@ -252,11 +252,11 @@ void highLevelAllocTest() {
 
 	assert(appAllocated().a == 10);
 
-	ubyte[] ub = ThisThread.alloc!(ubyte[])(150);
+	ubyte[] ub = ThreadMem.alloc!(ubyte[])(150);
 	
 	assert(ub.length == 150);
 	ub[50] = 'a';
-	ThisThread.free(ub);
+	ThreadMem.free(ub);
 	assert(ub is null);
 }
 
