@@ -33,7 +33,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	
 	const ~this()
 	{
-		// if (m_magic == 0) return;
+		//logDebug("RefCounted dtor: ", T.stringof);
 		dtor((cast(RefCounted*)&this));
 		(cast(RefCounted*)&this).m_magic = 0;
 	}
@@ -99,6 +99,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		checkInvariants();
 		if( m_object ){
 			if( --(*m_refCount) == 0 ){
+				//logDebug("RefCounted clear: ", T.stringof);
 				logTrace("Clearing Object: ", cast(void*)m_object);
 				if (m_free)
 					m_free(cast(void*)&this);
@@ -116,12 +117,14 @@ struct RefCounted(T, ALLOC = ThreadMem)
 
 	bool opCast(U : bool)() const nothrow
 	{
+		//try logDebug("RefCounted opcast: bool ", T.stringof); catch {}
 		return !(m_object is null && !m_refCount && !m_free);
 	}
 
 	U opCast(U)() const nothrow
 		if (__traits(hasMember, U, "isRefCounted") && (isImplicitlyConvertible!(U.T, T) || isImplicitlyConvertible!(T, U.T)))
 	{
+		//try logDebug("RefCounted opcast: ", T.stringof, " => ", U.stringof); catch {}
 		assert(U.sizeof == typeof(this).sizeof, "Error, U: "~ U.sizeof.to!string~ " != this: " ~ typeof(this).sizeof.to!string);
 		try { 
 			U ret = U.init;
@@ -174,6 +177,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	
 	private void checkInvariants()
 	const {
+		if (m_magic != 0x1EE75817) logDebug("CheckInvariants failed ", T.stringof);
 		assert(m_magic == 0x1EE75817, "Magic number of " ~ T.stringof ~ " expected 0x1EE75817, set to: " ~ (cast(void*)m_magic).to!string);
 		assert(!m_object || refCount > 0, (!m_object) ? "No m_object" : "Zero Refcount: " ~ refCount.to!string);
 	}

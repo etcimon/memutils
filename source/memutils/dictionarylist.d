@@ -152,7 +152,6 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	/// ditto
 	void getValuesAt(in KeyType key, scope void delegate(const(ValueType)) del)
 	const {
-		logDebug("Get values at 2");
 		uint keysum = computeCheckSumI(key);
 		foreach (ref f; m_fields[0 .. m_fieldCount]) {
 			if (f == Field.init) continue;

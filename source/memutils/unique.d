@@ -79,7 +79,7 @@ public:
 	
 	void opAssign()(auto ref TR p)
 	{
-		destroy(this);
+		if (_p) destroy(this);
 		_p = p;
 		p = null;
 		assert(p is null);
@@ -100,14 +100,14 @@ public:
 	{
 		debug(Unique) logTrace("Unique opAssign converting from ", U.stringof);
 		// first delete any resource we own
-		destroy(this);
+		if (_p) destroy(this);
 		_p = u._p;
 		u._p = null;
 	}
 	
 	~this()
 	{
-		//logError("Unique destructor of ", T.stringof);
+		// logError("Unique destructor of ", T.stringof, " : ", cast(void*)_p);
 		static if (ALLOC.stringof != "void") {
 			if (_p !is null)
 				ObjectAllocator!(T, ALLOC).free(_p);

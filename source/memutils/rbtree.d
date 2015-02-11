@@ -275,6 +275,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = Thre
      */
 	void clear()
 	{
+		_defaultInitialize();
 		logTrace("Clearing rbtree");
 		while (length > 0)
 			removeAny();

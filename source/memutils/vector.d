@@ -28,7 +28,8 @@ struct Vector(T, ALLOC = ThreadMem)
 	@disable this(this);
 	
 	void opAssign()(auto ref Vector!(T, ALLOC) other) {
-		this.swap(other);
+		if (other.ptr !is this.ptr)
+			this.swap(other);
 	}
 
 	void opAssign()(ref T[] other) {
@@ -46,14 +47,15 @@ struct Vector(T, ALLOC = ThreadMem)
 		{ 
 			if (p.length == 0) return;
 
-			_capacity = p.length;
-			_payload = allocArray!(T, ALLOC)(p.length);
+			length = p.length;
 
 			static if (isImplicitlyConvertible!(T, T)) {
-				if (_payload.ptr is p.ptr && _payload.length == p.length)
+				if (_payload.ptr is p.ptr && _payload.length == p.length) {
 					p = null;
-				else
-					_payload[0 .. p.length] = p[0 .. $];
+				}
+				else {
+					_payload[] = p[0 .. $]; // todo: use emplace?
+				}
 			}
 			else
 			{
@@ -118,7 +120,7 @@ struct Vector(T, ALLOC = ThreadMem)
 				reserve(newLength);
 				_payload = _payload.ptr[0 .. newLength];
 				static if (!isImplicitlyConvertible!(T, T)) {
-					T t;
+					T t = T();
 					foreach (size_t i; startEmplace .. length) 
 						memcpy((cast(void*)_payload.ptr) + i * T.sizeof, &t, T.sizeof); 
 					
@@ -221,16 +223,12 @@ struct Vector(T, ALLOC = ThreadMem)
 	/**
         Constructor taking a number of items
      */
-	this(U)(U[] values...) // TODO: overlap issue
-		if (isImplicitlyConvertible!(U, T) && !is(T == U))
+	this(U)(U[] values...)
+		if (isImplicitlyConvertible!(U, T))
 	{
 		_data = Data(cast(T[])values);
 	}
 
-	this()(auto ref T[] values) {
-		_data = Data(values);
-	}
-	
 	/**
         Constructor taking an input range
      */
@@ -244,7 +242,8 @@ struct Vector(T, ALLOC = ThreadMem)
 	 * Move Constructor
 	*/
 	this()(auto ref typeof(this) other) {
-		this.swap(other);
+		if (this.ptr !is other.ptr)
+			this.swap(other);
 	}
 
 	/**
@@ -255,8 +254,10 @@ struct Vector(T, ALLOC = ThreadMem)
      */
 	@property Vector!(T, ALLOC) dup() const
 	{
-		static if (__traits(compiles, { T a; T b; a = b; } ()))
-			return Vector!(T, ALLOC)(cast(T[])_data._payload);
+		static if (__traits(compiles, { T a; T b; a = b; } ())) {
+			auto ret = Vector!(T, ALLOC)(cast(T[])_data._payload);
+			return ret.move;
+		}
 		else static if (__traits(hasMember, T, "dup")) // Element is @disable this(this) but has dup()
 		{
 			Vector!(T, ALLOC) vec = Vector!(T, ALLOC)(length);
@@ -432,10 +433,10 @@ struct Vector(T, ALLOC = ThreadMem)
 			_data.length = value._data.length;
 			_data._payload[] = value._data._payload[];
 		}
-		else {
+		else static if (isImplicitlyConvertible!(T, ElementType!Stuff)) {
 			_data.length = value.length;
 			_data._payload[] = cast(T[]) value;
-		}
+		} else static assert(false, "Can't convert " ~ Stuff.stringof ~ " to " ~ T.stringof ~ "[]");
 	}
 	
 	/// ditto
