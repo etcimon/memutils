@@ -17,6 +17,7 @@ import memutils.constants;
 import memutils.utils;
 import std.conv : to;
 
+enum DebugUnique = false;
 
 // TODO: Move release() into Embed!, and add a releaseCheck() for refCounted (cannot release > 1 reference) 
 struct Unique(T, ALLOC = void)
@@ -64,7 +65,7 @@ public:
 	this(U)(Unique!U u)
 		if (is(u.TR:TR))
 	{
-		debug(Unique) logTrace("Unique constructor converting from ", U.stringof);
+		// logTrace("Unique constructor converting from ", U.stringof);
 		_p = u._p;
 		u._p = null;
 	}
@@ -80,8 +81,10 @@ public:
 		if (_p) destroy(this);
 		if (!p) return;
 		//logDebug("Unique ctor of ", T.stringof, " : ", ptr.to!string);
-		assert(ptr !in ptree, "Already owned pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
-		ptree.insert(ptr);
+		static if (HasDebugAllocations && DebugUnique) {
+			assert(ptr !in ptree, "Already owned pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
+			ptree.insert(ptr);
+		}
 		_p = p;
 		p = null;
 	}
@@ -115,18 +118,24 @@ public:
 		static if (ALLOC.stringof != "void") {
 			if (_p !is null) {
 				//logDebug("ptr in ptree: ", ptr in ptree);
-				assert(ptr in ptree);
-				ptree.remove(ptr);
-				memset(ptr, 0, AllocSize!T);
+
+				static if (HasDebugAllocations && DebugUnique) {
+					assert(ptr in ptree);
+					ptree.remove(ptr);
+					debug memset(ptr, 0, AllocSize!T);
+				}
 				ObjectAllocator!(T, ALLOC).free(_p);
 			}
 		}
 		else {
 			if (_p !is null) {
 				//logDebug("ptr in ptree: ", ptr in ptree);
-				assert(ptr in ptree);
-				ptree.remove(ptr);
-				memset(ptr, 0, AllocSize!T);
+
+				static if (HasDebugAllocations && DebugUnique) {
+					assert(ptr in ptree);
+					ptree.remove(ptr);
+					debug memset(ptr, 0, AllocSize!T);
+				}
 				delete _p;
 			}
 		}
@@ -151,9 +160,11 @@ public:
 	{
 		//logDebug("Drop");
 		if (!_p) return;
-		assert(ptr in ptree);
+		static if (HasDebugAllocations && DebugUnique) {
+			assert(ptr in ptree);
+			ptree.remove(ptr);
+		}
 		_p = null;
-		ptree.remove(ptr);
 	}
 	
 	/** Forwards member access to contents. */
@@ -185,11 +196,13 @@ private:
 			return cast(void*)&_p;
 	}
 
-	import memutils.rbtree;
-	static RBTree!(void*) ptree;
+	static if (HasDebugAllocations && DebugUnique) {
+		import memutils.rbtree;
+		static RBTree!(void*) ptree;
 
-	static this() {
-		ptree = RBTree!(void*)();
-		ptree.clear();
+		static this() {
+			ptree = RBTree!(void*)();
+			ptree.clear();
+		}
 	}
 }

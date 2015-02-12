@@ -76,7 +76,7 @@ version(Windows) {
 
 final class SecurePool
 {
-	__gshared immutable size_t alignment = Allocator.alignment;
+	__gshared immutable size_t alignment = 0x08;
 public:
 	void[] alloc(size_t n)
 	{

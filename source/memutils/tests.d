@@ -5,7 +5,6 @@ static if (HasDebugAllocations):
 
 // Test hashmap, freelists
 void hashmapFreeListTest(ALLOC)() {
-	Fiber f = Fiber.getThis();
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
 	{
 		HashMapRef!(string, string, ALLOC) hm;
