@@ -125,7 +125,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		if (__traits(hasMember, U, "isRefCounted") && (isImplicitlyConvertible!(U.T, T) || isImplicitlyConvertible!(T, U.T)))
 	{
 		//try logDebug("RefCounted opcast: ", T.stringof, " => ", U.stringof); catch {}
-		assert(U.sizeof == typeof(this).sizeof, "Error, U: "~ U.sizeof.to!string~ " != this: " ~ typeof(this).sizeof.to!string);
+		static assert(U.sizeof == typeof(this).sizeof, "Error, U: "~ U.sizeof.to!string~ " != this: " ~ typeof(this).sizeof.to!string);
 		try { 
 			U ret = U.init;
 			ret.m_object = cast(U.TR)this.m_object;

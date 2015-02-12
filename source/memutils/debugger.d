@@ -67,12 +67,6 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	{
 		assert(mem.length > 0, "Cannot serve a zero-length deallocation");
 
-		scope(failure) {
-
-			import backtrace.backtrace;
-			import std.stdio : stdout;
-			printPrettyTrace(stdout, PrintOptions.init, 3); 
-		}
 		size_t sz;
 		synchronized(this) {
 			sz = m_blocks.get(cast(const)mem.ptr, size_t.max);

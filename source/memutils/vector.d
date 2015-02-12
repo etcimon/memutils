@@ -108,7 +108,7 @@ struct Vector(T, ALLOC = ThreadMem)
 					// Zero out unused capacity to prevent gc from seeing
 					// false pointers
 					static if (hasIndirections!T)
-						memset(_payload.ptr + (newLength*T.sizeof), 0, (_payload.length - newLength) * T.sizeof);
+						memset(_payload.ptr + newLength, 0, (_payload.length - newLength) * T.sizeof);
 				}
 				_payload = _payload.ptr[0 .. newLength];
 				return;
@@ -122,7 +122,7 @@ struct Vector(T, ALLOC = ThreadMem)
 				static if (!isImplicitlyConvertible!(T, T)) {
 					T t = T();
 					foreach (size_t i; startEmplace .. length) 
-						memcpy((cast(void*)_payload.ptr) + i * T.sizeof, &t, T.sizeof); 
+						memcpy(_payload.ptr + i, &t, T.sizeof); 
 					
 				} else
 					initializeAll(_payload.ptr[startEmplace .. length]);
@@ -166,7 +166,7 @@ struct Vector(T, ALLOC = ThreadMem)
 			
 			T* t = &stuff;
 			
-			memcpy((cast(void*)_payload.ptr) + _payload.length * T.sizeof, t, T.sizeof);
+			memcpy(_payload.ptr + _payload.length, t, T.sizeof);
 			memset(t, 0, T.sizeof);
 			_payload = _payload.ptr[0 .. _payload.length + 1];
 			
@@ -233,7 +233,7 @@ struct Vector(T, ALLOC = ThreadMem)
         Constructor taking an input range
      */
 	this(Stuff)(Stuff stuff)
-		if (isInputRange!Stuff && isImplicitlyConvertible!(ElementType!Stuff, T) && !is(Stuff == T[]))
+		if (isInputRange!Stuff && isImplicitlyConvertible!(UnConst!(ElementType!Stuff), T) && !is(Stuff == ElementType!Stuff[]))
 	{
 		insertBack(stuff);
 	}
@@ -244,6 +244,10 @@ struct Vector(T, ALLOC = ThreadMem)
 	this()(auto ref typeof(this) other) {
 		if (this.ptr !is other.ptr)
 			this.swap(other);
+		else {
+			typeof(this) ini;
+			other.swap(ini);
+		}
 	}
 
 	/**

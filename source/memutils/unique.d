@@ -107,7 +107,7 @@ public:
 	
 	~this()
 	{
-		// logError("Unique destructor of ", T.stringof, " : ", cast(void*)_p);
+		//logTrace("Unique destructor of ", T.stringof, " : ", cast(void*)_p);
 		static if (ALLOC.stringof != "void") {
 			if (_p !is null)
 				ObjectAllocator!(T, ALLOC).free(_p);
