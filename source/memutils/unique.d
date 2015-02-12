@@ -17,7 +17,7 @@ import memutils.constants;
 import memutils.utils;
 import std.conv : to;
 
-enum DebugUnique = false;
+enum DebugUnique = true;
 
 // TODO: Move release() into Embed!, and add a releaseCheck() for refCounted (cannot release > 1 reference) 
 struct Unique(T, ALLOC = void)
@@ -82,7 +82,13 @@ public:
 		if (!p) return;
 		//logDebug("Unique ctor of ", T.stringof, " : ", ptr.to!string);
 		static if (HasDebugAllocations && DebugUnique) {
-			assert(ptr !in ptree, "Already owned pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
+			if(ptr in ptree)
+			{
+				import backtrace.backtrace;
+				import std.stdio : stdout;
+				printPrettyTrace(stdout);
+				assert(false, "Already owned pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
+			}
 			ptree.insert(ptr);
 		}
 		_p = p;
@@ -122,9 +128,12 @@ public:
 				static if (HasDebugAllocations && DebugUnique) {
 					assert(ptr in ptree);
 					ptree.remove(ptr);
-					debug memset(ptr, 0, AllocSize!T);
 				}
+
 				ObjectAllocator!(T, ALLOC).free(_p);
+
+				static if (HasDebugAllocations && DebugUnique)
+					debug memset(ptr, 0, AllocSize!T);
 			}
 		}
 		else {
@@ -132,11 +141,16 @@ public:
 				//logDebug("ptr in ptree: ", ptr in ptree);
 
 				static if (HasDebugAllocations && DebugUnique) {
-					assert(ptr in ptree);
+					import backtrace.backtrace;
+					import std.stdio : stdout;
+					if (ptr !in ptree){ printPrettyTrace(stdout); assert(false); }
 					ptree.remove(ptr);
-					debug memset(ptr, 0, AllocSize!T);
 				}
-				delete _p;
+
+				destroy(_p);
+
+				static if (HasDebugAllocations && DebugUnique)
+					debug memset(ptr, 0, AllocSize!T);
 			}
 		}
 
@@ -198,10 +212,10 @@ private:
 
 	static if (HasDebugAllocations && DebugUnique) {
 		import memutils.rbtree;
-		static RBTree!(void*) ptree;
+		static RBTree!(void*, "a < b", true, Malloc) ptree;
 
 		static this() {
-			ptree = RBTree!(void*)();
+			ptree = RBTree!(void*, "a < b", true, Malloc)();
 			ptree.clear();
 		}
 	}
