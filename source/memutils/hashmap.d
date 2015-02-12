@@ -23,8 +23,6 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 {
 	@disable this(this);
 
-	static if (ALLOC.stringof != "AppMem" && !hasIndirections!TableEntry) enum NOGC = true;
-
 	alias Traits = DefaultHashMapTraits!Key;
 	struct TableEntry {
 		UnConst!Key key;

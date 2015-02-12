@@ -646,9 +646,9 @@ struct RBNode(V, ALLOC)
 	/**
      * Get the left child
      */
-	@property inout(Node) left() inout
+	@property Node left() const
 	{
-		return _left;
+		return cast(Node)_left;
 	}
 	
 	/**

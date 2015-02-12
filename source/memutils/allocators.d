@@ -43,7 +43,11 @@ else {
 }
 
 interface Allocator {
-	enum size_t alignment = 0x10;
+	static if (HasSecurePool)
+		enum size_t alignment = 0x08;
+	else
+		enum size_t alignment = 0x10;
+
 	enum size_t alignmentMask = alignment-1;
 	
 	void[] alloc(size_t sz)

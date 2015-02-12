@@ -15,6 +15,8 @@ module memutils.unique;
 import memutils.allocators;
 import memutils.constants;
 import memutils.utils;
+import std.conv : to;
+
 
 // TODO: Move release() into Embed!, and add a releaseCheck() for refCounted (cannot release > 1 reference) 
 struct Unique(T, ALLOC = void)
@@ -34,8 +36,7 @@ public:
     */
 	this(inout TR p)
 	{
-		debug(Unique) logTrace("Unique constructor with rvalue");
-		_p = cast(TR)p;
+		opAssign(cast(TR)p);
 	}
 	/**
     Constructor that takes an lvalue. It nulls its source.
@@ -44,10 +45,7 @@ public:
     */
 	this(ref TR p)
 	{
-		_p = p;
-		debug(Unique) logTrace("Unique constructor nulling source");
-		p = null;
-		assert(p is null);
+		opAssign(p);
 	}
 	
 	/**
@@ -80,9 +78,12 @@ public:
 	void opAssign()(auto ref TR p)
 	{
 		if (_p) destroy(this);
+		if (!p) return;
+		//logDebug("Unique ctor of ", T.stringof, " : ", ptr.to!string);
+		assert(ptr !in ptree, "Already owned pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
+		ptree.insert(ptr);
 		_p = p;
 		p = null;
-		assert(p is null);
 	}
 	/*
     void opAssign(U)(in Unique!U p)
@@ -107,15 +108,29 @@ public:
 	
 	~this()
 	{
-		//logTrace("Unique destructor of ", T.stringof, " : ", cast(void*)_p);
+		//logDebug("Unique destructor of ", T.stringof, " : ", cast(void*)_p);
+		import std.c.string : memset;
+
+
 		static if (ALLOC.stringof != "void") {
-			if (_p !is null)
+			if (_p !is null) {
+				//logDebug("ptr in ptree: ", ptr in ptree);
+				assert(ptr in ptree);
+				ptree.remove(ptr);
+				memset(ptr, 0, AllocSize!T);
 				ObjectAllocator!(T, ALLOC).free(_p);
+			}
 		}
 		else {
-			if (_p !is null)
+			if (_p !is null) {
+				//logDebug("ptr in ptree: ", ptr in ptree);
+				assert(ptr in ptree);
+				ptree.remove(ptr);
+				memset(ptr, 0, AllocSize!T);
 				delete _p;
+			}
 		}
+
 		_p = null;
 	}
 	/** Returns whether the resource exists. */
@@ -127,16 +142,18 @@ public:
 	/** Transfer ownership to a $(D Unique) rvalue. Nullifies the current contents. */
 	Unique release()
 	{
-		debug(Unique) logTrace("Release");
-		auto u = Unique(_p);
-		assert(_p is null);
-		debug(Unique) logTrace("return from Release");
-		return u;
+		//logDebug("Release");
+		if (!_p) return Unique();
+		return Unique(_p);
 	}
 	
 	void drop()
 	{
+		//logDebug("Drop");
+		if (!_p) return;
+		assert(ptr in ptree);
 		_p = null;
+		ptree.remove(ptr);
 	}
 	
 	/** Forwards member access to contents. */
@@ -160,4 +177,19 @@ public:
 	
 private:
 	TR _p;
+
+	@property void* ptr() const {
+		static if (is(TR == T*))
+			return cast(void*)_p;
+		else
+			return cast(void*)&_p;
+	}
+
+	import memutils.rbtree;
+	static RBTree!(void*) ptree;
+
+	static this() {
+		ptree = RBTree!(void*)();
+		ptree.clear();
+	}
 }

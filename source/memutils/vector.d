@@ -148,9 +148,9 @@ struct Vector(T, ALLOC = ThreadMem)
 				_payload = _payload.ptr[0 .. _capacity];
 				_payload = reallocArray!(T, ALLOC)(_payload, elements)[0 .. len];
 			}
-			else if (elements > 0)
+			else if (elements > 0) {
 				_payload = allocArray!(T, ALLOC)(elements)[0 .. _payload.length];
-
+			}
 			_capacity = elements;
 		}
 		

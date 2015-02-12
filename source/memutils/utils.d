@@ -86,7 +86,6 @@ template ObjectAllocator(T, ALLOC)
 	
 	TR alloc(ARGS...)(auto ref ARGS args)
 	{
-		//logInfo("alloc %s/%d", T.stringof, ElemSize);
 		auto mem = getAllocator!(ALLOC.ident)().alloc(ElemSize);
 		static if ( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) GC.addRange(mem.ptr, ElemSize, typeid(T));
 		return emplace!T(mem, args);
@@ -113,6 +112,7 @@ T[] allocArray(T, ALLOC = ThreadMem)(size_t n)
 	auto allocator = thisAllocator();
 
 	auto mem = allocator.alloc(T.sizeof * n);
+	// logDebug("alloc ", T.stringof, ": ", mem.ptr);
 	auto ret = cast(T[])mem;
 	// logDebug("alloc ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
@@ -134,7 +134,9 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	auto allocator = thisAllocator();
 	// logDebug("realloc before ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
 
+	//logDebug("realloc fre ", T.stringof, ": ", array.ptr);
 	auto mem = allocator.realloc(cast(void[]) array, T.sizeof * n);
+	//logDebug("realloc ret ", T.stringof, ": ", mem.ptr);
 	auto ret = cast(T[])mem;
 	// logDebug("realloc after ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
 	
