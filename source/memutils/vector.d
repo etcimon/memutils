@@ -233,7 +233,7 @@ struct Vector(T, ALLOC = ThreadMem)
         Constructor taking an input range
      */
 	this(Stuff)(Stuff stuff)
-		if (isInputRange!Stuff && isImplicitlyConvertible!(UnConst!(ElementType!Stuff), T) && !is(Stuff == ElementType!Stuff[]))
+		if (isInputRange!Stuff && isImplicitlyConvertible!(UnConst!(ElementType!Stuff), T) && !is(Stuff == T[]))
 	{
 		insertBack(stuff);
 	}
