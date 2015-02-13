@@ -137,15 +137,15 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 		import std.array;
 		auto ret = Vector!(ValueType, ALLOC)(0);
 		this.opApply( (k, const ref v) {
-				static if (is(ValueType == string)) logDebug("Checking field: ", v);
+				// static if (is(ValueType == string)) logTrace("Checking field: ", v);
 				//logTrace("Looping ", k, " => ", v);
 				if (matches(key, k)) {
-					//logDebug("Appending: ", v);
+					//logTrace("Appending: ", v);
 					ret ~= v;
 				}
 				return 0;
 			});
-		//logDebug("Finished getValuesAt with: ", ret[]);
+		//logTrace("Finished getValuesAt with: ", ret[]);
 		return ret.move();
 	}
 	

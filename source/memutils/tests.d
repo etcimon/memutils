@@ -183,7 +183,7 @@ void dictionaryListTest(ALLOC)()
 	a.insert("a", 2);
 	assert(a["a"] == 1);
 	assert(a.getValuesAt("a") == [1, 2]);
-	//logDebug("Done getValuesAt");
+	//logTrace("Done getValuesAt");
 	a["a"] = 3;
 	assert(a["a"] == 3);
 	assert(a.getValuesAt("a") == [3, 2]);
@@ -263,7 +263,7 @@ version(none) void borrowTest() {
 	string borrowed;
 	{
 		Vector!char myChars = "hello"; // = "string"
-		logDebug(myChars[]);
+		logTrace(myChars[]);
 		myChars[].borrow();
 	}
 	writeln(borrowed);

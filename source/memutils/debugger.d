@@ -17,7 +17,9 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	{
 		m_baseAlloc = getAllocator!Base();
 	}
-	
+
+	~this() { m_blocks.clear(); }
+
 	@property size_t allocatedBlockCount() const { return m_blocks.length; }
 	@property size_t bytesAllocated() const { return m_bytes; }
 	@property size_t maxBytesAllocated() const { return m_maxBytes; }
@@ -26,7 +28,7 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	{
 		assert(sz > 0, "Cannot serve a zero-length allocation");
 
-		//logDebug("Bytes allocated in ", Base.stringof, ": ", bytesAllocated());
+		//logTrace("Bytes allocated in ", Base.stringof, ": ", bytesAllocated());
 		auto ret = m_baseAlloc.alloc(sz);
 		synchronized(this) {
 			assert(ret.length == sz, "base.alloc() returned block with wrong size.");
@@ -35,7 +37,7 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 			m_bytes += sz;
 			if( m_bytes > m_maxBytes ){
 				m_maxBytes = m_bytes;
-				//logDebug("New allocation maximum: %d (%d blocks)", m_maxBytes, m_blocks.length);
+				//logTrace("New allocation maximum: %d (%d blocks)", m_maxBytes, m_blocks.length);
 			}
 		}
 		return ret;

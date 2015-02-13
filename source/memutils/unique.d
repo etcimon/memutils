@@ -80,8 +80,11 @@ public:
 	{
 		if (_p) destroy(this);
 		if (!p) return;
+		_p = p;
 		//logDebug("Unique ctor of ", T.stringof, " : ", ptr.to!string);
+		_p = null;
 		static if (HasDebugAllocations && DebugUnique) {
+			ptree._defaultInitialize();
 			if(ptr in ptree)
 			{
 				import backtrace.backtrace;
@@ -112,20 +115,21 @@ public:
 		// first delete any resource we own
 		if (_p) destroy(this);
 		_p = u._p;
+		//logDebug("Unique ctor of ", T.stringof, " : ", ptr.to!string);
 		u._p = null;
 	}
 	
 	~this()
 	{
-		//logDebug("Unique destructor of ", T.stringof, " : ", cast(void*)_p);
+		//logDebug("Unique destructor of ", T.stringof, " : ", cast(void*)ptr);
 		import std.c.string : memset;
 
 
 		static if (ALLOC.stringof != "void") {
 			if (_p !is null) {
-				//logDebug("ptr in ptree: ", ptr in ptree);
 
 				static if (HasDebugAllocations && DebugUnique) {
+					ptree._defaultInitialize();
 					assert(ptr in ptree);
 					ptree.remove(ptr);
 				}
@@ -138,16 +142,17 @@ public:
 		}
 		else {
 			if (_p !is null) {
-				//logDebug("ptr in ptree: ", ptr in ptree);
 
 				static if (HasDebugAllocations && DebugUnique) {
 					import backtrace.backtrace;
 					import std.stdio : stdout;
+					ptree._defaultInitialize();
 					if (ptr !in ptree){ printPrettyTrace(stdout); assert(false); }
 					ptree.remove(ptr);
 				}
 
-				destroy(_p);
+				static if (is(TR == T*)) destroy(*_p);
+				else destroy(_p);
 
 				static if (HasDebugAllocations && DebugUnique)
 					debug memset(ptr, 0, AllocSize!T);
@@ -165,16 +170,17 @@ public:
 	/** Transfer ownership to a $(D Unique) rvalue. Nullifies the current contents. */
 	Unique release()
 	{
-		//logDebug("Release");
+		//logTrace("Release");
 		if (!_p) return Unique();
 		return Unique(_p);
 	}
 	
 	void drop()
 	{
-		//logDebug("Drop");
+		//logTrace("Drop");
 		if (!_p) return;
 		static if (HasDebugAllocations && DebugUnique) {
+			ptree._defaultInitialize();
 			assert(ptr in ptree);
 			ptree.remove(ptr);
 		}
@@ -193,8 +199,7 @@ public:
 	bool opCast(T : bool)() const {
 		return !isEmpty;
 	}
-	
-	
+
 	/**
     Postblit operator is undefined to prevent the cloning of $(D Unique) objects.
     */
@@ -213,10 +218,5 @@ private:
 	static if (HasDebugAllocations && DebugUnique) {
 		import memutils.rbtree;
 		static RBTree!(void*, "a < b", true, Malloc) ptree;
-
-		static this() {
-			ptree = RBTree!(void*, "a < b", true, Malloc)();
-			ptree.clear();
-		}
 	}
 }

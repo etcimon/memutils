@@ -40,7 +40,7 @@ public:
 		static if (HasBotan || HasSecurePool) {
 			//logTrace("CryptoSafe alloc ", n);
 			if (void[] p = ms_zeroise.alloc(n)) {
-				//logDebug("alloc P: ", p.length, " & ", p.ptr);
+				//logTrace("alloc P: ", p.length, " & ", p.ptr);
 				return p;
 			}
 		}
@@ -50,17 +50,17 @@ public:
 
 	void[] realloc(void[] mem, size_t n)
 	{
-		//logDebug("realloc P: ", mem.length, " & ", mem.ptr);
+		//logTrace("realloc P: ", mem.length, " & ", mem.ptr);
 		if (n <= mem.length)
 			return mem;
-		import std.c.string : memcpy, memset;
+		import std.c.string : memmove, memset;
 
 		static if (HasBotan || HasSecurePool) {
 			if (ms_zeroise.has(mem)) {
 				void[] p = ms_zeroise.alloc(n);
 				if (!p) 
 					p = m_secondary.alloc(n);
-				memcpy(p.ptr, mem.ptr, mem.length);
+				memmove(p.ptr, mem.ptr, mem.length);
 				memset(mem.ptr, 0, mem.length);
 				ms_zeroise.free(mem);
 				return p;
@@ -72,7 +72,7 @@ public:
 
 	void free(void[] mem)
 	{
-		//logDebug("free P: ", mem.length, " & ", mem.ptr);
+		//logTrace("free P: ", mem.length, " & ", mem.ptr);
 		import std.c.string : memset;
 		memset(mem.ptr, 0, mem.length);
 		static if (HasBotan || HasSecurePool)

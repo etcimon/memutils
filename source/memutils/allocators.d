@@ -13,6 +13,7 @@ import core.thread : Fiber;
 import core.exception : OutOfMemoryError;
 import core.stdc.stdlib;
 import core.memory;
+import core.sync.mutex;
 import std.conv;
 import std.exception : enforceEx;
 import std.traits;
@@ -101,12 +102,47 @@ auto getAllocator(int ALLOC)() {
 }
 
 R getAllocator(R)() {
-		static R alloc;
+	static R alloc;
 		
-		if (!alloc)
-			alloc = new R;
-		return alloc;
+	if (!alloc) {
+		alloc = new R;
+		synchronized(gs_mtx) gs_allocators ~= alloc;
+		g_allocators ~= alloc;
+	}
+	return alloc;
 }
+
+shared static this() {
+	gs_mtx = new Mutex;
+	gs_allocators.reserve(8);
+}
+
+static this() {
+	g_allocators.reserve(8);
+}
+
+static ~this() {
+	foreach (alloc; g_allocators) {
+		synchronized(gs_mtx) {
+			import std.algorithm : remove, countUntil;
+			import std.range : empty;
+			import std.array : array;
+			auto count = gs_allocators.countUntil(alloc)-1;
+			if (count != -1)
+			{
+				auto rem = gs_allocators.remove(count);
+				if (!rem.empty)
+					gs_allocators = rem.array;
+				else 
+					gs_allocators = null;
+			}
+		}
+	}
+}
+
+__gshared Mutex gs_mtx;
+__gshared Allocator[] gs_allocators; // workaround for early gc collect bug
+Allocator[] g_allocators; // used to delete thread-local allocators from gs_allocators
 
 size_t alignedSize(size_t sz)
 {

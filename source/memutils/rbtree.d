@@ -145,7 +145,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = Thre
 	private Node   _begin;
 	private size_t _length;
 
-	private void _defaultInitialize()
+	package void _defaultInitialize()
 	{
 		if (!_end) {
 			_begin = _end = _root = allocate();

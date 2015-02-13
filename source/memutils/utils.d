@@ -93,6 +93,8 @@ template ObjectAllocator(T, ALLOC)
 	
 	void free(TR obj)
 	{
+		
+		// logDebug("free ", ALLOC.stringof, ": ", cast(void*)obj);
 		auto objc = obj;
 		static if (is(TR == T*)) .destroy(*objc);
 		else .destroy(objc);
@@ -112,9 +114,9 @@ T[] allocArray(T, ALLOC = ThreadMem)(size_t n)
 	auto allocator = thisAllocator();
 
 	auto mem = allocator.alloc(T.sizeof * n);
-	// logDebug("alloc ", T.stringof, ": ", mem.ptr);
+	// logTrace("alloc ", T.stringof, ": ", mem.ptr);
 	auto ret = cast(T[])mem;
-	// logDebug("alloc ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
+	// logTrace("alloc ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
@@ -132,14 +134,14 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	assert(n > array.length, "Cannot reallocate to smaller sizes");
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
-	// logDebug("realloc before ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
+	// logTrace("realloc before ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
 
-	//logDebug("realloc fre ", T.stringof, ": ", array.ptr);
+	//logTrace("realloc fre ", T.stringof, ": ", array.ptr);
 	auto mem = allocator.realloc(cast(void[]) array, T.sizeof * n);
-	//logDebug("realloc ret ", T.stringof, ": ", mem.ptr);
+	//logTrace("realloc ret ", T.stringof, ": ", mem.ptr);
 	auto ret = cast(T[])mem;
-	// logDebug("realloc after ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
-	
+	// logTrace("realloc after ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
+
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
@@ -147,7 +149,7 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 		GC.removeRange(array.ptr);
 		GC.addRange(mem.ptr, mem.length, typeid(T));
 		// Zero out unused capacity to prevent gc from seeing false pointers
-		memset(mem.ptr + (array.length * T.sizeof), 0, (n - array.length) * T.sizeof);
+		memset(mem.ptr + array.length * T.sizeof, 0, (ret.length - array.length) * T.sizeof);
 	}
 	
 	return ret;
@@ -174,7 +176,10 @@ void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = si
 			static if (is(T == struct) && !isPointer!T) .destroy(e);
 			i++;
 		}
-	}
+	} /*else static if (hasIndirections!T) {
+		memset(array.ptr, 0, array.length * T.sizeof);
+	}*/
+
 	allocator.free(cast(void[])array);
 	array = null;
 }

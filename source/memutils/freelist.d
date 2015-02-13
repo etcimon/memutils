@@ -99,7 +99,7 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 		assert(elem_size >= size_t.sizeof);
 		m_elemSize = elem_size;
 		m_baseAlloc = base_allocator;
-		//logDebug("Create FreeListAlloc %d", m_elemSize);
+		//logTrace("Create FreeListAlloc %d", m_elemSize);
 	}
 	
 	@property size_t elementSize() const { return m_elemSize; }

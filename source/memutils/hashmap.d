@@ -209,7 +209,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 			setupHasher();
 		}
 
-		// logDebug("Resizing ", Key.stringof, " : ", Value.stringof, " : ", cast(void*)&this, " from ", m_table.length, " to: ", new_size);
+		// logTrace("Resizing ", Key.stringof, " : ", Value.stringof, " : ", cast(void*)&this, " from ", m_table.length, " to: ", new_size);
 
 		uint pot = 0;
 		while (new_size > 1) pot++, new_size /= 2;
@@ -270,7 +270,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 			m_hasher = (Key k) {
 				string s = k.toString();
 				size_t hash = typeid(string).getHash(&s);
-				// logDebug("string ", s, " hash:" , hash);
+				// logTrace("string ", s, " hash:" , hash);
 				return hash;
 			};
 		}

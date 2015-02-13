@@ -59,7 +59,7 @@ struct Vector(T, ALLOC = ThreadMem)
 			}
 			else
 			{
-				memcpy(_payload.ptr, p.ptr, T.sizeof*p.length);
+				memmove(_payload.ptr, p.ptr, T.sizeof*p.length);
 			}
 		}
 		
@@ -122,7 +122,7 @@ struct Vector(T, ALLOC = ThreadMem)
 				static if (!isImplicitlyConvertible!(T, T)) {
 					T t = T();
 					foreach (size_t i; startEmplace .. length) 
-						memcpy(_payload.ptr + i, &t, T.sizeof); 
+						memmove(_payload.ptr + i, &t, T.sizeof); 
 					
 				} else
 					initializeAll(_payload.ptr[startEmplace .. length]);
@@ -166,7 +166,7 @@ struct Vector(T, ALLOC = ThreadMem)
 			
 			T* t = &stuff;
 			
-			memcpy(_payload.ptr + _payload.length, t, T.sizeof);
+			memmove(_payload.ptr + _payload.length, t, T.sizeof);
 			memset(t, 0, T.sizeof);
 			_payload = _payload.ptr[0 .. _payload.length + 1];
 			
@@ -268,7 +268,7 @@ struct Vector(T, ALLOC = ThreadMem)
 			// swap each element with a duplicate
 			foreach (size_t i, ref el; _data._payload) {
 				T t = el.dup;
-				memcpy(vec._data._payload.ptr + i, &t, T.sizeof);
+				memmove(vec._data._payload.ptr + i, &t, T.sizeof);
 				memset(&t, 0, T.sizeof);
 			}
 			return vec.move();
@@ -416,7 +416,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		static if (__traits(compiles, {_data._payload[i] = cast(T) val; }()))
 			_data._payload[i] = cast(T) val;
 		else { // swap
-			memcpy(_data._payload.ptr + i, &val, U.sizeof);
+			memmove(_data._payload.ptr + i, &val, U.sizeof);
 			memset(&val, 0, U.sizeof);
 		}
 	}
