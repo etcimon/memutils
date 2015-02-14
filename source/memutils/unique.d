@@ -66,7 +66,7 @@ public:
 		if (is(u.TR:TR))
 	{
 		// logTrace("Unique constructor converting from ", U.stringof);
-		_p = u._p;
+		opAssign(u._p);
 		u._p = null;
 	}
 	
@@ -80,19 +80,18 @@ public:
 	{
 		if (_p) destroy(this);
 		if (!p) return;
-		_p = p;
-		//logDebug("Unique ctor of ", T.stringof, " : ", ptr.to!string);
-		_p = null;
+		//logTrace("Unique ctor of ", T.stringof, " : ", ptr.to!string);
 		static if (HasDebugAllocations && DebugUnique) {
 			ptree._defaultInitialize();
-			if(ptr in ptree)
+			if(cast(void*)p in ptree)
 			{
 				import backtrace.backtrace;
 				import std.stdio : stdout;
+				logDebug("Already owned pointer: " ~ p.to!string ~ " of type " ~ T.stringof);
 				printPrettyTrace(stdout);
-				assert(false, "Already owned pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
+				assert(false);
 			}
-			ptree.insert(ptr);
+				ptree.insert(cast(void*)p);
 		}
 		_p = p;
 		p = null;
@@ -111,22 +110,19 @@ public:
 	void opAssign(U)(Unique!U u)
 		if (is(u.TR:TR))
 	{
-		debug(Unique) logTrace("Unique opAssign converting from ", U.stringof);
-		// first delete any resource we own
-		if (_p) destroy(this);
-		_p = u._p;
-		//logDebug("Unique ctor of ", T.stringof, " : ", ptr.to!string);
+		opAssign(u._p);
 		u._p = null;
 	}
 	
 	~this()
 	{
-		//logDebug("Unique destructor of ", T.stringof, " : ", cast(void*)ptr);
+		//logDebug("Unique destructor of ", T.stringof, " : ", ptr);
 		import std.c.string : memset;
 
 
 		static if (ALLOC.stringof != "void") {
-			if (_p !is null) {
+			if (_p) {
+				//logTrace("ptr in ptree: ", ptr in ptree);
 
 				static if (HasDebugAllocations && DebugUnique) {
 					ptree._defaultInitialize();
@@ -136,26 +132,32 @@ public:
 
 				ObjectAllocator!(T, ALLOC).free(_p);
 
-				static if (HasDebugAllocations && DebugUnique)
-					debug memset(ptr, 0, AllocSize!T);
+				//static if (HasDebugAllocations && DebugUnique)
+				//	debug memset(ptr, 0, AllocSize!T);
 			}
 		}
 		else {
-			if (_p !is null) {
+			if (_p) {
+				//logTrace("ptr in ptree: ", ptr in ptree);
 
 				static if (HasDebugAllocations && DebugUnique) {
 					import backtrace.backtrace;
 					import std.stdio : stdout;
 					ptree._defaultInitialize();
-					if (ptr !in ptree){ printPrettyTrace(stdout); assert(false); }
+					if (ptr !in ptree){ 
+						logDebug("Unknown pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
+						printPrettyTrace(stdout); assert(false);
+					}
 					ptree.remove(ptr);
 				}
 
-				static if (is(TR == T*)) destroy(*_p);
-				else destroy(_p);
+				static if (is(TR == T*)) .destroy(*_p);
+				else .destroy(_p);
+				//delete _p;
 
-				static if (HasDebugAllocations && DebugUnique)
-					debug memset(ptr, 0, AllocSize!T);
+				//static if (HasDebugAllocations && DebugUnique) {
+				//	debug memset(ptr, 0, AllocSize!T);
+				//}
 			}
 		}
 
@@ -168,11 +170,13 @@ public:
 	}
 	
 	/** Transfer ownership to a $(D Unique) rvalue. Nullifies the current contents. */
-	Unique release()
+	TR release()
 	{
 		//logTrace("Release");
-		if (!_p) return Unique();
-		return Unique(_p);
+		if (!_p) return null;
+		auto ret = _p;
+		opAssign(null);
+		return ret;
 	}
 	
 	void drop()
@@ -209,10 +213,7 @@ private:
 	TR _p;
 
 	@property void* ptr() const {
-		static if (is(TR == T*))
-			return cast(void*)_p;
-		else
-			return cast(void*)&_p;
+		return cast(void*)_p;
 	}
 
 	static if (HasDebugAllocations && DebugUnique) {

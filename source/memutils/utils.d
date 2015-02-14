@@ -93,8 +93,6 @@ template ObjectAllocator(T, ALLOC)
 	
 	void free(TR obj)
 	{
-		
-		// logDebug("free ", ALLOC.stringof, ": ", cast(void*)obj);
 		auto objc = obj;
 		static if (is(TR == T*)) .destroy(*objc);
 		else .destroy(objc);
@@ -141,7 +139,7 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	//logTrace("realloc ret ", T.stringof, ": ", mem.ptr);
 	auto ret = cast(T[])mem;
 	// logTrace("realloc after ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
-
+	
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
@@ -149,7 +147,7 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 		GC.removeRange(array.ptr);
 		GC.addRange(mem.ptr, mem.length, typeid(T));
 		// Zero out unused capacity to prevent gc from seeing false pointers
-		memset(mem.ptr + array.length * T.sizeof, 0, (ret.length - array.length) * T.sizeof);
+		memset(mem.ptr + (array.length * T.sizeof), 0, (n - array.length) * T.sizeof);
 	}
 	
 	return ret;
@@ -161,7 +159,7 @@ void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = si
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
 
-	// logDebug("free ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
+	// logTrace("free ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
@@ -176,10 +174,7 @@ void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = si
 			static if (is(T == struct) && !isPointer!T) .destroy(e);
 			i++;
 		}
-	} /*else static if (hasIndirections!T) {
-		memset(array.ptr, 0, array.length * T.sizeof);
-	}*/
-
+	}
 	allocator.free(cast(void[])array);
 	array = null;
 }
