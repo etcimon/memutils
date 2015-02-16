@@ -102,7 +102,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 	
 	void opIndexAssign(inout Value value, in Key key)
 	{
-		assert(!Traits.equals(key, Traits.clearValue), "Inserting clear value into hash map.");
+		//assert(!Traits.equals(key, Traits.clearValue), "Inserting clear value into hash map.");
 		grow(1);
 		auto i = findInsertIndex(key);
 		if (!Traits.equals(m_table[i].key, key)) m_length++;
