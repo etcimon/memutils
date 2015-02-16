@@ -85,7 +85,6 @@ auto getAllocator(int ALLOC)() {
 		
 		if (!alloc) {
 			alloc = new R;
-			gs_allocators ~= alloc;
 		}
 		return alloc;
 	}
@@ -105,39 +104,15 @@ auto getAllocator(int ALLOC)() {
 
 R getAllocator(R)() {
 	static R alloc;
-		
 	if (!alloc) {
 		alloc = new R;
-		g_allocators ~= alloc;
 	}
 	return alloc;
 }
 
+static if (HasBotan)
 shared static ~this() {
-	foreach_reverse ( alloc; g_allocators ) {
-		if (alloc) destroy(alloc);
-		alloc = null;
-	}
-	foreach_reverse ( alloc; gs_allocators ) {
-		if (alloc) destroy(alloc);
-		alloc = null;
-	}
-	destroy(g_allocators);
-	destroy(gs_allocators);
-	static if (!HasBotan) GC.collect();
-	.exit(0); // TODO: this will avoid throwing when some invariant fails in final GC collection...
-}
-
-Allocator[] g_allocators;
-__gshared Allocator[] gs_allocators;
-
-static ~this() {
-	if (!thread_isMainThread) {
-		foreach_reverse ( alloc; g_allocators ) {
-			if (alloc) destroy(alloc);
-		}
-		destroy(g_allocators);
-	}
+   .exit(0); // TODO: Fix invariant error. Maybe this is due to an erroneous treap in GC
 }
 
 size_t alignedSize(size_t sz)

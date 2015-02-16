@@ -17,7 +17,6 @@ import memutils.allocators;
 import memutils.securepool;
 import memutils.debugger;
 
-
 final class SecureAllocator(Base : Allocator) : Allocator
 {
 private:
