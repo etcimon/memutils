@@ -26,6 +26,7 @@ import memutils.debugger;
 import memutils.cryptosafe;
 import memutils.freelist;
 import memutils.utils : Malloc;
+import core.thread : thread_isMainThread;
 
 static if (HasDebugAllocations) {
 	pragma(msg, "Memory debugger enabled");
@@ -82,9 +83,10 @@ auto getAllocator(int ALLOC)() {
 	static if (ALLOC == NativeGC) {	
 		static __gshared R alloc;
 		
-		if (!alloc)
+		if (!alloc) {
 			alloc = new R;
-		
+			gs_allocators ~= alloc;
+		}
 		return alloc;
 	}
 	else static if (ALLOC == ScopedFiberPool) {
@@ -111,12 +113,33 @@ R getAllocator(R)() {
 	return alloc;
 }
 
+shared static ~this() {
+	foreach_reverse ( alloc; g_allocators ) {
+		if (alloc) destroy(alloc);
+		alloc = null;
+	}
+	foreach_reverse ( alloc; gs_allocators ) {
+		if (alloc) destroy(alloc);
+		alloc = null;
+	}
+	destroy(g_allocators);
+	destroy(gs_allocators);
+	static if (!HasBotan) GC.collect();
+	.exit(0); // TODO: this will avoid throwing when some invariant fails in final GC collection...
+}
+
 Allocator[] g_allocators;
+__gshared Allocator[] gs_allocators;
 
 static ~this() {
-	foreach_reverse ( ref alloc; g_allocators )
-		delete alloc;
+	if (!thread_isMainThread) {
+		foreach_reverse ( alloc; g_allocators ) {
+			if (alloc) destroy(alloc);
+		}
+		destroy(g_allocators);
+	}
 }
+
 size_t alignedSize(size_t sz)
 {
 	return ((sz + Allocator.alignment - 1) / Allocator.alignment) * Allocator.alignment;

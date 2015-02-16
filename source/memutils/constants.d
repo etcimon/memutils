@@ -23,7 +23,7 @@ else					const HasSecurePool = false;
 
 const SecurePool_MLock_Max = 524_287;
 
-version(Have_Botan_d) 	const HasBotan = true; 
+version(Have_botan) 	const HasBotan = true; 
 else 					const HasBotan = false;
 
 version(EnableDebugger) const HasDebuggerEnabled = true;

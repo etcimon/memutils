@@ -212,7 +212,7 @@ package:
 			m_pool_unaligned = pool_ptr[0 .. pool_size];
 
 			import std.c.string : memset;
-			memset(m_pool_unaligned.ptr, 0, m_pool_unaligned.length);
+			//memset(m_pool_unaligned.ptr, 0, m_pool_unaligned.length);
 			
 			if (mlock(m_pool_unaligned.ptr, m_pool_unaligned.length) != 0)
 			{
@@ -235,7 +235,7 @@ package:
 		if (m_pool)
 		{
 			import std.c.string : memset;
-			memset(m_pool_unaligned.ptr, 0, m_pool_unaligned.length);
+			//memset(m_pool_unaligned.ptr, 0, m_pool_unaligned.length);
 			munlock(m_pool_unaligned.ptr, m_pool_unaligned.length);
 			munmap(m_pool_unaligned.ptr, m_pool_unaligned.length);
 			m_pool = null;

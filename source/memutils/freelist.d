@@ -26,7 +26,12 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 	{
 		m_baseAlloc = getAllocator!Base();
 		foreach (i; iotaTuple!freeListCount)
-			m_freeLists[i] = new FreeListAlloc!Base(nthFreeListSize!(i), m_baseAlloc);
+			m_freeLists[i] = new FreeListAlloc!Base(nthFreeListSize!(i));
+	}
+
+	~this() {
+		foreach(fl; m_freeLists)
+			destroy(fl);
 	}
 	
 	void[] alloc(size_t sz)
@@ -85,20 +90,31 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 
 final class FreeListAlloc(Base : Allocator) : Allocator
 {
+	import memutils.vector : Vector;
+	import memutils.utils : Malloc;
 	private static struct FreeListSlot { FreeListSlot* next; }
 	private {
 		immutable size_t m_elemSize;
 		Base m_baseAlloc;
 		FreeListSlot* m_firstFree = null;
+		size_t[] m_owned;
 		size_t m_nalloc = 0;
 		size_t m_nfree = 0;
 	}
+
+	~this() {
+		import core.thread : thread_isMainThread;
+		if (!thread_isMainThread)
+		foreach(size_t slot; m_owned) {
+			m_baseAlloc.free( (cast(void*)slot)[0 .. m_elemSize]);
+		}
+	}
 	
-	this(size_t elem_size, Base base_allocator)
+	this(size_t elem_size)
 	{
 		assert(elem_size >= size_t.sizeof);
 		m_elemSize = elem_size;
-		m_baseAlloc = base_allocator;
+		m_baseAlloc = getAllocator!Base();
 		//logTrace("Create FreeListAlloc %d", m_elemSize);
 	}
 	
@@ -121,6 +137,7 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 			m_nfree--;
 		} else {
 			mem = m_baseAlloc.alloc(m_elemSize);
+			m_owned ~= cast(size_t)mem.ptr;
 			//logInfo("Alloc %d bytes: alloc: %d, free: %d", SZ, s_nalloc, s_nfree);
 		}
 		m_nalloc++;

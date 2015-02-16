@@ -17,7 +17,7 @@ void destroyFiberPool(Fiber f = Fiber.getThis()) {
 	if (auto ptr = (f in g_fiberAlloc)) {
 		static if (typeof(ptr).stringof.startsWith("DebugAllocator")) {
 			ptr.m_baseAlloc.freeAll();
-			delete *ptr;
+			destroy(*ptr);
 		}
 		else ptr.freeAll();
 		g_fiberAlloc.remove(f);

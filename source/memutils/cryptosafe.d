@@ -17,20 +17,23 @@ import memutils.allocators;
 import memutils.securepool;
 import memutils.debugger;
 
+
 final class SecureAllocator(Base : Allocator) : Allocator
 {
-private:	
+private:
 	Base m_secondary;
-
 	static if (HasBotan || HasSecurePool) {
-
+		
 		__gshared SecurePool ms_zeroise;	
 		shared static this() { 
 			if (!ms_zeroise) ms_zeroise = new SecurePool();
 		}
+		shared static ~this() { 
+			if (ms_zeroise) destroy(ms_zeroise);
+		}
 	}
-public:
-	
+
+public:	
 	this() {
 		m_secondary = getAllocator!Base();
 	}
