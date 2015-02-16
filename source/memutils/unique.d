@@ -91,7 +91,7 @@ public:
 				printPrettyTrace(stdout);
 				assert(false);
 			}
-				ptree.insert(cast(void*)p);
+			ptree.insert(cast(void*)p);
 		}
 		_p = p;
 		p = null;
@@ -175,7 +175,7 @@ public:
 		//logTrace("Release");
 		if (!_p) return null;
 		auto ret = _p;
-		opAssign(null);
+        drop();
 		return ret;
 	}
 	
