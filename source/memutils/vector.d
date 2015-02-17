@@ -1,6 +1,7 @@
 ﻿module memutils.vector;
 
-import std.algorithm : swap, initializeAll, empty;
+import std.algorithm : swap, initializeAll;
+import std.range : empty;
 import std.traits;
 import std.c.string;
 import std.range : isInputRange, isForwardRange, isRandomAccessRange, ElementType, refRange, RefRange, hasLength;
