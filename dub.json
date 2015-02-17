@@ -1,10 +1,10 @@
 {
 	"name": "memutils",
+	"license": "MIT",
 	"description": "Overhead allocators, allocator-aware containers and lifetime management for D objects.",
 	"copyright": "Copyright © 2015, Etienne Cimon",
 	"authors": ["Etienne Cimon", "Sönke Ludwig", "others..."],
 	"target": "staticLibrary",
 	"versions": ["CryptoSafe", "SecurePool"],
-	"buildOptions": ["inline"],
-	"dependencies": { "backtrace-d": "~master" }
+	"buildOptions": ["inline"]
 }

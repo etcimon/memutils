@@ -4,6 +4,7 @@
 * This is a more advanced base allocator.
 * 
 * (C) 2012,2014 Jack Lloyd
+* (C) 2014-2015 Etienne Cimon
 * (C) 2014,2015 Etienne Cimon
 *
 * Distributed under the terms of the Simplified BSD License (see Botan's license.txt)

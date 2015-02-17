@@ -85,10 +85,7 @@ public:
 			ptree._defaultInitialize();
 			if(cast(void*)p in ptree)
 			{
-				import backtrace.backtrace;
-				import std.stdio : stdout;
 				logDebug("Already owned pointer: " ~ p.to!string ~ " of type " ~ T.stringof);
-				printPrettyTrace(stdout);
 				assert(false);
 			}
 			ptree.insert(cast(void*)p);
@@ -141,12 +138,10 @@ public:
 				//logTrace("ptr in ptree: ", ptr in ptree);
 
 				static if (HasDebugAllocations && DebugUnique) {
-					import backtrace.backtrace;
-					import std.stdio : stdout;
 					ptree._defaultInitialize();
 					if (ptr !in ptree){ 
 						logDebug("Unknown pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
-						printPrettyTrace(stdout); assert(false);
+						assert(false);
 					}
 					ptree.remove(ptr);
 				}
