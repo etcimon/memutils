@@ -24,7 +24,8 @@ import memutils.utils : Malloc;
 
 version(Posix) {
 
-	import core.sys.posix.sys.mman;
+	version(linux) import core.sys.linux.sys.mman;
+	else version(Posix) import core.sys.posix.sys.mman;
 	import core.sys.posix.sys.resource;
 	
 	enum {
