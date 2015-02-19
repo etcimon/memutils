@@ -23,14 +23,13 @@ import memutils.allocators;
 import memutils.utils : Malloc;
 
 version(Posix) {
-	import core.sys.linux.sys.mman;
+
+	import core.sys.posix.sys.mman;
 	import core.sys.posix.sys.resource;
 	
 	enum {
 		RLIMIT_MEMLOCK = 8
 	}
-}
-version(linux) {
 	enum { MADV_DONTDUMP = 16 }
 }
 version(Windows) {
