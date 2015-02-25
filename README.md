@@ -8,7 +8,7 @@ A new allocation syntax comes with many benefits, including the easy replacement
 - `SecureMem`: When storing sensitive data such as private certificates, passwords or keys, the CryptoSafe allocator
 enhances safety by zeroising the memory after being freed, and optionally it can use a memory pool (SecurePool) 
 that doesn't get dumped to disk on a crash or during OS sleep/hibernation.
-- `alloc!T`: Overrides the GC using the `PoolStack`, or falls back on `new` if no pools are available.
+- `alloc!T`: Overrides the GC using the [PoolStack](https://github.com/etcimon/memutils/blob/master/source/memutils/scoped.d#L121), or falls back on `new` if no pools are available.
 
 The allocator-friendly containers are:
 - `Vector`: An array.
@@ -21,7 +21,7 @@ The allocator-friendly containers are:
 The allocator-friendly lifetime management objects are:
 - `RefCounted`: Similar to shared_ptr in C++, it's also compatible with interface casting.
 - `Unique`: Similar to unique_ptr in C++, by default it will consider objects to have been created with `new`, but if a custom allocator is specified it will destroy an object pointer allocated from the same allocator with `.free`.
- - `ScopedPool`: Adds a `Pool` to the `PoolStack` until the end of scope, allowing an override of GC allocations when calling `alloc` anywhere beyond its creation.
+- `ScopedPool`: Adds a `Pool` to the `PoolStack` until the end of scope, allowing an override of GC allocations when calling `alloc` anywhere beyond its creation.
 
 The `RefCounted` object makes use of a new `mixin template`, available to replace the `alias this m_obj;` idiom, it can be found in `memutils.helpers`. It enables the proxying of operators (including operator overloads) from the underlying object. Type inference will not work for callback delegates used in methods such as `opApply`, but essentially it allows the most similar experience to base interfaces. 
 
