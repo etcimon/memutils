@@ -13,12 +13,10 @@ import std.conv : emplace;
 import std.algorithm : min, max;
 import memutils.vector;
 
-// TODO: Write a PoolStack allocator that uses GC as secondary
-// It should be possible to push/pop/freeze Pool Allocators in it,
-// This will allow a ScopedPool to exist and the `New!` operations to use them
-// ex: auto pool = ScopedPool();
+final class PoolAllocator(Base : Allocator)
+{
+	public int id = -1; // intrusive ID used for ScopedPools
 
-final class PoolAllocator(Base : Allocator) : Allocator {
 	static struct Pool { Pool* next; void[] data; void[] remaining; }
 
 	private {
@@ -26,9 +24,9 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 		Pool* m_freePools;
 		Pool* m_fullPools;
 		Vector!(void delegate()) m_destructors;
-		size_t m_poolSize;
 		int m_pools;
 	}
+	public size_t m_poolSize;
 	
 	this(size_t pool_size = 64*1024)
 	{
@@ -73,6 +71,7 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 			p.next = cast(Pool*)m_fullPools;
 			m_fullPools = p;
 		}
+		//logDebug("PoolAllocator ", id, " allocated ", sz, " with ", totalSize());
 		
 		return ret[0 .. sz];
 	}
@@ -106,11 +105,11 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 	
 	void freeAll()
 	{
-		logTrace("Destroying ", totalSize(), " of data, allocated: ", allocatedSize());
+		//logDebug("Destroying ", totalSize(), " of data, allocated: ", allocatedSize());
 		// destroy all initialized objects
-		foreach (ref dtor; m_destructors) {
+		foreach_reverse (ref dtor; m_destructors[])
 			dtor();
-		}
+
 		destroy(m_destructors);
 
 		size_t i;
@@ -129,6 +128,7 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 	
 	void reset()
 	{
+		//logDebug("Reset()");
 		freeAll();
 		Pool* pnext;
 		size_t i;
@@ -141,8 +141,26 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 		
 	}
 
-	void onDestroy(void delegate() dtor) {
+	package void onDestroy(void delegate() dtor) {
 		m_destructors ~= dtor;
+	}
+
+	package void removeArrayDtors(void delegate() last_dtor, size_t n) {
+		bool found;
+		foreach_reverse(i, ref el; m_destructors[]) {
+			if (el == last_dtor)
+			{
+				Vector!(void delegate()) arr;
+				if (n >= i)
+					arr ~= m_destructors[0 .. i-n+1];
+				if (i != m_destructors.length - 1)
+					arr ~= m_destructors[i+1 .. $];
+				m_destructors[] = arr[];
+				found = true;
+				break;
+			}
+		}
+		assert(found);
 	}
 
 	@property size_t totalSize()
@@ -168,4 +186,6 @@ final class PoolAllocator(Base : Allocator) : Allocator {
 			amt += p.data.length - p.remaining.length;
 		return amt;
 	}
+
+	~this() { reset(); }
 }

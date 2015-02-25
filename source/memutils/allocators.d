@@ -33,14 +33,12 @@ static if (HasDebugAllocations) {
 	alias LocklessAllocator = DebugAllocator!(AutoFreeListAllocator!(MallocAllocator));
 	static if (HasCryptoSafe)
 		alias CryptoSafeAllocator = DebugAllocator!(SecureAllocator!(DebugAllocator!(AutoFreeListAllocator!(MallocAllocator))));
-	alias FiberPool = DebugAllocator!(PoolAllocator!(AutoFreeListAllocator!(MallocAllocator)));
 	alias ProxyGCAllocator = DebugAllocator!GCAllocator;
 }
 else {
 	alias LocklessAllocator = AutoFreeListAllocator!(MallocAllocator);
 	static if (HasCryptoSafe)
 		alias CryptoSafeAllocator = SecureAllocator!LocklessAllocator;
-	alias FiberPool = PoolAllocator!LocklessAllocator;
 	alias ProxyGCAllocator = GCAllocator;
 }
 
@@ -70,13 +68,10 @@ interface Allocator {
 
 package:
 
-static HashMap!(Fiber, FiberPool, Malloc) g_fiberAlloc;
-
 auto getAllocator(int ALLOC)() {
 	static if (ALLOC == LocklessFreeList) alias R = LocklessAllocator;
 	else static if (ALLOC == NativeGC) alias R = ProxyGCAllocator;
 	else static if (HasCryptoSafe && ALLOC == CryptoSafe) alias R = CryptoSafeAllocator;
-	else static if (ALLOC == ScopedFiberPool) alias R = FiberPool;
 	else static if (ALLOC == Mallocator) alias R = MallocAllocator;
 	else static assert(false, "Invalid allocator specified");
 
@@ -87,17 +82,6 @@ auto getAllocator(int ALLOC)() {
 			alloc = new R;
 		}
 		return alloc;
-	}
-	else static if (ALLOC == ScopedFiberPool) {
-		
-		Fiber f = Fiber.getThis();
-		assert(f !is null);
-		if (auto ptr = (f in g_fiberAlloc)) {
-			return *ptr;
-		}
-		auto ret = new R();
-		g_fiberAlloc[f] = ret;
-		return ret;
 	}
 	else return getAllocator!R();
 }

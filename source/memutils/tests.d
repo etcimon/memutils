@@ -215,13 +215,10 @@ void propagateTests(alias fct)() {
 	fct!AppMem();
 	fct!SecureMem();
 	fct!ThreadMem();
-	Fiber f;
-	f = new Fiber(delegate { fct!ThisFiber(); });
-	f.call();
-	destroyFiberPool(f);
 }
 
 void highLevelAllocTest() {
+	logDebug("Testing High Level Allocators");
 	class A {
 		int a;
 
@@ -233,16 +230,6 @@ void highLevelAllocTest() {
 	a.a = 10;
 	ThreadMem.free(a);
 	assert(!a);
-
-	Fiber f;
-	f = new Fiber(delegate { 
-			A b = ThisFiber.alloc!A();
-			b.a = 10;
-			// freeing is not needed, this allocator is scoped on the fiber
-			// ThisFiber.free(b);
-		});
-	f.call();
-	destroyFiberPool(f);
 
 	A appAllocated() {
 		A c = AppMem.alloc!A();
@@ -259,15 +246,41 @@ void highLevelAllocTest() {
 	ThreadMem.free(ub);
 	assert(ub is null);
 }
-
-version(none) void borrowTest() {
-	string borrowed;
-	{
-		Vector!char myChars = "hello"; // = "string"
-		logTrace(myChars[]);
-		myChars[].borrow();
+struct A {
+	int a;
+	
+	~this() {
+		//logDebug("Dtor called");
+		a = 0;
 	}
-	writeln(borrowed);
+}
+
+void scopedTest() {
+
+
+	logDebug("Testing ScopedPool");
+
+	A* num;
+	{ 
+		PoolStack.push();
+		num = alloc!A(0);
+		num.a = 2;
+		//logDebug("Freezing");
+		PoolStack.freeze(1);
+		//logDebug("Frozen");
+		assert(PoolStack.empty, "Stack is not empty");
+		PoolStack.pop();
+		assert(num.a == 0, "Dtor not called");
+	}
+	{
+		auto pool1 = ScopedPool();
+		num = alloc!A(0);
+	}
+
+
+	Fiber f;
+	f = new Fiber(delegate { auto pool = ScopedPool(); destroy(pool); });
+	f.call();
 }
 
 // TODO: test FiberPool, Circular buffer, Scoped
@@ -281,7 +294,7 @@ unittest {
 	propagateTests!circularBufferTest();
 	propagateTests!dictionaryListTest();
 
-	version(none) borrowTest();
+	scopedTest();
 
 	highLevelAllocTest();
 }

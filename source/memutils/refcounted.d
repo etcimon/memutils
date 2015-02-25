@@ -33,7 +33,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	
 	const ~this()
 	{
-		//logTrace("RefCounted dtor: ", T.stringof);
+		//logDebug("RefCounted dtor: ", T.stringof);
 		dtor((cast(RefCounted*)&this));
 		(cast(RefCounted*)&this).m_magic = 0;
 	}
@@ -51,6 +51,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	
 	const this(this)
 	{
+		//logDebug("RefCounted copy ctor");
 		(cast(RefCounted*)&this).copyctor();
 	}
 	
@@ -179,6 +180,6 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	const {
 		//if (m_magic != 0x1EE75817) logTrace("CheckInvariants failed ", T.stringof);
 		assert(m_magic == 0x1EE75817, "Magic number of " ~ T.stringof ~ " expected 0x1EE75817, set to: " ~ (cast(void*)m_magic).to!string);
-		assert(!m_object || refCount > 0, (!m_object) ? "No m_object" : "Zero Refcount: " ~ refCount.to!string);
+		assert(!m_object || refCount > 0, (!m_object) ? "No m_object" : "Zero Refcount: " ~ refCount.to!string ~ " for " ~ T.stringof);
 	}
 }

@@ -227,6 +227,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	this(U)(U[] values...)
 		if (isImplicitlyConvertible!(U, T))
 	{
+		// TODO: This doesn't work with refcounted
 		_data = Data(cast(T[])values);
 	}
 

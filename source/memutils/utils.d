@@ -7,57 +7,11 @@ import std.c.string : memset, memcpy;
 import memutils.allocators;
 import std.algorithm : startsWith;
 import memutils.constants;
-
-// TODO: Remove ThisFiber and replace with a PoolStack.
-// TODO: Write a ScopedPool util implemented as a PoolStack
-
-
-/** Unregister your fiber with this when you're done! This is very important! **/
-void destroyFiberPool(Fiber f = Fiber.getThis()) {
-	if (auto ptr = (f in g_fiberAlloc)) {
-		static if (typeof(ptr).stringof.startsWith("DebugAllocator")) {
-			ptr.m_baseAlloc.freeAll();
-			destroy(*ptr);
-		}
-		else ptr.freeAll();
-		g_fiberAlloc.remove(f);
-	}
-	else logError("Fiber not found");
-}
-
-private void registerFiberArray(T)(ref T arr) {
-	import std.range : ElementType;
-	// Add destructors to fiber pool
-	static if ((hasElaborateDestructor!(ElementType!T) || __traits(hasMember, ElementType!T, "__dtor") )) {
-		foreach (ref el; arr)
-			ThisFiber.addDtor(&el.__dtor);
-	}
-	ThisFiber.ignore(arr.ptr); // debugger fix
-}
-
-// TODO: Do I need this?
-/*FiberPool getFiberPool(Fiber f) {
-	assert(f);
-
-	if (auto ptr = (f in g_fiberAlloc)) 
-	{
-		return *ptr;
-	}
-	else {
-		auto ret = new FiberPool();
-		g_fiberAlloc[f] = ret;
-		return ret;
-	}
-}*/
-
+import memutils.vector : Array;
 import std.traits : isArray;
 
 struct AppMem {
 	mixin ConvenienceAllocators!(NativeGC, typeof(this));
-}
-
-struct ThisFiber {
-	mixin ConvenienceAllocators!(ScopedFiberPool, typeof(this));
 }
 
 struct ThreadMem {
@@ -76,21 +30,30 @@ package:
 
 template ObjectAllocator(T, ALLOC)
 {
+	import std.traits : ReturnType;
 	import core.memory : GC;
 	enum ElemSize = AllocSize!T;
-	
+
+	static if (ALLOC.stringof == "PoolStack") {
+		ReturnType!(ALLOC.front) function() m_getAlloc = &ALLOC.front;
+	}
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 
 	alias TR = RefTypeOf!T;
-	
+
+
 	TR alloc(ARGS...)(auto ref ARGS args)
 	{
-		auto mem = getAllocator!(ALLOC.ident)().alloc(ElemSize);
+		static if (ALLOC.stringof != "PoolStack")
+			auto mem = getAllocator!(ALLOC.ident)().alloc(ElemSize);
+		else
+			auto mem = m_getAlloc().alloc(ElemSize);
 		static if ( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) GC.addRange(mem.ptr, ElemSize, typeid(T));
 		return emplace!T(mem, args);
+
 	}
-	
+
 	void free(TR obj)
 	{
 		auto objc = obj;
@@ -98,7 +61,11 @@ template ObjectAllocator(T, ALLOC)
 		else .destroy(objc);
 
 		static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) GC.removeRange(cast(void*)obj);
-		getAllocator!(ALLOC.ident)().free((cast(void*)obj)[0 .. ElemSize]);
+
+		static if (ALLOC.stringof != "PoolStack")
+			getAllocator!(ALLOC.ident)().free((cast(void*)obj)[0 .. ElemSize]);
+		else
+			m_getAlloc().free((cast(void*)obj)[0 .. ElemSize]);
 
 	}
 }
@@ -106,7 +73,6 @@ template ObjectAllocator(T, ALLOC)
 /// Allocates an array without touching the memory.
 T[] allocArray(T, ALLOC = ThreadMem)(size_t n)
 {
-
 	import core.memory : GC;
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
@@ -227,29 +193,18 @@ static:
 		freeArray!(ElementType!T, THIS)(arr);
 	}
 
-static if (ident == ScopedFiberPool):
-package:
-	void ignore(void* ptr) {
-		static if( HasDebugAllocations) {
-			auto allocator = getAllocator!ident();
-			allocator.ignore(ptr);
-		}
-	}
-
-	void addDtor(void delegate() dtor) {
-		auto allocator = getAllocator!ScopedFiberPool();
-		static if (HasDebugAllocations) allocator.m_baseAlloc.onDestroy(dtor);
-		else allocator.onDestroy(dtor);
-	}
-	
-	
-
 }
 
 string translateAllocator() { /// requires (ALLOC) template parameter
 	return `
 	static assert(ALLOC.ident, "The 'ALLOC' template parameter is not in scope.");
-	ReturnType!(getAllocator!(ALLOC.ident)) thisAllocator() {
-		return getAllocator!(ALLOC.ident)();
-	}`;
+	static if (ALLOC.stringof != "PoolStack") {
+		ReturnType!(getAllocator!(ALLOC.ident)) thisAllocator() {
+			return getAllocator!(ALLOC.ident)();
+		}
+	}
+	else {
+		ReturnType!(ALLOC.front) function() thisAllocator = &ALLOC.front;
+	}
+	`;
 }
