@@ -4,12 +4,11 @@ The `memutils` library provides a set of 4 enhanced allocators tweaked for bette
 A new allocation syntax comes with many benefits, including the easy replacement of allocators.
 
 - `AppMem` : The AppMem Allocator pipes through the original garbage collection, but is integrated to support the new syntax and recommends manual management. If the `DebugAllocator` is disabled, automatic garbage collection works through this allocator but it will *not* call any explicit destructors.
-- `ThisThread`: This allocator is fine tuned for thread-local heap allocations and doesn't slow down due to locks or additional pressure on the GC.
-- `ThisFiber`: The Fiber Pool contains a list of destructors allocated through it and they are called when it goes out of scope. It is 
-best used in a Fiber (Task) to prevent locking, GC pressure, and to release memory in the fastest way possible. 
+- `ThreadMem`: This allocator is fine tuned for thread-local heap allocations and doesn't slow down due to locks or additional pressure on the GC.
 - `SecureMem`: When storing sensitive data such as private certificates, passwords or keys, the CryptoSafe allocator
 enhances safety by zeroising the memory after being freed, and optionally it can use a memory pool (SecurePool) 
 that doesn't get dumped to disk on a crash or during OS sleep/hibernation.
+- `alloc!T`: Overrides the GC using the `PoolStack`, or falls back on `new` if no pools are available.
 
 The allocator-friendly containers are:
 - `Vector`: An array.
@@ -22,6 +21,7 @@ The allocator-friendly containers are:
 The allocator-friendly lifetime management objects are:
 - `RefCounted`: Similar to shared_ptr in C++, it's also compatible with interface casting.
 - `Unique`: Similar to unique_ptr in C++, by default it will consider objects to have been created with `new`, but if a custom allocator is specified it will destroy an object pointer allocated from the same allocator with `.free`.
+ - `ScopedPool`: Adds a `Pool` to the `PoolStack` until the end of scope, allowing an override of GC allocations when calling `alloc` anywhere beyond its creation.
 
 The `RefCounted` object makes use of a new `mixin template`, available to replace the `alias this m_obj;` idiom, it can be found in `memutils.helpers`. It enables the proxying of operators (including operator overloads) from the underlying object. Type inference will not work for callback delegates used in methods such as `opApply`, but essentially it allows the most similar experience to base interfaces. 
 
@@ -46,12 +46,12 @@ void main() {
 ```
 ---------------
 
-You can use `AppMem`, `ThisThread`, `ThisFiber`, `SecureMem` for array or object allocations!
+You can use `AppMem`, `ThreadMem`, `SecureMem` for array or object allocations!
 
 ```D
- A a = ThisThread.alloc!A();
+ A a = ThreadMem.alloc!A();
  // do something with "a"
- ThisThread.free(a);
+ ThreadMem.free(a);
 
  ubyte[] ub = AppMem.alloc!(ubyte[])(150);
  assert(ub.length == 150);
