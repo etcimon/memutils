@@ -150,8 +150,9 @@ static:
 			if (m_fstack.hasTop)
 				return m_fstack.pop();
 			//else
-			cast(void) m_ffreezer.pop(1);
+			auto ret = m_ffreezer.pop(1);
 			//logTrace("Pop ThreadStack instead");
+			m_fstack.cnt--;
 			return;
 		}
 		// else
