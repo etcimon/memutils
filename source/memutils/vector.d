@@ -154,7 +154,24 @@ struct Vector(T, ALLOC = ThreadMem)
 			}
 			_capacity = elements;
 		}
-		
+
+		static if (is(T == char))
+		size_t pushBack(Stuff)(Stuff stuff) 
+			if (is(Stuff == char[]) || is(Stuff == string))
+		{
+			TRACE("Vector.append @disabled this(this)");
+			if (_capacity <= length + stuff.length)
+			{
+				reserve(1 + (length + stuff.length) * 3 / 2);
+			}
+			assert(capacity >= length + stuff.length && _payload.ptr);
+						
+			memmove(_payload.ptr + _payload.length, stuff.ptr, stuff.length);
+			_payload = _payload.ptr[0 .. _payload.length + stuff.length];
+			
+			return 1;
+		}
+
 		size_t pushBack(Stuff)(auto ref Stuff stuff)
 			if (!isImplicitlyConvertible!(T, T) && is(T == Stuff))
 		{
@@ -364,10 +381,10 @@ struct Vector(T, ALLOC = ThreadMem)
      */
 	auto opSlice() inout
 	{
-		static if (is(T[] == ubyte[]))
-			return cast(string) _data._payload;
-		else
-			return *cast(T[]*)&_data._payload;
+		//static if (is(T[] == ubyte[]))
+		//	return cast(string) _data._payload;
+		//else
+		return *cast(T[]*)&_data._payload;
 	}
 	
 	/**

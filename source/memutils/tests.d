@@ -266,6 +266,7 @@ void scopedTest() {
 		num = alloc!A(0);
 		num.a = 2;
 		//logDebug("Freezing");
+		PoolStack.disable(); PoolStack.enable();
 		PoolStack.freeze(1);
 		//logDebug("Frozen");
 		assert(PoolStack.empty, "Stack is not empty");
@@ -279,7 +280,7 @@ void scopedTest() {
 
 
 	Fiber f;
-	f = new Fiber(delegate { auto pool = ScopedPool(); destroy(pool); });
+	f = new Fiber(delegate { auto pool = ScopedPool(); pool.freeze(); pool.unfreeze(); PoolStack.disable(); PoolStack.enable(); });
 	f.call();
 }
 

@@ -18,6 +18,8 @@ import core.exception;
 alias ScopedPool = RefCounted!ScopedPoolImpl;
 
 final class ScopedPoolImpl {
+	// TODO: Use a name for debugging?
+
 	int id;
 	/// Initializes a scoped pool with max_mem
 	/// max_mem doesn't do anything at the moment
@@ -130,41 +132,49 @@ static:
 
 	/// creates a new pool as the fiber stack top or the thread stack top
 	void push() {
-		logTrace("Pushing PoolStack");
+		//logTrace("Pushing PoolStack");
 		if (Fiber.getThis())
 			return m_fstack.push();
 		m_tstack.push();
-		logTrace("Pushed ThreadStack");
+		//logTrace("Pushed ThreadStack");
 	}
 
 	/// destroy the most recent pool and free all its resources, calling destructors
 	/// if you're in a fiber, search for stack top in the fiber stack or the fiber freezer and destroy it.
 	/// otherwise, search in the thread stack or the thread freezer and destroy it.
 	void pop() {
-		logTrace("Pop PoolStack");
+		//logTrace("Pop PoolStack");
 		if (Fiber.getThis() && (!m_fstack.empty || !m_ffreezer.empty))
 		{
-			logTrace("Pop FiberStack");
+			//logTrace("Pop FiberStack");
 			if (m_fstack.hasTop)
 				return m_fstack.pop();
 			//else
 			cast(void) m_ffreezer.pop(1);
-			logTrace("Pop ThreadStack instead");
+			//logTrace("Pop ThreadStack instead");
 			return;
 		}
 		// else
 		auto front = m_tstack.front;
 		assert(front, "Can't find a pool to pop");
-		logTrace("Pop ThreadStack");
+		//logTrace("Pop ThreadStack");
 		if (m_tstack.hasTop)
 			return m_tstack.pop();
-		logTrace("Doesn't have top?");
+		//logTrace("Doesn't have top?");
 		//else
 		auto ret = m_tfreezer.pop(1);
 
 		m_tstack.cnt--;
-		logTrace("Destroyign ", ret.back.id);
+		//logTrace("Destroyign ", ret.back.id);
 
+	}
+
+	void disable() {
+		freeze(m_tstack.length + m_fstack.length);
+	}
+
+	void enable() {
+		unfreeze(m_ffreezer.length + m_tfreezer.length);
 	}
 
 package:
@@ -232,7 +242,7 @@ struct ThreadPoolFreezer
 
 	void push(Array!(ManagedPool, Malloc) pools)
 	{
-		logTrace("Push Thread Freezer of ", m_pools.length);
+		//logTrace("Push Thread Freezer of ", m_pools.length);
 		// insert sorted
 		foreach(ref item; pools[]) {
 			bool found;
@@ -245,19 +255,19 @@ struct ThreadPoolFreezer
 			}
 			if (!found) m_pools ~= item;
 		}
-		logTrace("Pushed Thread Freezer now ", m_pools.length);
+		//logTrace("Pushed Thread Freezer now ", m_pools.length);
 	}
 
 	Array!(ManagedPool, Malloc) pop(size_t n) {
 		assert(!empty);
-		logTrace("Pop Thread Freezer of ", m_pools.length, " id ", m_pools.back.id);
+		//logTrace("Pop Thread Freezer of ", m_pools.length, " id ", m_pools.back.id);
 		// already sorted
 		auto pools = Array!(ManagedPool, Malloc)( m_pools[$-n .. $] );
 
 		
 		m_pools.length = (m_pools.length - 1);
-		logTrace("Popped Thread Freezer returning ", pools.length, " expecting ", n);
-		logTrace("Returning ID ", pools.back.id);
+		//logTrace("Popped Thread Freezer returning ", pools.length, " expecting ", n);
+		//logTrace("Returning ID ", pools.back.id);
 		return pools;
 	}
 	
@@ -285,7 +295,7 @@ struct FiberPoolFreezer
 
 	void push(Array!(ManagedPool, Malloc) pools)
 	{
-		logTrace("Push Fiber Freezer of ", length);
+		//logTrace("Push Fiber Freezer of ", length);
 		Fiber f = Fiber.getThis();
 		assert(f !is null);
 		if (auto ptr = (f in m_pools)) {
@@ -303,16 +313,16 @@ struct FiberPoolFreezer
 				}
 				if (!found) arr ~= item;
 			}
-			logTrace("Pushed Fiber Freezer of ", length);
+			//logTrace("Pushed Fiber Freezer of ", length);
 			return;
 		}
 		//else
 		m_pools[f] = pools.dupr;
-		logTrace("Pushed Fiber Freezer of ", length);
+		//logTrace("Pushed Fiber Freezer of ", length);
 	}
 
 	Array!(ManagedPool, Malloc) pop(size_t n) {
-		logTrace("Pop Fiber Freezer of ", length);
+		//logTrace("Pop Fiber Freezer of ", length);
 		assert(!empty);
 		
 		Fiber f = Fiber.getThis();
@@ -326,7 +336,7 @@ struct FiberPoolFreezer
 		// already sorted
 		auto pools = Array!(ManagedPool, Malloc)( arr[$-n .. $] );
 		arr.length = (arr.length - n);
-		logTrace("Popped Fiber Freezer of ", length);
+		//logTrace("Popped Fiber Freezer of ", length);
 		return pools;
 	}
 
@@ -344,15 +354,15 @@ struct ThreadPoolStack
 
 
 	ManagedPool opIndex(size_t n) {
-		logTrace("OpIndex[", n, "] in Thread Pool of ", length, " top: ", cnt, " id: ", m_pools[n].id);
+		//logTrace("OpIndex[", n, "] in Thread Pool of ", length, " top: ", cnt, " id: ", m_pools[n].id);
 		return m_pools[n];
 	}
 
 	@property ManagedPool front() 
 	{
-		logTrace("Front Thread Pool of ", length);
+		//logTrace("Front Thread Pool of ", length);
 		if (empty) {
-			logTrace("Empty");
+			//logTrace("Empty");
 			return ManagedPool();
 		}
 		return m_pools.back;
@@ -361,38 +371,38 @@ struct ThreadPoolStack
 	void pop()
 	{
 		assert(!empty);
-		logTrace("Pop Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//logTrace("Pop Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 		auto pool = m_pools.back;
 		assert(pool.id == cnt-1);
 		--cnt;
 		m_pools.removeBack();
-		if (!empty) logTrace("Popped Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//if (!empty) logTrace("Popped Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 	}
 
 	void push() {
-		if (!m_pools.empty) logTrace("Push Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
-		else logTrace("Push Thread Pool of ", length, " top: ", cnt);
+		//if (!m_pools.empty) logTrace("Push Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//else logTrace("Push Thread Pool of ", length, " top: ", cnt);
 		ManagedPool pool = ManagedPool();
 		pool.id = cnt++;
 		m_pools.pushBack(pool);
-		logTrace("Pushed Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//logTrace("Pushed Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 	}
 
 	Array!(ManagedPool, Malloc) freeze(size_t n) {
 		assert(!empty);
-		if (!m_pools.empty) logTrace("Freeze ", n, " in Thread Pool of ", length, " top: ", cnt);
-		else logTrace("Freeze ", n, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//if (!m_pools.empty) logTrace("Freeze ", n, " in Thread Pool of ", length, " top: ", cnt);
+		//else logTrace("Freeze ", n, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 		assert(n <= length);
-		Array!(ManagedPool, Malloc) ret = Array!(ManagedPool, Malloc)(m_pools[$-n .. $]);
-		
+		Array!(ManagedPool, Malloc) ret;
+		ret[] = m_pools[$-n .. $];
 		m_pools.length = (m_pools.length - 1);
-		logTrace("Returning ", ret.length);
-		if (!empty) logTrace("Freezeed ", n, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//logTrace("Returning ", ret.length);
+		//if (!empty) logTrace("Freezeed ", n, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 		return ret;
 	}
 
 	void unfreeze(Array!(ManagedPool, Malloc) pools) {
-		logTrace("Unfreeze ", pools.length, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//logTrace("Unfreeze ", pools.length, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 		// insert sorted
 		foreach(ref item; pools[]) {
 			bool found;
@@ -405,7 +415,7 @@ struct ThreadPoolStack
 			}
 			if (!found) m_pools ~= item;
 		}
-		logTrace("Unfreezed ", pools.length, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//logTrace("Unfreezed ", pools.length, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 	}
 
 package:
@@ -437,7 +447,7 @@ struct FiberPoolStack
 	ManagedPool opIndex(size_t n) {
 		assert(!empty);
 		Fiber f = Fiber.getThis();
-		logTrace("OpIndex[", n, "] in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f][n].id);
+		//logTrace("OpIndex[", n, "] in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f][n].id);
 		return m_pools[f][n];
 
 	}
@@ -447,7 +457,7 @@ struct FiberPoolStack
 		assert(!empty);
 		Fiber f = Fiber.getThis();
 		if (auto ptr = (f in m_pools)) {
-			logTrace("front in Fiber Pool of ", length, " top: ", cnt, " len: ", (*ptr).back().id);
+			//logTrace("front in Fiber Pool of ", length, " top: ", cnt, " len: ", (*ptr).back().id);
 			return (*ptr).back();
 		}
 		return ManagedPool();
@@ -459,14 +469,14 @@ struct FiberPoolStack
 		assert(!empty);
 
 		Fiber f = Fiber.getThis();
-		logTrace("pop in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
+		//logTrace("pop in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
 		auto arr = m_pools[f];
 		assert(arr.back.id == cnt-1);
 		arr.removeBack();
 		cnt++;
 		if (arr.empty) 
 			m_pools.remove(f);
-		if (!empty) logTrace("popped in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
+		//if (!empty) logTrace("popped in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
 	}
 
 	void push()
@@ -474,7 +484,7 @@ struct FiberPoolStack
 		ManagedPool pool = ManagedPool();
 		pool.id = cnt++;
 		Fiber f = Fiber.getThis();
-		if (!empty) logTrace("Push in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools.get(f).back.id);
+		//if (!empty) logTrace("Push in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools.get(f).back.id);
 		assert(f !is null);
 		if (auto ptr = (f in m_pools)) {
 			*ptr ~= pool;
@@ -491,11 +501,12 @@ struct FiberPoolStack
 	Array!(ManagedPool, Malloc) freeze(size_t n) {
 		assert(n <= length);
 		Fiber f = Fiber.getThis();
-		logTrace("Freeze in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
+		//logTrace("Freeze in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
 		auto arr = m_pools[f];
-		Array!(ManagedPool, Malloc) ret = Array!(ManagedPool, Malloc)(arr[$-n .. $]);
+		Array!(ManagedPool, Malloc) ret;
+		ret[] = arr[$-n .. $];
 		arr.length = (arr.length - n);
-		logTrace("Frozen in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
+		//logTrace("Frozen in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
 		return ret;
 	}
 
@@ -504,7 +515,7 @@ struct FiberPoolStack
 	{
 		Fiber f = Fiber.getThis();
 		assert(f !is null);
-		logTrace("Unfreeze in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
+		//logTrace("Unfreeze in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
 		if (auto ptr = (f in m_pools)) {
 			auto arr = *ptr;
 			// insert sorted
@@ -519,7 +530,7 @@ struct FiberPoolStack
 				}
 				if (!found) arr ~= item;
 			}
-			logTrace("Unfrozen in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
+			//logTrace("Unfrozen in Fiber Pool of ", length, " top: ", cnt, " id: ", m_pools[f].back.id);
 			return;
 		}
 		assert(false);

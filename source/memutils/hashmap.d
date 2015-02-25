@@ -259,7 +259,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 			m_hasher = (Key k) {
 				import std.typecons : scoped;
 				import memutils.vector : Vector;
-				Vector!ubyte s = k.toVector();
+				Vector!char s = k.toVector();
 				size_t hash = hashOf(s[], 0);
 				return hash;
 			};
