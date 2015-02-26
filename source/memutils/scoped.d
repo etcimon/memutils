@@ -25,23 +25,23 @@ final class ScopedPoolImpl {
 	/// max_mem doesn't do anything at the moment
 	this(size_t max_mem = 0) {
 		PoolStack.push();
-		id = PoolStack.front.id;
+		id = PoolStack.top.id;
 	}
 
 	~this() {
-		debug if(id != PoolStack.front.id) unfreeze();
+		debug if(id != PoolStack.top.id) unfreeze();
 		PoolStack.pop();
 	}
 
 	/// Use only if ScopedPool is the highest on stack.
 	void freeze() {
-		enforce(id == PoolStack.front.id);
+		enforce(id == PoolStack.top.id);
 		enforce(PoolStack.freeze(1) == 1, "Failed to freeze pool");
 	}
 
 	void unfreeze() {
 		enforce(PoolStack.unfreeze(1) == 1, "Failed to unfreeze pool");
-		enforce(id == PoolStack.front.id);
+		enforce(id == PoolStack.top.id);
 	}
 }
 
@@ -55,7 +55,7 @@ T alloc(T, ARGS...)(auto ref ARGS args)
 		
 		// Add destructor to pool
 		static if (hasElaborateDestructor!T || __traits(hasMember, T, "__dtor") ) 
-			PoolStack.front().onDestroy(&ret.__dtor);
+			PoolStack.top().onDestroy(&ret.__dtor);
 	}
 	else {
 		ret = new T(args);
@@ -74,7 +74,7 @@ T* alloc(T, ARGS...)(auto ref ARGS args)
 		
 		// Add destructor to pool
 		static if (hasElaborateDestructor!T || __traits(hasMember, T, "__dtor") ) 
-			PoolStack.front.onDestroy(&ret.__dtor);
+			PoolStack.top.onDestroy(&ret.__dtor);
 		
 	}
 	else {
@@ -123,11 +123,11 @@ static:
 	@property bool empty() { return m_tstack.empty && m_fstack.empty; }
 
 	/// returns the most recent unfrozen pool, null if none available
-	@property ManagedPool front() {
+	@property ManagedPool top() {
 		if (Fiber.getThis() && !m_fstack.empty) {
-			return m_fstack.front;
+			return m_fstack.top;
 		}
-		return m_tstack.front;
+		return m_tstack.top;
 	}
 
 	/// creates a new pool as the fiber stack top or the thread stack top
@@ -156,8 +156,8 @@ static:
 			return;
 		}
 		// else
-		auto front = m_tstack.front;
-		assert(front, "Can't find a pool to pop");
+		auto top = m_tstack.top;
+		assert(top, "Can't find a pool to pop");
 		//logTrace("Pop ThreadStack");
 		if (m_tstack.hasTop)
 			return m_tstack.pop();
@@ -351,7 +351,7 @@ struct ThreadPoolStack
 	@property size_t length() const { return m_pools.length; }
 	@property bool empty() const { return length == 0; }
 	size_t opDollar() const { return length; }
-	@property bool hasTop() { return length > 0 && cnt-1 == front.id; }
+	@property bool hasTop() { return length > 0 && cnt-1 == top.id; }
 
 
 	ManagedPool opIndex(size_t n) {
@@ -359,7 +359,7 @@ struct ThreadPoolStack
 		return m_pools[n];
 	}
 
-	@property ManagedPool front() 
+	@property ManagedPool top() 
 	{
 		//logTrace("Front Thread Pool of ", length);
 		if (empty) {
@@ -437,7 +437,7 @@ struct FiberPoolStack
 		return 0;
 	}
 
-	@property bool hasTop() { return length > 0 && cnt-1 == front.id; }
+	@property bool hasTop() { return length > 0 && cnt-1 == top.id; }
 
 	@property bool empty() const {
 		return length == 0; 
@@ -453,19 +453,19 @@ struct FiberPoolStack
 
 	}
 
-	@property ManagedPool front() 
+	@property ManagedPool top() 
 	{
 		assert(!empty);
 		Fiber f = Fiber.getThis();
 		if (auto ptr = (f in m_pools)) {
-			//logTrace("front in Fiber Pool of ", length, " top: ", cnt, " len: ", (*ptr).back().id);
+			//logTrace("top in Fiber Pool of ", length, " top: ", cnt, " len: ", (*ptr).back().id);
 			return (*ptr).back();
 		}
 		return ManagedPool();
 
 	}
 
-	// returns next item ie. front()
+	// returns next item ie. top()
 	void pop() {
 		assert(!empty);
 
@@ -547,7 +547,7 @@ private void registerPoolArray(T)(ref T arr) {
 	// Add destructors to fiber pool
 	static if (is(T == struct) && (hasElaborateDestructor!(ElementType!T) || __traits(hasMember, ElementType!T, "__dtor") )) {
 		foreach (ref el; arr)
-			PoolStack.front.onDestroy(&el.__dtor);
+			PoolStack.top.onDestroy(&el.__dtor);
 	}
 }
 
@@ -557,10 +557,10 @@ private void reregisterPoolArray(T)(ref T arr, ref T arr2) {
 	static if (is(T == struct) && (hasElaborateDestructor!(ElementType!T) || __traits(hasMember, ElementType!T, "__dtor") )) {
 		if (arr.ptr is arr2.ptr && arr2.length > arr.length) {
 			foreach (ref el; arr2[arr.length - 1 .. $])
-				PoolStack.front.onDestroy(&el.__dtor);
+				PoolStack.top.onDestroy(&el.__dtor);
 		}
 		else {
-			PoolStack.front.removeArrayDtors(&arr.back.__dtor, arr.length);
+			PoolStack.top.removeArrayDtors(&arr.back.__dtor, arr.length);
 			registerPoolArray(arr2);
 		}
 	}

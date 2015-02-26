@@ -35,7 +35,7 @@ template ObjectAllocator(T, ALLOC)
 	enum ElemSize = AllocSize!T;
 
 	static if (ALLOC.stringof == "PoolStack") {
-		ReturnType!(ALLOC.front) function() m_getAlloc = &ALLOC.front;
+		ReturnType!(ALLOC.top) function() m_getAlloc = &ALLOC.top;
 	}
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
@@ -203,7 +203,7 @@ string translateAllocator() { /// requires (ALLOC) template parameter
 		}
 	}
 	else {
-		ReturnType!(ALLOC.front) function() thisAllocator = &ALLOC.front;
+		ReturnType!(ALLOC.top) function() thisAllocator = &ALLOC.top;
 	}
 	`;
 }
