@@ -197,7 +197,6 @@ static:
 
 string translateAllocator() { /// requires (ALLOC) template parameter
 	return `
-	static assert(ALLOC.ident, "The 'ALLOC' template parameter is not in scope.");
 	static if (ALLOC.stringof != "PoolStack") {
 		ReturnType!(getAllocator!(ALLOC.ident)) thisAllocator() {
 			return getAllocator!(ALLOC.ident)();

@@ -96,7 +96,7 @@ auto alloc(T)(size_t n)
 		registerPoolArray(ret);
 	}
 	else {
-		ret = new T[n];
+		ret = new T(n);
 	}
 	return ret;
 }
