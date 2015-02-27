@@ -49,7 +49,13 @@ template ObjectAllocator(T, ALLOC)
 			auto mem = getAllocator!(ALLOC.ident)().alloc(ElemSize);
 		else
 			auto mem = m_getAlloc().alloc(ElemSize);
-		static if ( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) GC.addRange(mem.ptr, ElemSize, typeid(T));
+		static if ( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) 
+		{
+			static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
+				GC.addRange(mem.ptr, ElemSize, typeid(T));
+			else
+				GC.addRange(mem.ptr, ElemSize);	
+		}
 		return emplace!T(mem, args);
 
 	}
@@ -86,7 +92,10 @@ T[] allocArray(T, ALLOC = ThreadMem)(size_t n)
 	
 	static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
 		// TODO: Do I need to add range for GC.malloc too?
-		GC.addRange(mem.ptr, mem.length, typeid(T));
+		static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
+			GC.addRange(mem.ptr, mem.length, typeid(T));
+		else
+			GC.addRange(mem.ptr, mem.length);
 	}
 
 	// don't touch the memory - all practical uses of this function will handle initialization.
@@ -111,7 +120,10 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	
 	static if (hasIndirections!T && !NOGC) {
 		GC.removeRange(array.ptr);
-		GC.addRange(mem.ptr, mem.length, typeid(T));
+		static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
+                                GC.addRange(mem.ptr, mem.length, typeid(T));
+                        else
+                                GC.addRange(mem.ptr, mem.length);
 		// Zero out unused capacity to prevent gc from seeing false pointers
 		memset(mem.ptr + (array.length * T.sizeof), 0, (n - array.length) * T.sizeof);
 	}
