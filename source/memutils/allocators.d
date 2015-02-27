@@ -99,6 +99,8 @@ shared static ~this() {
    .exit(0); // TODO: Fix invariant error. Maybe this is due to an erroneous treap in GC
 }
 
+version(LDC) shared static ~this() { .exit(0); } // LDC unit tests failing otherwise
+
 size_t alignedSize(size_t sz)
 {
 	return ((sz + Allocator.alignment - 1) / Allocator.alignment) * Allocator.alignment;

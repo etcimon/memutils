@@ -36,7 +36,7 @@ version(Posix) {
 	enum { MADV_DONTDUMP = 16 }
 }
 version(Windows) {
-	private nothrow @nogc pure:
+	@nogc private nothrow pure:
 	import core.sys.windows.windows;
 
 	enum PROT_READ = 0;
