@@ -9,6 +9,8 @@ import std.algorithm : startsWith;
 import memutils.constants;
 import memutils.vector : Array;
 import std.traits : isArray;
+import std.range : ElementType;
+import memutils.helpers : UnConst;
 
 struct AppMem {
 	mixin ConvenienceAllocators!(NativeGC, typeof(this));
@@ -167,14 +169,14 @@ static:
 		return ObjectAllocator!(T, THIS).alloc(args);
 	}
 	
-	void free(T)(ref T* obj)
+	void free(T)(auto ref T* obj)
 		if (!isArray!T && !is(T : Object))
 	{
 		scope(exit) obj = null;
 		ObjectAllocator!(T, THIS).free(obj);
 	}
 	
-	void free(T)(ref T obj)
+	void free(T)(auto ref T obj)
 		if (!isArray!T && is(T  : Object))
 	{
 		scope(exit) obj = null;
@@ -185,24 +187,35 @@ static:
 	auto alloc(T)(size_t n)
 		if (isArray!T)
 	{
-		import std.range : ElementType;
-		return allocArray!(ElementType!T, THIS)(n);
+		alias ElType = UnConst!(typeof(T.init[0]));
+		return allocArray!(ElType, THIS)(n);
 	}
-	
-	auto realloc(T)(ref T arr, size_t n)
+
+	auto copy(T)(auto ref T arr)
 		if (isArray!T)
 	{
-		import std.range : ElementType;
-		scope(exit) arr = null;
-		return reallocArray!(ElementType!T, THIS)(arr, n);
+		alias ElType = UnConst!(typeof(arr[0]));
+		auto arr_copy = allocArray!(ElType, THIS)(arr.length);
+		memcpy(arr_copy.ptr, arr.ptr, arr.length);
+
+		return cast(T)arr_copy;
 	}
-	
-	void free(T)(ref T arr)
+
+	auto realloc(T)(auto ref T arr, size_t n)
 		if (isArray!T)
 	{
-		import std.range : ElementType;
+		alias ElType = UnConst!(typeof(arr[0]));
 		scope(exit) arr = null;
-		freeArray!(ElementType!T, THIS)(arr);
+		auto arr_copy = reallocArray!(typeof(arr[0]), THIS)(arr, n);
+		return cast(T) arr_copy;
+	}
+	
+	void free(T)(auto ref T arr)
+		if (isArray!T)
+	{
+		alias ElType = typeof(arr[0]);
+		scope(exit) arr = null;
+		freeArray!(ElType, THIS)(arr);
 	}
 
 }
