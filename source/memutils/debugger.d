@@ -19,13 +19,19 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	}
 
 	~this() { m_blocks.clear(); }
-
-	@property size_t allocatedBlockCount() const { return m_blocks.length; }
-	@property size_t bytesAllocated() const { return m_bytes; }
-	@property size_t maxBytesAllocated() const { return m_maxBytes; }
-	
+	public {
+		@property size_t allocatedBlockCount() const { return m_blocks.length; }
+		@property size_t bytesAllocated() const { return m_bytes; }
+		@property size_t maxBytesAllocated() const { return m_maxBytes; }
+		void printMap() {
+			foreach(const ref void* ptr, const ref size_t sz; m_blocks) {
+				logDebug(ptr, " sz ", sz);
+			}
+		}
+	}
 	void[] alloc(size_t sz)
 	{
+
 		assert(sz > 0, "Cannot serve a zero-length allocation");
 
 		//logTrace("Bytes allocated in ", Base.stringof, ": ", bytesAllocated());
@@ -40,6 +46,10 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 				//logTrace("New allocation maximum: %d (%d blocks)", m_maxBytes, m_blocks.length);
 			}
 		}
+
+
+		//logDebug("Alloc ptr: ", ret.ptr, " sz: ", ret.length);
+		
 		return ret;
 	}
 	
@@ -75,7 +85,8 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 			assert(sz != size_t.max, "free() called with non-allocated object. "~ mem.ptr.to!string~ " m_blocks len: "~ m_blocks.length.to!string);
 			assert(sz == mem.length, "free() called with block of wrong size.");
 		}
-		
+
+		//logDebug("free ptr: ", mem.ptr, " sz: ", mem.length);
 		m_baseAlloc.free(mem);
 		
 		synchronized(this) {

@@ -68,7 +68,7 @@ interface Allocator {
 
 package:
 
-auto getAllocator(int ALLOC)() {
+public auto getAllocator(int ALLOC)() {
 	static if (ALLOC == LocklessFreeList) alias R = LocklessAllocator;
 	else static if (ALLOC == NativeGC) alias R = ProxyGCAllocator;
 	else static if (HasCryptoSafe && ALLOC == CryptoSafe) alias R = CryptoSafeAllocator;

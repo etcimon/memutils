@@ -43,11 +43,13 @@ public:
 		static if (HasBotan || HasSecurePool) {
 			//logTrace("CryptoSafe alloc ", n);
 			if (void[] p = ms_zeroise.alloc(n)) {
-				//logTrace("alloc P: ", p.length, " & ", p.ptr);
+				//logDebug("alloc P: ", p.length, " & ", p.ptr);
 				return p;
 			}
 		}
 		void[] p = m_secondary.alloc(n);
+
+		//logDebug("FALLBACK alloc P: ", p.length, " & ", p.ptr);
 		return p;
 	}
 

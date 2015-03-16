@@ -6,5 +6,6 @@
 	"authors": ["Etienne Cimon", "Sönke Ludwig", "others..."],
 	"target": "staticLibrary",
 	"versions": ["CryptoSafe", "SecurePool"],
-	"buildOptions": []
+	"buildOptions": [],
+	"dependencies": { "backtrace-d": "~master"}
 }
