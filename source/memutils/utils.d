@@ -196,7 +196,7 @@ static:
 	{
 		alias ElType = UnConst!(typeof(arr[0]));
 		auto arr_copy = allocArray!(ElType, THIS)(arr.length);
-		memcpy(arr_copy.ptr, arr.ptr, arr.length);
+		memcpy(arr_copy.ptr, arr.ptr, arr.length * ElType.sizeof);
 
 		return cast(T)arr_copy;
 	}
