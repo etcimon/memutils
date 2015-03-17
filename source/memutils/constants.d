@@ -34,6 +34,9 @@ static if (HasDebuggerEnabled && !DisableDebugAllocations ) const HasDebugAlloca
 else static if (!DisableDebugAllocations && HasUnittests) const HasDebugAllocations = true;
 else					  const HasDebugAllocations = false;
 
+version(SkipMemutilsTests) const SkipUnitTests = true;
+else					   const SkipUnitTests = false;
+
 enum { // LogLevel
 	Trace,
 	Info,

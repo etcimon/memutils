@@ -284,7 +284,7 @@ void scopedTest() {
 	f.call();
 }
 
-// TODO: test FiberPool, Circular buffer, Scoped
+static if (!SkipUnitTests)
 unittest {
 	propagateTests!hashmapFreeListTest();
 	propagateTests!vectorArrayTest();
