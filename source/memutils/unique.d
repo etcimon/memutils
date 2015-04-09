@@ -216,3 +216,7 @@ private:
 		static RBTree!(void*, "a < b", true, Malloc) ptree;
 	}
 }
+
+auto unique(T)(T obj) {
+	return Unique!T(obj);
+}
