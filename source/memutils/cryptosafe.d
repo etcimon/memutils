@@ -26,6 +26,7 @@ private:
 		
 		__gshared SecurePool ms_zeroise;	
 		shared static this() { 
+			//logDebug("Shared static this() SecurePool");
 			if (!ms_zeroise) ms_zeroise = new SecurePool();
 		}
 		shared static ~this() { 
@@ -41,12 +42,13 @@ public:
 	void[] alloc(size_t n)
 	{
 		static if (HasBotan || HasSecurePool) {
-			//logTrace("CryptoSafe alloc ", n);
+			//logDebug("CryptoSafe alloc ", n);
 			if (void[] p = ms_zeroise.alloc(n)) {
-				//logDebug("alloc P: ", p.length, " & ", p.ptr);
+				logDebug("alloc P: ", p.length, " & ", p.ptr);
 				return p;
 			}
 		}
+		//logDebug("secondary alloc");
 		void[] p = m_secondary.alloc(n);
 
 		//logDebug("FALLBACK alloc P: ", p.length, " & ", p.ptr);

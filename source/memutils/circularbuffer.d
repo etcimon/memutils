@@ -42,10 +42,13 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 		@property void capacity(size_t new_size)
 		{
 			if( m_buffer.length ){
-				m_buffer = reallocArray!(T, ALLOC)(m_buffer, new_size);
-				auto newfill = min(m_fill, new_size);
+				auto temp = allocArray!(T, ALLOC)(new_size);
+				size_t tmp_fill = m_fill;
+				read(temp[0 .. m_fill]);
 				m_start = 0;
-				m_fill = newfill;
+				m_fill = tmp_fill;
+				freeArray(m_buffer);
+				m_buffer = temp;
 			} else m_buffer = allocArray!(T, ALLOC)(new_size);
 		}
 	}
@@ -74,7 +77,12 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	}
 	void putN(size_t n) { assert(m_fill+n <= m_buffer.length); m_fill += n; }
 	void popFront() { assert(!empty); m_start = mod(m_start+1); m_fill--; }
-	void popFrontN(size_t n) { assert(length >= n); m_start = mod(m_start + n); m_fill -= n; }
+	void popFrontN(size_t n) { 
+		import std.c.string : memset; 
+		assert(length >= n); 
+		m_start = mod(m_start + n);
+		m_fill -= n;
+	}
 	void popBack() { assert(!empty); m_fill--; }
 	void popBackN(size_t n) { assert(length >= n); m_fill -= n; }
 
@@ -112,6 +120,7 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	}
 	void read(T[] dst)
 	{
+		import std.c.string : memset;
 		assert(dst.length <= length);
 		if( !dst.length ) return;
 		if( mod(m_start) >= mod(m_start+dst.length) ){
@@ -119,8 +128,15 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 			size_t chunk2 = dst.length - chunk1;
 			dst[0 .. chunk1] = m_buffer[m_start .. $];
 			dst[chunk1 .. $] = m_buffer[0 .. chunk2];
+			//static if (is(ALLOC == SecureMem)) 
+			//{
+			//	memset(m_buffer.ptr + m_start, 0, chunk1);
+			//	memset(m_buffer.ptr, 0, chunk2);
+			//}
 		} else {
 			dst[] = m_buffer[m_start .. m_start+dst.length];
+			//static if (is(ALLOC == SecureMem)) 
+			//	memset(m_buffer.ptr + m_start, 0, dst.length);
 		}
 		popFrontN(dst.length);
 	}
