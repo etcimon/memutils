@@ -99,7 +99,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
         have the same key, possibly resulting in duplicates. Use opIndexAssign
         if you want to avoid duplicates.
     */
-	void insert(in KeyType key, ValueType value)
+	void insert()(auto const ref KeyType key, ValueType value)
 	{
 		auto keysum = computeCheckSumI(key);
 		if (m_fieldCount < m_fields.length) {
@@ -285,10 +285,12 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 			m_extendedFieldCount = (m_extendedFieldCount + n)*3/2;
 			logTrace("Extended field count: ", m_extendedFieldCount);
 			m_extendedFields = reallocArray!(Field, ALLOC)(m_extendedFields, m_extendedFieldCount)[0 .. oldsz + n];
+			memset(m_extendedFields.ptr + oldsz, 0, (m_extendedFieldCount-oldsz)*Field.sizeof);
 		}
 		else {
 			m_extendedFieldCount = 16;
 			m_extendedFields = allocArray!(Field, ALLOC)(16).ptr[0 .. n];
+			memset(m_extendedFields.ptr, 0, m_extendedFieldCount*Field.sizeof);
 		}
 	}
 
@@ -332,9 +334,12 @@ private:
 
 void removeFromArrayIdx(T)(ref T[] array, size_t idx)
 {
-	foreach( j; idx+1 .. array.length)
+	import std.algorithm : swap;
+	foreach( j; idx+1 .. array.length) { 
 		array[j-1] = array[j];
-	array.length = array.length-1;
+	}
+	array[array.length-1].destroy();
+	array = array.ptr[0 .. array.length-1];
 }
 
 /// Special version of icmp() with optimization for ASCII characters

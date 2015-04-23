@@ -19,8 +19,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	private TR m_object;
 	private ulong* m_refCount;
 	private void function(void*) m_free;
-	private size_t m_magic = 0x1EE75817; // workaround for compiler bug
-	
+
 	static RefCounted opCall(ARGS...)(auto ref ARGS args)
 	{
 		RefCounted ret;
@@ -35,7 +34,6 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	{
 		//logDebug("RefCounted dtor: ", T.stringof);
 		dtor((cast(RefCounted*)&this));
-		(cast(RefCounted*)&this).m_magic = 0;
 	}
 	
 	static void dtor(U)(U* ctxt) {
@@ -113,7 +111,6 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		m_object = null;
 		m_refCount = null;
 		m_free = null;
-		m_magic = 0x1EE75817;
 	}
 
 	bool opCast(U : bool)() const nothrow
@@ -155,10 +152,13 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		ObjectAllocator!(T, ALLOC).free(m_object);
 		//logTrace("Freeing refCount: ", cast(void*)m_refCount);
 		ObjectAllocator!(ulong, ALLOC).free(m_refCount);
+		m_refCount = null;
+		m_object = null;
 	}
 
 
 	private @property ulong refCount() const {
+		if (!m_refCount) return 0;
 		return *m_refCount;
 	}
 
@@ -169,7 +169,6 @@ struct RefCounted(T, ALLOC = ThreadMem)
 				auto newObj = this.opCall();
 				(cast(RefCounted*)&this).m_object = newObj.m_object;
 				(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
-				//(cast(RefCounted*)&this).m_magic = 0x1EE75817;
 				newObj.m_object = null;
 			}
 		}
@@ -178,8 +177,6 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	
 	private void checkInvariants()
 	const {
-		//if (m_magic != 0x1EE75817) logTrace("CheckInvariants failed ", T.stringof);
-		assert(m_magic == 0x1EE75817, "Magic number of " ~ T.stringof ~ " expected 0x1EE75817, set to: " ~ (cast(void*)m_magic).to!string);
 		assert(!m_object || refCount > 0, (!m_object) ? "No m_object" : "Zero Refcount: " ~ refCount.to!string ~ " for " ~ T.stringof);
 	}
 }

@@ -44,7 +44,7 @@ public:
 		static if (HasBotan || HasSecurePool) {
 			//logDebug("CryptoSafe alloc ", n);
 			if (void[] p = ms_zeroise.alloc(n)) {
-				logDebug("alloc P: ", p.length, " & ", p.ptr);
+				//logDebug("alloc P: ", p.length, " & ", p.ptr);
 				return p;
 			}
 		}
