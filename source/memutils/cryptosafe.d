@@ -36,6 +36,9 @@ private:
 
 public:	
 	this() {
+		static if (HasBotan || HasSecurePool) {
+			if (!ms_zeroise) ms_zeroise = new SecurePool();
+		}
 		m_secondary = getAllocator!Base();
 	}
 	
