@@ -78,18 +78,17 @@ public auto getAllocator(int ALLOC)(bool is_freeing = false) {
 	static if (ALLOC == NativeGC) {	
 		static __gshared R alloc;
 		
-		if (!alloc) {
+		if (!alloc && !is_freeing) {
 			alloc = new R;
 		}
 		return alloc;
 	}
-	else if (!is_freeing) return getAllocator!R();
-	else return null;
+	else return getAllocator!R(is_freeing);
 }
 
-R getAllocator(R)() {
+R getAllocator(R)(bool is_freeing = false) {
 	static R alloc;
-	if (!alloc) {
+	if (!alloc && !is_freeing) {
 		alloc = new R;
 	}
 	return alloc;
