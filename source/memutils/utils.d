@@ -70,8 +70,10 @@ template ObjectAllocator(T, ALLOC)
 
 		static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) GC.removeRange(cast(void*)obj);
 
-		static if (ALLOC.stringof != "PoolStack")
-			getAllocator!(ALLOC.ident)().free((cast(void*)obj)[0 .. ElemSize]);
+		static if (ALLOC.stringof != "PoolStack") {
+			if (auto a = getAllocator!(ALLOC.ident)(true))
+				a.free((cast(void*)obj)[0 .. ElemSize]);
+		}
 		else
 			m_getAlloc().free((cast(void*)obj)[0 .. ElemSize]);
 
@@ -137,7 +139,8 @@ void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = si
 {
 	import core.memory : GC;
 	mixin(translateAllocator());
-	auto allocator = thisAllocator();
+	auto allocator = thisAllocator(true); // freeing. Avoid allocating in a dtor
+	if (!allocator) return;
 
 	// logTrace("free ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
@@ -223,8 +226,8 @@ static:
 string translateAllocator() { /// requires (ALLOC) template parameter
 	return `
 	static if (ALLOC.stringof != "PoolStack") {
-		ReturnType!(getAllocator!(ALLOC.ident)) thisAllocator() {
-			return getAllocator!(ALLOC.ident)();
+		ReturnType!(getAllocator!(ALLOC.ident)) thisAllocator(bool is_freeing = false) {
+			return getAllocator!(ALLOC.ident)(is_freeing);
 		}
 	}
 	else {
