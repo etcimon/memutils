@@ -47,8 +47,10 @@ template ObjectAllocator(T, ALLOC)
 
 	TR alloc(ARGS...)(auto ref ARGS args)
 	{
-		static if (ALLOC.stringof != "PoolStack")
-			auto mem = getAllocator!(ALLOC.ident)().alloc(ElemSize);
+		static if (ALLOC.stringof != "PoolStack") {
+			auto allocator_ = getAllocator!(ALLOC.ident)();
+			auto mem = allocator_.alloc(ElemSize);
+		}
 		else
 			auto mem = m_getAlloc().alloc(ElemSize);
 		static if ( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) 

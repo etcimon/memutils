@@ -34,6 +34,7 @@ static if (HasDebugAllocations) {
 	static if (HasCryptoSafe)
 		alias CryptoSafeAllocator = DebugAllocator!(SecureAllocator!(DebugAllocator!(AutoFreeListAllocator!(MallocAllocator))));
 	alias ProxyGCAllocator = DebugAllocator!GCAllocator;
+
 }
 else {
 	alias LocklessAllocator = AutoFreeListAllocator!(MallocAllocator);
@@ -74,10 +75,9 @@ public auto getAllocator(int ALLOC)(bool is_freeing = false) {
 	else static if (HasCryptoSafe && ALLOC == CryptoSafe) alias R = CryptoSafeAllocator;
 	else static if (ALLOC == Mallocator) alias R = MallocAllocator;
 	else static assert(false, "Invalid allocator specified");
-
 	static if (ALLOC == NativeGC) {	
 		static __gshared R alloc;
-		
+
 		if (!alloc && !is_freeing) {
 			alloc = new R;
 		}
