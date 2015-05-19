@@ -105,9 +105,9 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 	~this() {
 		import core.thread : thread_isMainThread;
 		if (!thread_isMainThread)
-		foreach(size_t slot; m_owned) {
-			m_baseAlloc.free( (cast(void*)slot)[0 .. m_elemSize]);
-		}
+			foreach(size_t slot; m_owned) {
+				m_baseAlloc.free( (cast(void*)slot)[0 .. m_elemSize]);
+			}
 	}
 	
 	this(size_t elem_size)
@@ -137,7 +137,8 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 			m_nfree--;
 		} else {
 			mem = m_baseAlloc.alloc(m_elemSize);
-			m_owned ~= cast(size_t)mem.ptr;
+			if (!thread_isMainThread)
+				m_owned ~= cast(size_t)mem.ptr;
 			//logInfo("Alloc %d bytes: alloc: %d, free: %d", SZ, s_nalloc, s_nfree);
 		}
 		m_nalloc++;

@@ -47,7 +47,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 	
 	void remove(Key key)
 	{
-		static if (Key.stringof.countUntil("OIDImpl") != -1) logError("Removing: ", key.toString());
+		//static if (Key.stringof.countUntil("OIDImpl") != -1) logError("Removing: ", key.toString());
 		auto idx = findIndex(key);
 		assert (idx != size_t.max, "Removing non-existent element.");
 		auto i = idx;
