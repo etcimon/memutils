@@ -79,18 +79,10 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	}
 	
 	private void opAssignImpl(U)(U other) {
-		_clear();
-		m_object = cast(typeof(this.m_object))other.m_object;
-		m_refCount = other.m_refCount;
-		static if (!is (U == typeof(this))) {
-			static void destr(void* ptr) {
-				U.dtor(cast(typeof(&this))ptr);
-			}
-			m_free = &destr;
-		} else
-			m_free = other.m_free;
-		if( m_object )
-			(*m_refCount)++;
+		import std.algorithm : swap;
+		.swap(m_object, cast(typeof(this.m_object))other.m_object);
+		.swap(m_refCount, other.m_refCount);
+		.swap(m_free, other.m_free);
 	}
 	
 	private void _clear()

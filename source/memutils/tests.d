@@ -1,6 +1,5 @@
 ﻿module memutils.tests;
 import memutils.all;
-import std.stdio : writeln;
 static if (HasDebugAllocations):
 
 // Test hashmap, freelists

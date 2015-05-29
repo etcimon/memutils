@@ -97,7 +97,7 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 		immutable size_t m_elemSize;
 		Base m_baseAlloc;
 		FreeListSlot* m_firstFree = null;
-		size_t[] m_owned;
+		Vector!(size_t, Malloc) m_owned;
 		size_t m_nalloc = 0;
 		size_t m_nfree = 0;
 	}
@@ -105,7 +105,7 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 	~this() {
 		import core.thread : thread_isMainThread;
 		if (!thread_isMainThread)
-			foreach(size_t slot; m_owned) {
+			foreach(size_t slot; m_owned[]) {
 				m_baseAlloc.free( (cast(void*)slot)[0 .. m_elemSize]);
 			}
 	}

@@ -37,11 +37,12 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 		//logTrace("Bytes allocated in ", Base.stringof, ": ", bytesAllocated());
 		auto ret = m_baseAlloc.alloc(sz);
 		synchronized(this) {
-			try {
-				assert(ret.length == sz, "base.alloc() returned block with wrong size.");
+			assert(ret.length == sz, "base.alloc() returned block with wrong size.");
+
+			/*try {
 				assert(m_blocks.get(cast(const size_t)ret.ptr, size_t.max) == size_t.max, "base.alloc() returned block that is already allocated: " ~ ret.ptr.to!string ~ " sz: " ~ ret.length.to!string ~ " was: " ~ m_blocks.get(cast(const size_t)ret.ptr, size_t.max).to!string);
 			} catch (Throwable e) { import std.stdio : writeln; writeln(e.toString()); }
-
+*/
 			m_blocks[cast(size_t)ret.ptr] = sz;
 			m_bytes += sz;
 			if( m_bytes > m_maxBytes ){
