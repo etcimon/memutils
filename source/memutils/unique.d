@@ -147,7 +147,11 @@ public:
 				}
 
 				static if (is(TR == T*)) .destroy(*_p);
-				else .destroy(_p);
+				else if (auto __p = cast(Object) _p)
+					.destroy(__p);
+				else if (_p !is null)
+					delete _p;
+				else _p = null;
 				//delete _p;
 
 				//static if (HasDebugAllocations && DebugUnique) {
