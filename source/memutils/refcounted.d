@@ -11,7 +11,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 {
 	import core.memory : GC;
 	mixin Embed!m_object;
-
+	static if (!is(ALLOC == AppMem)) enum NOGC = true;
 	enum isRefCounted = true;
 
 	enum ElemSize = AllocSize!T;
@@ -79,10 +79,18 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	}
 	
 	private void opAssignImpl(U)(U other) {
-		import std.algorithm : swap;
-		.swap(m_object, cast(typeof(this.m_object))other.m_object);
-		.swap(m_refCount, other.m_refCount);
-		.swap(m_free, other.m_free);
+		_clear();
+		m_object = cast(typeof(this.m_object))other.m_object;
+		m_refCount = other.m_refCount;
+		static if (!is (U == typeof(this))) {
+			static void destr(void* ptr) {
+				U.dtor(cast(typeof(&this))ptr);
+			}
+			m_free = &destr;
+		} else
+			m_free = other.m_free;
+		if( m_object )
+			(*m_refCount)++;
 	}
 	
 	private void _clear()

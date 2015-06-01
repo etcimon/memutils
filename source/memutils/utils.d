@@ -70,7 +70,10 @@ template ObjectAllocator(T, ALLOC)
 		static if (is(TR == T*)) .destroy(*objc);
 		else .destroy(objc);
 
-		static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) GC.removeRange(cast(void*)obj);
+		static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
+			static if (is(T == T*)) GC.removeRange(cast(void*)obj);
+			else GC.removeRange(cast(void*)&obj);
+		}
 
 		static if (ALLOC.stringof != "PoolStack") {
 			if (auto a = getAllocator!(ALLOC.ident)(true))

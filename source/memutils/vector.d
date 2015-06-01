@@ -27,7 +27,7 @@ public alias SecureVector(T) = Vector!(T, SecureMem);
 struct Vector(T, ALLOC = ThreadMem)
 {	
 	@disable this(this);
-	
+	static if (!is(ALLOC == AppMem)) enum NOGC = true;
 	void opAssign()(auto ref Vector!(T, ALLOC) other) {
 		if (other.ptr !is this.ptr)
 			this.swap(other);
