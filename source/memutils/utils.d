@@ -33,6 +33,7 @@ package:
 template ObjectAllocator(T, ALLOC)
 {
 	import std.traits : ReturnType;
+	import core.memory : GC;
 	enum ElemSize = AllocSize!T;
 
 	static if (ALLOC.stringof == "PoolStack") {
@@ -54,7 +55,10 @@ template ObjectAllocator(T, ALLOC)
 			auto mem = m_getAlloc().alloc(ElemSize);
 		static if ( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) 
 		{
-			GCI.addRange(mem.ptr, ElemSize);
+			static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
+				GC.addRange(mem.ptr, ElemSize, typeid(T));
+			else
+				GC.addRange(mem.ptr, ElemSize);	
 		}
 		return emplace!T(mem, args);
 
@@ -65,13 +69,9 @@ template ObjectAllocator(T, ALLOC)
 		TR objc = obj;
 		static if (is(TR == T*)) .destroy(*objc);
 		else .destroy(objc);
-		static TR last;
-		if (last !is obj)
-			last = obj;
-		else return;
+
 		static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
-			if (!GCI.removeRange(cast(void*)obj))
-				return;
+			GC.removeRange(cast(void*)obj);
 		}
 
 		static if (ALLOC.stringof != "PoolStack") {
@@ -100,7 +100,10 @@ T[] allocArray(T, ALLOC = ThreadMem)(size_t n)
 	
 	static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
 		// TODO: Do I need to add range for GC.malloc too?
-		GCI.addRange(mem.ptr, mem.length, typeid(T));
+		static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
+			GC.addRange(mem.ptr, mem.length, typeid(T));
+		else
+			GC.addRange(mem.ptr, mem.length);
 	}
 
 	// don't touch the memory - all practical uses of this function will handle initialization.
@@ -124,8 +127,11 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	else enum NOGC = false;
 	
 	static if (hasIndirections!T && !NOGC) {
-		GCI.removeRange(array.ptr);
-		GCI.addRange(mem.ptr, mem.length);
+		GC.removeRange(array.ptr);
+		static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
+                                GC.addRange(mem.ptr, mem.length, typeid(T));
+                        else
+                                GC.addRange(mem.ptr, mem.length);
 		// Zero out unused capacity to prevent gc from seeing false pointers
 		memset(mem.ptr + (array.length * T.sizeof), 0, (n - array.length) * T.sizeof);
 	}
@@ -135,6 +141,7 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 
 void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = size_t.max)
 {
+	import core.memory : GC;
 	mixin(translateAllocator());
 	auto allocator = thisAllocator(true); // freeing. Avoid allocating in a dtor
 	if (!allocator) return;
@@ -142,9 +149,9 @@ void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = si
 	// logTrace("free ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
-
+	
 	static if (ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
-		if (!GCI.removeRange(array.ptr)) return;
+		GC.removeRange(array.ptr);
 	}
 
 	static if (hasElaborateDestructor!T) { // calls destructors, but not for indirections...
@@ -159,33 +166,6 @@ void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = si
 	array = null;
 }
 
-struct GCI {
-static:
-	import memutils.hashmap;
-	//HashMap!(size_t, bool, Malloc) m_ranges;
-
-	bool addRange(void* ptr, size_t len, TypeInfo ti = null) {
-		import core.memory : GC;
-		/*if (auto p = cast(size_t)ptr in m_ranges) {
-			return false;
-		}
-		m_ranges[cast(size_t) ptr] = true;*/
-		static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
-			GC.addRange(ptr, len, ti);
-		else
-			GC.addRange(ptr, len);
-		return true;
-	}
-
-	bool removeRange(void* ptr) {
-		import core.memory : GC;
-		//if (auto p = cast(size_t) ptr in m_ranges) {
-			GC.removeRange(ptr);
-			//m_ranges.remove(cast(size_t) ptr);
-		//} else return false;
-		return true;
-	}
-}
 mixin template ConvenienceAllocators(alias ALLOC, alias THIS) {
 	package enum ident = ALLOC;
 static:
