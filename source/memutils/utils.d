@@ -23,8 +23,8 @@ struct ThreadMem {
 struct SecureMem {
 	mixin ConvenienceAllocators!(CryptoSafe, typeof(this));
 }
-
-package struct Malloc {
+// Reserved for containers
+struct Malloc {
 	enum ident = Mallocator;
 }
 
@@ -66,13 +66,14 @@ template ObjectAllocator(T, ALLOC)
 
 	void free(TR obj)
 	{
-		TR objc = obj;
-		static if (is(TR == T*)) .destroy(*objc);
-		else .destroy(objc);
 
 		static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
 			GC.removeRange(cast(void*)obj);
 		}
+
+		TR objc = obj;
+		static if (is(TR == T*)) .destroy(*objc);
+		else .destroy(objc);
 
 		static if (ALLOC.stringof != "PoolStack") {
 			if (auto a = getAllocator!(ALLOC.ident)(true))

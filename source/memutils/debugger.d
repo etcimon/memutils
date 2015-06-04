@@ -1,13 +1,14 @@
 ﻿module memutils.debugger;
 import memutils.allocators;
 import memutils.hashmap;
+import memutils.dictionarylist;
 
 /**
 * Another proxy allocator used to aggregate statistics and to enforce correct usage.
 */
 final class DebugAllocator(Base : Allocator) : Allocator {
 	private {
-		HashMap!(size_t, size_t, Malloc) m_blocks;
+		DictionaryListRef!(size_t, size_t, Malloc) m_blocks;
 		size_t m_bytes;
 		size_t m_maxBytes;
 	}
@@ -18,7 +19,6 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 		m_baseAlloc = getAllocator!Base();
 	}
 
-	~this() { m_blocks.clear(); }
 	public {
 		@property size_t allocatedBlockCount() const { return m_blocks.length; }
 		@property size_t bytesAllocated() const { return m_bytes; }
@@ -27,6 +27,9 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 			foreach(const ref size_t ptr, const ref size_t sz; m_blocks) {
 				logDebug(cast(void*)ptr, " sz ", sz);
 			}
+		}
+		auto getMap() {
+			return m_blocks;
 		}
 	}
 	void[] alloc(size_t sz)
