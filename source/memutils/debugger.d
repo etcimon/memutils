@@ -8,7 +8,8 @@ import memutils.dictionarylist;
 */
 final class DebugAllocator(Base : Allocator) : Allocator {
 	private {
-		DictionaryListRef!(size_t, size_t, Malloc) m_blocks;
+		static if (HasDictionaryDebugger) DictionaryListRef!(size_t, size_t, Malloc) m_blocks;
+		else HashMap!(size_t, size_t, Malloc) m_blocks;
 		size_t m_bytes;
 		size_t m_maxBytes;
 	}
@@ -28,7 +29,7 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 				logDebug(cast(void*)ptr, " sz ", sz);
 			}
 		}
-		auto getMap() {
+		static if (HasDictionaryDebugger) auto getMap() {
 			return m_blocks;
 		}
 	}

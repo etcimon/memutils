@@ -147,7 +147,6 @@ public:
 				}
 
 				static if (is(TR == T*)) .destroy(*_p);
-				else static if (is(T == interface)) delete _p;
 				else .destroy(_p);
 				//delete _p;
 
