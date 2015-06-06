@@ -18,12 +18,12 @@ else					const HasCryptoSafe = false;
 /// uses a swap protected pool on top of CryptoSafeAllocator
 /// otherwise, uses a regular lockless freelist
 version(SecurePool)		const HasSecurePool = true;
-else					const HasSecurePool = false;
+else				const HasSecurePool = false;
 
 const SecurePool_MLock_Max = 524_287;
 
-version(Have_botan) 	const HasBotan = true; 
-else 					const HasBotan = false;
+/*version(Have_botan) 	const HasBotan = true; 
+else */					const HasBotan = false;
 version(DictionaryDebugger) const HasDictionaryDebugger = true;
 else					const HasDictionaryDebugger = false;
 version(EnableDebugger) const HasDebuggerEnabled = true;

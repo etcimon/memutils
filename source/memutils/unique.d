@@ -148,11 +148,6 @@ public:
 
 				static if (is(TR == T*)) .destroy(*_p);
 				else .destroy(_p);
-				//delete _p;
-
-				//static if (HasDebugAllocations && DebugUnique) {
-				//	debug memset(ptr, 0, AllocSize!T);
-				//}
 			}
 		}
 

@@ -86,12 +86,20 @@ public auto getAllocator(int ALLOC)(bool is_freeing = false) {
 	else return getAllocator!R(is_freeing);
 }
 
-R getAllocator(R)(bool is_freeing = false) {
-	static R alloc;
+R getAllocator(R)(bool is_freeing = false, bool kill_it = false) {
+	import memutils.unique : Unique;
+	static Unique!R alloc;
+	if (kill_it) { alloc.free(); return null; }
 	if (!alloc && !is_freeing) {
 		alloc = new R;
 	}
-	return alloc;
+
+	return *alloc;
+}
+
+static ~this() {
+	getAllocator!CryptoSafeAllocator(false, true);
+	getAllocator!LocklessAllocator(false, true);
 }
 
 static if (HasBotan)

@@ -10,7 +10,7 @@ import std.algorithm : countUntil;
 struct RefCounted(T, ALLOC = ThreadMem)
 {
 	import core.memory : GC;
-	mixin Embed!m_object;
+	mixin Embed!(m_object, false);
 	static if (!is(ALLOC == AppMem)) enum NOGC = true;
 	enum isRefCounted = true;
 

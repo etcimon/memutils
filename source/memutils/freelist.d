@@ -97,7 +97,7 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 		immutable size_t m_elemSize;
 		Base m_baseAlloc;
 		FreeListSlot* m_firstFree = null;
-		Vector!(size_t, Malloc) m_owned;
+		HashMap!(size_t, size_t, Malloc) m_owned;
 		size_t m_nalloc = 0;
 		size_t m_nfree = 0;
 	}
@@ -105,9 +105,25 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 	~this() {
 		import core.thread : thread_isMainThread;
 		if (!thread_isMainThread)
-			foreach(size_t slot; m_owned[]) {
-				m_baseAlloc.free( (cast(void*)slot)[0 .. m_elemSize]);
+		{
+			if (m_owned.length > 0)
+			{
+				import std.stdio : writeln;
+				foreach(const ref size_t ptr, const ref size_t size; m_owned)
+					writeln( cast(void*)ptr, " : ", size);
+				asm { int 3; }
 			}
+		}
+		while ( m_firstFree ){
+			auto slot = m_firstFree;
+			m_firstFree = slot.next;
+			slot.next = null;
+			m_baseAlloc.free( (cast(void*)slot)[0 .. m_elemSize] );
+			m_nfree--;
+		}
+		//foreach(size_t slot; m_owned[])
+			//	m_baseAlloc.free( (cast(void*)slot)[0 .. m_elemSize]);
+	
 	}
 	
 	this(size_t elem_size)
@@ -137,9 +153,16 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 			m_nfree--;
 		} else {
 			mem = m_baseAlloc.alloc(m_elemSize);
-			if (!thread_isMainThread)
-				m_owned ~= cast(size_t)mem.ptr;
 			//logInfo("Alloc %d bytes: alloc: %d, free: %d", SZ, s_nalloc, s_nfree);
+		}
+		if (!thread_isMainThread) {
+			//import std.stdio : writeln;
+			//Exception ex = new Exception("");
+			//try throw ex; catch (Exception e) { 
+			//writeln(mem.ptr, " : ", e.toString());
+			//}
+			m_owned[cast(size_t)mem.ptr] = m_elemSize;
+
 		}
 		m_nalloc++;
 		//logInfo("Alloc %d bytes: alloc: %d, free: %d", SZ, s_nalloc, s_nfree);
@@ -148,6 +171,8 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 
 	void[] realloc(void[] mem, size_t sz)
 	{
+		if (!thread_isMainThread)
+			m_owned[cast(size_t)mem.ptr] = sz;
 		assert(mem.length == m_elemSize);
 		assert(sz == m_elemSize);
 		return mem;
@@ -158,6 +183,9 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 		assert(mem.length == m_elemSize, "Memory block passed to free has wrong size.");
 		auto s = cast(FreeListSlot*)mem.ptr;
 		s.next = m_firstFree;
+
+		if (!thread_isMainThread)
+			m_owned.remove(cast(size_t)mem.ptr);
 		m_firstFree = s;
 		m_nalloc--;
 		m_nfree++;

@@ -12,13 +12,18 @@ template UnConst(T) {
 
 /// TODO: Imitate Unique! for all objects (assume dtor) with release()
 /// TODO: implement @override on underlying type T, and check for shadowed members.
-mixin template Embed(alias OBJ)
+mixin template Embed(alias OBJ, alias OWNED)
 {
 	alias TR = typeof(OBJ);
 	static if (is(typeof(*OBJ) == struct))
 			alias T = typeof(*OBJ);
 	else
 		alias T = TR;
+
+	static if (is(typeof(OWNED) == bool)) ~this() {
+		if (OWNED && OBJ !is null)
+			destroy(OBJ);
+	}
 
 	static if (!__traits(hasMember, typeof(this), "defaultInit")) {
 		void defaultInit() const {}
@@ -40,7 +45,15 @@ mixin template Embed(alias OBJ)
 		static if (is(TR == T*)) return *OBJ;
 		else return OBJ;
 	}
-	
+
+	@property TR release() {
+		defaultInit();
+		checkInvariants();
+		TR ret = OBJ;
+		OBJ = null;
+		return ret;
+	}
+
 	alias opStar this;
 	
 	auto opBinaryRight(string op, Key)(Key key)
