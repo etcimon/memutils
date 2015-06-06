@@ -88,13 +88,13 @@ public auto getAllocator(int ALLOC)(bool is_freeing = false) {
 
 R getAllocator(R)(bool is_freeing = false, bool kill_it = false) {
 	import memutils.unique : Unique;
-	static Unique!R alloc;
-	if (kill_it) { alloc.free(); return null; }
+	static R alloc;
+	if (kill_it) { alloc.destroy(); return null; }
 	if (!alloc && !is_freeing) {
 		alloc = new R;
 	}
 
-	return *alloc;
+	return alloc;
 }
 
 static ~this() {

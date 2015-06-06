@@ -48,7 +48,7 @@ template ObjectAllocator(T, ALLOC)
 	TR alloc(ARGS...)(auto ref ARGS args)
 	{
 		static if (ALLOC.stringof != "PoolStack") {
-			auto allocator_ = getAllocator!(ALLOC.ident)();
+			auto allocator_ = getAllocator!(ALLOC.ident)(false);
 			auto mem = allocator_.alloc(ElemSize);
 		}
 		else
