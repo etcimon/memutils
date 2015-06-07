@@ -60,6 +60,7 @@ template ObjectAllocator(T, ALLOC)
 			else
 				GC.addRange(mem.ptr, ElemSize);	
 		}
+
 		return emplace!T(mem, args);
 
 	}

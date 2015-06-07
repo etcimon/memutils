@@ -23,8 +23,10 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	static RefCounted opCall(ARGS...)(auto ref ARGS args)
 	{
 		RefCounted ret;
+
 		ret.m_object = ObjectAllocator!(T, ALLOC).alloc(args);
 		ret.m_refCount = ObjectAllocator!(ulong, ALLOC).alloc();
+		// logTrace("refcount: ", cast(void*)ret.m_refCount, " m_object: ", cast(void*)ret.m_object, " Type: ", T.stringof);
 		(*ret.m_refCount) = 1;
 		logTrace("Allocating: ", cast(void*)ret.m_object, " of ", T.stringof, " sz: ", ElemSize, " allocator: ", ALLOC.stringof);
 		return ret;
@@ -40,6 +42,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		static if (!is (U == typeof(this))) {
 			typeof(this)* this_ = cast(typeof(this)*)ctxt;
 			this_.m_object = cast(typeof(this.m_object)) ctxt.m_object;
+			this_.m_refCount = cast(typeof(this.m_refCount)) ctxt.m_refCount;
 			this_._deinit();
 		}
 		else {
@@ -127,7 +130,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		try { 
 			U ret = U.init;
 			ret.m_object = cast(U.TR)this.m_object;
-			
+
 			static if (!is (U == typeof(this))) {
 				if (!m_free) {
 					static void destr(void* ptr) {
@@ -150,7 +153,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	private void _deinit() {
 		//logTrace("Freeing: ", T.stringof, " ptr ", cast(void*) m_object, " sz: ", ElemSize, " allocator: ", ALLOC.stringof);
 		ObjectAllocator!(T, ALLOC).free(m_object);
-		//logTrace("Freeing refCount: ", cast(void*)m_refCount);
+		//logTrace("Freeing refcount: ", cast(void*)m_refCount, " object: ", cast(void*)m_object, " Type: ", T.stringof);
 		ObjectAllocator!(ulong, ALLOC).free(m_refCount);
 		m_refCount = null;
 		m_object = null;

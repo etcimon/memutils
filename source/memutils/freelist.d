@@ -104,7 +104,7 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 
 	~this() {
 		import core.thread : thread_isMainThread;
-		if (!thread_isMainThread)
+		version(DebugLeaks)//if (!thread_isMainThread)
 		{
 			if (m_owned.length > 0)
 			{
@@ -155,7 +155,8 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 			mem = m_baseAlloc.alloc(m_elemSize);
 			//logInfo("Alloc %d bytes: alloc: %d, free: %d", SZ, s_nalloc, s_nfree);
 		}
-		if (!thread_isMainThread) {
+		version(DebugLeaks)//if (!thread_isMainThread)
+		{
 			//import std.stdio : writeln;
 			//Exception ex = new Exception("");
 			//try throw ex; catch (Exception e) { 
@@ -171,7 +172,7 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 
 	void[] realloc(void[] mem, size_t sz)
 	{
-		if (!thread_isMainThread)
+		version(DebugLeaks)//if (!thread_isMainThread)
 			m_owned[cast(size_t)mem.ptr] = sz;
 		assert(mem.length == m_elemSize);
 		assert(sz == m_elemSize);
@@ -184,7 +185,7 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 		auto s = cast(FreeListSlot*)mem.ptr;
 		s.next = m_firstFree;
 
-		if (!thread_isMainThread)
+		version(DebugLeaks)//if (!thread_isMainThread)
 			m_owned.remove(cast(size_t)mem.ptr);
 		m_firstFree = s;
 		m_nalloc--;
