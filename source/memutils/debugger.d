@@ -35,7 +35,6 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	}
 	void[] alloc(size_t sz)
 	{
-
 		assert(sz > 0, "Cannot serve a zero-length allocation");
 
 		//logTrace("Bytes allocated in ", Base.stringof, ": ", bytesAllocated());
@@ -54,8 +53,6 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 				//logTrace("New allocation maximum: %d (%d blocks)", m_maxBytes, m_blocks.length);
 			}
 		}
-
-
 		//logDebug("Alloc ptr: ", ret.ptr, " sz: ", ret.length);
 		
 		return ret;
