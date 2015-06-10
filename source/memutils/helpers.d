@@ -19,8 +19,8 @@ mixin template Embed(alias OBJ, alias OWNED)
 			alias T = typeof(*OBJ);
 	else
 		alias T = TR;
-
-	static if (is(typeof(OWNED) == bool)) ~this() {
+	import std.traits : isSomeFunction;
+	static if (!isSomeFunction!OBJ && is(typeof(OWNED) == bool)) ~this() {
 		if (OWNED && OBJ !is null)
 			destroy(OBJ);
 	}
@@ -31,6 +31,8 @@ mixin template Embed(alias OBJ, alias OWNED)
 	static if (!__traits(hasMember, typeof(this), "checkInvariants")) {
 		void checkInvariants() const {}
 	}
+
+	static if (!isSomeFunction!OBJ)
 	@property ref const(T) opStar() const
 	{
 		(cast(typeof(this)*)&this).defaultInit();
@@ -46,6 +48,7 @@ mixin template Embed(alias OBJ, alias OWNED)
 		else return OBJ;
 	}
 
+	static if (!isSomeFunction!OBJ)
 	@property TR release() {
 		defaultInit();
 		checkInvariants();

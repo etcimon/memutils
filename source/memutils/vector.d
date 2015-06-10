@@ -318,7 +318,7 @@ struct Vector(T, ALLOC = ThreadMem)
      */
 	@property bool empty() const
 	{
-		return _data._payload.empty;
+		return !_data._payload || _data._payload.empty;
 	}
 	
 	/**
