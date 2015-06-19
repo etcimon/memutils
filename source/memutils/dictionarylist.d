@@ -51,7 +51,9 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	alias ValueType = VALUE;
 	
 	struct FieldTuple { KeyType key; ValueType value; }
-	
+
+	@property bool empty() const { return length == 0; }
+
 	/** The number of fields present in the map.
     */
 	@property size_t length() const { return m_fieldCount + m_extendedFields.length; }

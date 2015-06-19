@@ -105,7 +105,7 @@ static ~this() {
 }
 
 version(LDC) shared static ~this() { .exit(0); } // LDC unit tests failing otherwise
-version(Have_botan) shared static ~this() { .exit(0); }
+version(Have_botan) version(unittest) static ~this() { import core.thread : thread_isMainThread; if (thread_isMainThread) .exit(0); }
 
 size_t alignedSize(size_t sz)
 {
