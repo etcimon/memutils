@@ -1121,12 +1121,15 @@ struct RBNode(V, ALLOC)
 		Node n = &this;
 		if(n.right is null)
 		{
-			while(!n.isLeftNode)
+			while(n._parent && !n.isLeftNode)
 				n = n._parent;
 			return n._parent;
 		}
-		else
+		else if (n.right !is null) {
+			if (!n._parent) return null;
 			return n.right.leftmost;
+		}
+		else return null;
 	}
 	
 	/**
@@ -1182,7 +1185,7 @@ struct RBRange(Elem, ALLOC)
      */
 	@property bool empty() const
 	{
-		return _begin is _end;
+		return _begin is _end || !_begin;
 	}
 	
 	/**

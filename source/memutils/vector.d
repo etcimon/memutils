@@ -613,7 +613,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	{
 		return insertBack(cast(T) stuff);
 	}
-	
+
 	size_t insert(Stuff...)(Stuff stuff) {
 		return insertBack(stuff);
 	}

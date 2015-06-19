@@ -12,6 +12,8 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 		else HashMap!(size_t, size_t, Malloc) m_blocks;
 		size_t m_bytes;
 		size_t m_maxBytes;
+		void function(size_t) m_allocSizeCallback;
+		void function(size_t) m_freeSizeCallback;
 	}
 	package Base m_baseAlloc;
 	
@@ -21,6 +23,10 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	}
 
 	public {
+		void setAllocSizeCallbacks(void function(size_t) alloc_sz_cb, void function(size_t) free_sz_cb) {
+			m_allocSizeCallback = alloc_sz_cb;
+			m_freeSizeCallback = free_sz_cb;
+		}
 		@property size_t allocatedBlockCount() const { return m_blocks.length; }
 		@property size_t bytesAllocated() const { return m_bytes; }
 		@property size_t maxBytesAllocated() const { return m_maxBytes; }
@@ -42,12 +48,10 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 		synchronized(this) {
 			assert(ret.length == sz, "base.alloc() returned block with wrong size.");
 
-			/*try {
-				assert(m_blocks.get(cast(const size_t)ret.ptr, size_t.max) == size_t.max, "base.alloc() returned block that is already allocated: " ~ ret.ptr.to!string ~ " sz: " ~ ret.length.to!string ~ " was: " ~ m_blocks.get(cast(const size_t)ret.ptr, size_t.max).to!string);
-			} catch (Throwable e) { import std.stdio : writeln; writeln(e.toString()); }
-*/
 			m_blocks[cast(size_t)ret.ptr] = sz;
 			m_bytes += sz;
+			if (m_allocSizeCallback)
+				m_allocSizeCallback(sz);
 			if( m_bytes > m_maxBytes ){
 				m_maxBytes = m_bytes;
 				//logTrace("New allocation maximum: %d (%d blocks)", m_maxBytes, m_blocks.length);
@@ -76,6 +80,10 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 			m_blocks.remove(cast(size_t)mem.ptr);
 			m_blocks[cast(size_t)ret.ptr] = new_size;
 			m_bytes += new_size;
+			if (m_freeSizeCallback)
+				m_freeSizeCallback(sz);
+			if (m_allocSizeCallback)
+				m_allocSizeCallback(new_size);
 		}
 		return ret;
 	}
@@ -98,6 +106,8 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 		
 		synchronized(this) {
 			m_bytes -= sz;
+			if (m_freeSizeCallback)
+				m_freeSizeCallback(sz);
 			m_blocks.remove(cast(size_t)mem.ptr);
 		}
 	}

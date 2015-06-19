@@ -97,6 +97,7 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 		immutable size_t m_elemSize;
 		Base m_baseAlloc;
 		FreeListSlot* m_firstFree = null;
+		size_t space;
 		version(DebugLeaks) HashMap!(size_t, size_t, Malloc) m_owned;
 		size_t m_nalloc = 0;
 		size_t m_nfree = 0;

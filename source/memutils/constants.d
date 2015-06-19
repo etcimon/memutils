@@ -24,15 +24,19 @@ const SecurePool_MLock_Max = 524_287;
 
 version(Have_botan) 	const HasBotan = true; 
 else			const HasBotan = false;
+version(Have_vibe_d) const HasVibe = true;
+else				 const HasVibe = false;
 version(DictionaryDebugger) const HasDictionaryDebugger = true;
 else					const HasDictionaryDebugger = false;
 version(EnableDebugger) const HasDebuggerEnabled = true;
 else					  const HasDebuggerEnabled = false;
 version(DisableDebugger)   const DisableDebugAllocations = true;
+else version(VibeNoDebug) const DisableDebugAllocations = true;
 else					const DisableDebugAllocations = false;
 
 static if (HasDebuggerEnabled && !DisableDebugAllocations ) const HasDebugAllocations = true;
 else static if (!DisableDebugAllocations && HasUnittests) const HasDebugAllocations = true;
+else static if (!DisableDebugAllocations && HasVibe) const HasDebugAllocations = true;
 else					  const HasDebugAllocations = false;
 
 version(SkipMemutilsTests) const SkipUnitTests = true;
