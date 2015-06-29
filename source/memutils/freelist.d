@@ -90,6 +90,14 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 
 final class FreeListAlloc(Base : Allocator) : Allocator
 {
+	version(TLSGC) { } else {
+		import core.sync.mutex : Mutex;
+		__gshared Mutex mtx;
+		shared static this() {
+			mtx = new Mutex;
+		}
+	}
+
 	import memutils.vector : Vector;
 	import memutils.utils : Malloc;
 	private static struct FreeListSlot { FreeListSlot* next; }
@@ -145,6 +153,11 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 	
 	void[] alloc()
 	{
+		version(TLSGC) { } else {
+			mtx.lock_nothrow();
+			scope(exit) mtx.unlock_nothrow();
+		}
+
 		void[] mem;
 		if( m_firstFree ){
 			auto slot = m_firstFree;
@@ -173,6 +186,11 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 
 	void[] realloc(void[] mem, size_t sz)
 	{
+		version(TLSGC) { } else {
+			mtx.lock_nothrow();
+			scope(exit) mtx.unlock_nothrow();
+		}
+
 		version(DebugLeaks)//if (!thread_isMainThread)
 			m_owned[cast(size_t)mem.ptr] = sz;
 		assert(mem.length == m_elemSize);
@@ -182,6 +200,11 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 
 	void free(void[] mem)
 	{
+		version(TLSGC) { } else {
+			mtx.lock_nothrow();
+			scope(exit) mtx.unlock_nothrow();
+		}
+
 		assert(mem.length == m_elemSize, "Memory block passed to free has wrong size.");
 		auto s = cast(FreeListSlot*)mem.ptr;
 		s.next = m_firstFree;

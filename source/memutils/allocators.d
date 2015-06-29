@@ -75,20 +75,15 @@ public auto getAllocator(int ALLOC)(bool is_freeing = false) {
 	else static if (HasCryptoSafe && ALLOC == CryptoSafe) alias R = CryptoSafeAllocator;
 	else static if (ALLOC == Mallocator) alias R = MallocAllocator;
 	else static assert(false, "Invalid allocator specified");
-	static if (ALLOC == NativeGC) {	
-		static __gshared R alloc;
-
-		if (!alloc && !is_freeing) {
-			alloc = new R;
-		}
-		return alloc;
-	}
-	else return getAllocator!R(is_freeing);
+	return getAllocator!R(is_freeing);
 }
 
 R getAllocator(R)(bool is_freeing = false, bool kill_it = false) {
 	import memutils.unique : Unique;
-	static R alloc;
+	version(TLSGC)
+		static R alloc;
+	else static __gshared R alloc;
+
 	static bool deinit;
 	if (deinit) throw new Exception("Deinitialized...wtf");
 	if (kill_it) {alloc.destroy(); deinit = true; alloc = null; return null; }
@@ -99,6 +94,7 @@ R getAllocator(R)(bool is_freeing = false, bool kill_it = false) {
 	return alloc;
 }
 
+version(TLSGC)
 static ~this() {
 	getAllocator!CryptoSafeAllocator(false, true);
 	getAllocator!LocklessAllocator(false, true);
