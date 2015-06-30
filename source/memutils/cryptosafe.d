@@ -20,7 +20,14 @@ import memutils.debugger;
 
 final class SecureAllocator(Base : Allocator) : Allocator
 {
-private:
+private:	
+	version(TLSGC) { } else {
+		import core.sync.mutex : Mutex;
+		__gshared Mutex mtx;
+		shared static this() {
+			mtx = new Mutex;
+		}
+	}
 	Base m_secondary;
 	static if (HasBotan || HasSecurePool) {
 		
@@ -44,6 +51,10 @@ public:
 	
 	void[] alloc(size_t n)
 	{
+		version(TLSGC) { } else {
+			mtx.lock_nothrow();
+			scope(exit) mtx.unlock_nothrow();
+		}
 		static if (HasBotan || HasSecurePool) {
 			//logDebug("CryptoSafe alloc ", n);
 			if (void[] p = ms_zeroise.alloc(n)) {
@@ -60,6 +71,10 @@ public:
 
 	void[] realloc(void[] mem, size_t n)
 	{
+		version(TLSGC) { } else {
+			mtx.lock_nothrow();
+			scope(exit) mtx.unlock_nothrow();
+		}
 		//logTrace("realloc P: ", mem.length, " & ", mem.ptr);
 		if (n <= mem.length)
 			return mem;
@@ -82,6 +97,10 @@ public:
 
 	void free(void[] mem)
 	{
+		version(TLSGC) { } else {
+			mtx.lock_nothrow();
+			scope(exit) mtx.unlock_nothrow();
+		}
 		//logTrace("free P: ", mem.length, " & ", mem.ptr);
 		import std.c.string : memset;
 		memset(mem.ptr, 0, mem.length);
