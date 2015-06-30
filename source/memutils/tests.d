@@ -1,6 +1,6 @@
 ﻿module memutils.tests;
 import memutils.all;
-static if (HasDebugAllocations):
+static if (HasUnittests && !SkipUnitTests && !DisableDebugAllocations):
 
 // Test hashmap, freelists
 void hashmapFreeListTest(ALLOC)() {
@@ -283,7 +283,6 @@ void scopedTest() {
 	f.call();
 }
 
-static if (!SkipUnitTests)
 unittest {
 	propagateTests!hashmapFreeListTest();
 	propagateTests!vectorArrayTest();

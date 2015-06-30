@@ -55,7 +55,6 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 		auto ret = m_baseAlloc.alloc(sz);
 		synchronized(this) {
 			assert(ret.length == sz, "base.alloc() returned block with wrong size.");
-
 			m_blocks[cast(size_t)ret.ptr] = sz;
 			m_bytes += sz;
 			if (m_allocSizeCallback)
