@@ -32,7 +32,7 @@ static if (HasDebugAllocations) {
 	pragma(msg, "Memory debugger enabled");
 	alias LocklessAllocator = DebugAllocator!(AutoFreeListAllocator!(MallocAllocator));
 	static if (HasCryptoSafe)
-		alias CryptoSafeAllocator = DebugAllocator!(SecureAllocator!(DebugAllocator!(AutoFreeListAllocator!(MallocAllocator))));
+		alias CryptoSafeAllocator = DebugAllocator!(SecureAllocator!(AutoFreeListAllocator!(MallocAllocator)));
 	alias ProxyGCAllocator = DebugAllocator!GCAllocator;
 
 }
@@ -69,6 +69,10 @@ interface Allocator {
 
 package:
 
+version(TLSGC) { } else {
+	public import core.sync.mutex : Mutex;
+	__gshared Mutex mtx;
+}
 public auto getAllocator(int ALLOC)(bool is_freeing = false) {
 	static if (ALLOC == LocklessFreeList) alias R = LocklessAllocator;
 	else static if (ALLOC == NativeGC) alias R = ProxyGCAllocator;

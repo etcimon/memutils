@@ -21,13 +21,6 @@ import memutils.debugger;
 final class SecureAllocator(Base : Allocator) : Allocator
 {
 private:	
-	version(TLSGC) { } else {
-		import core.sync.mutex : Mutex;
-		__gshared Mutex mtx;
-		shared static this() {
-			mtx = new Mutex;
-		}
-	}
 	Base m_secondary;
 	static if (HasBotan || HasSecurePool) {
 		
@@ -43,6 +36,9 @@ private:
 
 public:	
 	this() {
+		version(TLSGC) { } else {
+			if (!mtx) mtx = new Mutex;
+		}
 		static if (HasBotan || HasSecurePool) {
 			if (!ms_zeroise) ms_zeroise = new SecurePool();
 		}

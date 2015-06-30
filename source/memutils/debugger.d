@@ -19,6 +19,9 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	
 	this()
 	{
+		version(TLSGC) { } else {
+			if (!mtx) mtx = new Mutex;
+		}
 		m_baseAlloc = getAllocator!Base();
 	}
 
@@ -41,6 +44,11 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	}
 	void[] alloc(size_t sz)
 	{
+		version(TLSGC) { } else {
+			mtx.lock_nothrow();
+			scope(exit) mtx.unlock_nothrow();
+		}
+
 		assert(sz > 0, "Cannot serve a zero-length allocation");
 
 		//logTrace("Bytes allocated in ", Base.stringof, ": ", bytesAllocated());
@@ -64,6 +72,10 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	
 	void[] realloc(void[] mem, size_t new_size)
 	{
+		version(TLSGC) { } else {
+			mtx.lock_nothrow();
+			scope(exit) mtx.unlock_nothrow();
+		}
 		assert(new_size > 0 && mem.length > 0, "Cannot serve a zero-length reallocation");
 		void[] ret;
 		size_t sz;
@@ -90,6 +102,10 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 	
 	void free(void[] mem)
 	{
+		version(TLSGC) { } else {
+			mtx.lock_nothrow();
+			scope(exit) mtx.unlock_nothrow();
+		}
 		assert(mem.length > 0, "Cannot serve a zero-length deallocation");
 
 		size_t sz;
