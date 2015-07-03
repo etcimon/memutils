@@ -24,13 +24,14 @@ private:
 	Base m_secondary;
 	static if (HasBotan || HasSecurePool) {
 		
-		__gshared SecurePool ms_zeroise;	
+		__gshared SecurePool ms_zeroise;
+		__gshared bool ms_deinit;
 		shared static this() { 
 			//logDebug("Shared static this() SecurePool");
 			if (!ms_zeroise) ms_zeroise = new SecurePool();
 		}
 		shared static ~this() { 
-			if (ms_zeroise) destroy(ms_zeroise);
+			if (ms_zeroise) { destroy(ms_zeroise); ms_zeroise = null; ms_deinit = true; }
 		}
 	}
 
@@ -101,7 +102,7 @@ public:
 		import std.c.string : memset;
 		memset(mem.ptr, 0, mem.length);
 		static if (HasBotan || HasSecurePool)
-			if (ms_zeroise.free(mem))
+			if (ms_deinit || ms_zeroise.free(mem))
 				return;
 		m_secondary.free(mem);
 	}
