@@ -47,7 +47,7 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 				read(temp[0 .. m_fill]);
 				m_start = 0;
 				m_fill = tmp_fill;
-				freeArray(m_buffer);
+				freeArray!(T, ALLOC)(m_buffer);
 				m_buffer = temp;
 			} else m_buffer = allocArray!(T, ALLOC)(new_size);
 		}
