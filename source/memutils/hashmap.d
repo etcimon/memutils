@@ -39,6 +39,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 	
 	~this()
 	{
+		clear();
 		if (m_table) freeArray!(TableEntry, ALLOC)(m_table);
 	}
 

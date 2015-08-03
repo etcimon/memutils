@@ -89,7 +89,6 @@ R getAllocator(R)(bool is_freeing = false, bool kill_it = false) {
 	else static __gshared R alloc;
 
 	static bool deinit;
-	if (deinit) throw new Exception("Deinitialized...wtf");
 	if (kill_it) {alloc.destroy(); deinit = true; alloc = null; return null; }
 	if (!alloc && !is_freeing) {
 		alloc = new R;
