@@ -222,7 +222,7 @@ package:
 				munmap(m_pool_unaligned.ptr, m_pool_unaligned.length);
 				m_pool_unaligned = null;
 				import core.stdc.errno;
-				logDebug("Could not mlock " ~ to!string(pool_size) ~ " bytes: " ~ errno().to!string);
+				logError("Could not mlock " ~ to!string(pool_size) ~ " bytes: " ~ errno().to!string);
 				return;
 			}
 			
