@@ -11,7 +11,7 @@ import memutils.vector : Array;
 import std.traits : isArray;
 import std.range : ElementType;
 import memutils.helpers : UnConst;
-
+import memutils._destroy;
 struct AppMem {
 	mixin ConvenienceAllocators!(NativeGC, typeof(this));
 }
@@ -74,8 +74,8 @@ template ObjectAllocator(T, ALLOC)
 		}
 
 		TR objc = obj;
-		static if (is(TR == T*)) .destroy(*objc);
-		else .destroy(objc);
+		static if (is(TR == T*)) _destroy(*objc);
+		else _destroy(objc);
 
 		static if (ALLOC.stringof != "PoolStack") {
 			if (auto a = getAllocator!(ALLOC.ident)(true))
@@ -160,7 +160,7 @@ void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = si
 		size_t i;
 		foreach (ref e; array) {
 			if (i == max_destroy) break;
-			static if (is(T == struct) && !isPointer!T) .destroy(e);
+			static if (is(T == struct) && !isPointer!T) _destroy(e);
 			i++;
 		}
 	}

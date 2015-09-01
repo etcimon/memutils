@@ -27,7 +27,7 @@ import memutils.cryptosafe;
 import memutils.freelist;
 import memutils.utils : Malloc;
 import core.thread : thread_isMainThread;
-
+import memutils._destroy;
 static if (HasDebugAllocations) {
 	pragma(msg, "Memory debugger enabled");
 	alias LocklessAllocator = DebugAllocator!(AutoFreeListAllocator!(MallocAllocator));
@@ -89,7 +89,7 @@ R getAllocator(R)(bool is_freeing = false, bool kill_it = false) {
 	else static __gshared R alloc;
 
 	static bool deinit;
-	if (kill_it) {alloc.destroy(); deinit = true; alloc = null; return null; }
+	if (kill_it) {alloc._destroy(); deinit = true; alloc = null; return null; }
 	if (!alloc && !is_freeing) {
 		alloc = new R;
 	}

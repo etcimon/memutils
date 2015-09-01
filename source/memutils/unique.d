@@ -16,7 +16,7 @@ import memutils.allocators;
 import memutils.constants;
 import memutils.utils;
 import std.conv : to;
-
+import memutils._destroy;
 enum DebugUnique = true;
 
 // TODO: Move release() into Embed!, and add a releaseCheck() for refCounted (cannot release > 1 reference) 
@@ -146,8 +146,8 @@ public:
 					ptree.remove(ptr);
 				}
 
-				static if (is(TR == T*)) .destroy(*_p);
-				else .destroy(_p);
+				static if (is(TR == T*)) _destroy(*_p);
+				else _destroy(_p);
 			}
 		}
 

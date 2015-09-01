@@ -11,7 +11,7 @@ import memutils.allocators;
 import memutils.helpers;
 import memutils.utils;
 import memutils.refcounted;
-
+import memutils._destroy;
 public alias SecureArray(T) = Array!(T, SecureMem);
 
 template Array(T, ALLOC = ThreadMem) 
@@ -103,9 +103,9 @@ struct Vector(T, ALLOC = ThreadMem)
 				static if (hasElaborateDestructor!T) {
 					foreach (ref e; _payload.ptr[newLength .. _payload.length]) {
 						static if (is(T == struct) && !isPointer!T) // call destructors but not for indirections...
-							.destroy(e);
+							_destroy(e);
 					}
-					
+
 					// Zero out unused capacity to prevent gc from seeing
 					// false pointers
 					static if (hasIndirections!T)
@@ -665,7 +665,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	{
 		enforce(!empty);
 		static if (hasElaborateDestructor!T)
-			.destroy(_data._payload[$ - 1]);
+			_destroy(_data._payload[$ - 1]);
 		
 		_data._payload = _data._payload[0 .. $ - 1];
 	}
@@ -674,7 +674,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	
 		enforce(!empty);
 		static if (hasElaborateDestructor!T)
-			.destroy(_data._payload[0]);
+			_destroy(_data._payload[0]);
 	
 		_data._payload = _data._payload[1 .. $];
 	}
@@ -697,7 +697,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		if (howMany > length) howMany = length;
 		static if (hasElaborateDestructor!T)
 			foreach (ref e; _data._payload[$ - howMany .. $])
-				.destroy(e);
+				_destroy(e);
 		
 		_data._payload = _data._payload[0 .. $ - howMany];
 		return howMany;
