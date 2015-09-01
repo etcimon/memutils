@@ -6,7 +6,6 @@
 	"authors": ["Etienne Cimon", "Sönke Ludwig", "others..."],
 	"target": "staticLibrary",
 	"versions": ["CryptoSafe", "SecurePool"],
-	"buildOptions": [],
     "configurations": [
         {
             "name": "secure"

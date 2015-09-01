@@ -30,6 +30,7 @@ struct Malloc {
 
 package:
 
+
 template ObjectAllocator(T, ALLOC)
 {
 	import std.traits : ReturnType;
@@ -101,7 +102,6 @@ T[] allocArray(T, ALLOC = ThreadMem)(size_t n)
 	else enum NOGC = false;
 	
 	static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
-		// TODO: Do I need to add range for GC.malloc too?
 		static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
 			GC.addRange(mem.ptr, mem.length, typeid(T));
 		else
@@ -128,12 +128,12 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
-	static if (hasIndirections!T && !NOGC) {
+	static if (ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
 		GC.removeRange(array.ptr);
 		static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
-                                GC.addRange(mem.ptr, mem.length, typeid(T));
-                        else
-                                GC.addRange(mem.ptr, mem.length);
+                GC.addRange(mem.ptr, mem.length, typeid(T));
+        else
+                GC.addRange(mem.ptr, mem.length);
 		// Zero out unused capacity to prevent gc from seeing false pointers
 		memset(mem.ptr + (array.length * T.sizeof), 0, (n - array.length) * T.sizeof);
 	}
