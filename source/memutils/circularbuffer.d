@@ -65,7 +65,10 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	void put(TC : T)(TC[] itms)
 	{
 		if( !itms.length ) return;
-		assert(m_fill+itms.length <= m_buffer.length, "Cannot write to buffer, it is full.");
+		static if( N == 0 ) {
+			if (m_fill+itms.length > m_buffer.length)
+				capacity = capacity*2;
+		} else assert(m_fill+itms.length <= m_buffer.length, "Cannot write to buffer, it is full.");
 		if( mod(m_start+m_fill) >= mod(m_start+m_fill+itms.length) ){
 			size_t chunk1 = m_buffer.length - (m_start+m_fill);
 			size_t chunk2 = itms.length - chunk1;
