@@ -11,7 +11,6 @@ import memutils.constants;
 import std.algorithm;
 import std.traits : hasElaborateDestructor, isBasicType;
 import memutils.utils;
-import memutils._destroy;
 
 struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	@disable this(this);
@@ -113,8 +112,8 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 		}
 		m_fill--;
 		static if (hasElaborateDestructor!T) { // calls destructors
-			static if (is(T == struct) && isPointer!T) _destroy(*m_buffer[mod(m_start+m_fill)]);
-			else _destroy(m_buffer[mod(m_start+m_fill)]);
+			static if (is(T == struct) && isPointer!T) .destroy(*m_buffer[mod(m_start+m_fill)]);
+			else .destroy(m_buffer[mod(m_start+m_fill)]);
 		}
 	}
 	inout(T)[] peek() inout { return m_buffer[m_start .. min(m_start+m_fill, m_buffer.length)]; }

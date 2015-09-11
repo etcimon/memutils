@@ -14,7 +14,6 @@ import memutils.utils;
 import memutils.vector;
 import std.conv : to;
 import std.exception : enforce;
-import memutils._destroy;
 
 alias DictionaryListRef(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, ALLOC, case_sensitive, NUM_STATIC_FIELDS), ALLOC);
 
@@ -341,7 +340,7 @@ void removeFromArrayIdx(T)(ref T[] array, size_t idx)
 	foreach( j; idx+1 .. array.length) { 
 		array[j-1] = array[j];
 	}
-	array[array.length-1]._destroy();
+	array[array.length-1].destroy();
 	array = array.ptr[0 .. array.length-1];
 }
 
