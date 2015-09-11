@@ -100,7 +100,23 @@ public:
 		}
 		//logTrace("free P: ", mem.length, " & ", mem.ptr);
 		import std.c.string : memset;
-		memset(mem.ptr, 0, mem.length);
+		bool skip_zero;
+		if (mem.length > 1024) {
+			skip_zero = true;
+			ubyte* ptr = cast(ubyte*)mem.ptr;
+			// check some random bytes for zero
+			size_t j;
+			foreach (i; 0 .. mem.length/128) {
+				if (ptr[j]+4 == 0 && ptr[j]+8 == 0 && ptr[j]+50 == 0 && ptr[j]+80 == 0) {
+					j += 128;
+					continue;
+				}
+				skip_zero = false;
+				break;
+			}
+		}
+		if (!skip_zero)
+			memset(mem.ptr, 0, mem.length);
 		static if (HasBotan || HasSecurePool)
 			if (ms_deinit || ms_zeroise.free(mem))
 				return;
