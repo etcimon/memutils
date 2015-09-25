@@ -23,7 +23,7 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	}
 	static if( N == 0 ){
 		this(size_t capacity) { m_buffer = allocArray!(T, ALLOC)(capacity); }
-		~this() { if (m_buffer) freeArray!(T, ALLOC)(m_buffer); }
+		~this() { if (m_buffer) freeArray!(T, ALLOC)(m_buffer, m_fill, m_start); }
 	} 
 	else {
 		// clear ring buffer static fields upon removal (to run struct destructors, if T is a struct)
@@ -47,7 +47,7 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 				read(temp[0 .. m_fill]);
 				m_start = 0;
 				m_fill = tmp_fill;
-				freeArray!(T, ALLOC)(m_buffer);
+				freeArray!(T, ALLOC)(m_buffer, m_fill, m_start);
 				m_buffer = temp;
 			} else m_buffer = allocArray!(T, ALLOC)(new_size);
 		}

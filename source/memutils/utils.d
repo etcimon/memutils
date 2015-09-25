@@ -141,7 +141,7 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	return ret;
 }
 
-void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = size_t.max)
+void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = size_t.max, size_t offset = 0)
 {
 	import core.memory : GC;
 	mixin(translateAllocator());
@@ -159,7 +159,8 @@ void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = si
 	static if (hasElaborateDestructor!T) { // calls destructors, but not for indirections...
 		size_t i;
 		foreach (ref e; array) {
-			if (i == max_destroy) break;
+			if (i < offset) { i++; continue; }
+			if (i + offset == max_destroy) break;
 			static if (is(T == struct) && !isPointer!T) .destroy(e);
 			i++;
 		}
