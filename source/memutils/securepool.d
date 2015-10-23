@@ -11,7 +11,7 @@
 */
 module memutils.securepool;
 import memutils.constants;
-static if (HasBotan || HasSecurePool):
+static if (HasSecurePool):
 
 package:
 

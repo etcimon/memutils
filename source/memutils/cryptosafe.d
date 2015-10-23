@@ -11,7 +11,7 @@
 */
 module memutils.cryptosafe;
 import memutils.constants;
-static if (HasBotan || HasCryptoSafe):
+static if (HasCryptoSafe):
 pragma(msg, "Enhanced memory security is enabled.");
 
 import memutils.allocators;
@@ -22,7 +22,7 @@ final class SecureAllocator(Base : Allocator) : Allocator
 {
 private:	
 	Base m_secondary;
-	static if (HasBotan || HasSecurePool) {
+	static if (HasSecurePool) {
 		
 		__gshared SecurePool ms_zeroise;
 		__gshared bool ms_deinit;
@@ -40,7 +40,7 @@ public:
 		version(TLSGC) { } else {
 			if (!mtx) mtx = new Mutex;
 		}
-		static if (HasBotan || HasSecurePool) {
+		static if (HasSecurePool) {
 			if (!ms_zeroise) ms_zeroise = new SecurePool();
 		}
 		m_secondary = getAllocator!Base();
@@ -52,7 +52,7 @@ public:
 			mtx.lock_nothrow();
 			scope(exit) mtx.unlock_nothrow();
 		}
-		static if (HasBotan || HasSecurePool) {
+		static if (HasSecurePool) {
 			//logDebug("CryptoSafe alloc ", n);
 			if (void[] p = ms_zeroise.alloc(n)) {
 				//logDebug("alloc P: ", p.length, " & ", p.ptr);
@@ -77,7 +77,7 @@ public:
 			return mem;
 		import std.c.string : memmove, memset;
 
-		static if (HasBotan || HasSecurePool) {
+		static if (HasSecurePool) {
 			if (ms_zeroise.has(mem)) {
 				void[] p = ms_zeroise.alloc(n);
 				if (!p) 
@@ -117,7 +117,7 @@ public:
 		}
 		if (!skip_zero)
 			memset(mem.ptr, 0, mem.length);
-		static if (HasBotan || HasSecurePool)
+		static if (HasSecurePool)
 			if (ms_deinit || ms_zeroise.free(mem))
 				return;
 		m_secondary.free(mem);

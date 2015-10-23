@@ -11,7 +11,7 @@ enum { // overhead allocator definitions, lazily loaded
 
 enum Mallocator = 0x05; // For use by the DebugAllocator.
 
-const LogLevel = Debug;
+const LogLevel = Error;
 version(CryptoSafe) 	const HasCryptoSafe = true;
 else					const HasCryptoSafe = false;
 

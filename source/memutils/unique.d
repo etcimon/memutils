@@ -82,6 +82,7 @@ public:
 		if (!p) return;
 		//logTrace("Unique ctor of ", T.stringof, " : ", ptr.to!string);
 		static if (HasDebugAllocations && DebugUnique) {
+			mtx.lock(); scope(exit) mtx.unlock();
 			ptree._defaultInitialize();
 			if(cast(void*)p in ptree)
 			{
@@ -122,6 +123,7 @@ public:
 				//logTrace("ptr in ptree: ", ptr in ptree);
 
 				static if (HasDebugAllocations && DebugUnique) {
+					mtx.lock(); scope(exit) mtx.unlock();
 					ptree._defaultInitialize();
 					assert(ptr in ptree);
 					ptree.remove(ptr);
@@ -138,6 +140,7 @@ public:
 				//logTrace("ptr in ptree: ", ptr in ptree);
 
 				static if (HasDebugAllocations && DebugUnique) {
+					mtx.lock(); scope(exit) mtx.unlock();
 					ptree._defaultInitialize();
 					if (ptr !in ptree){ 
 						logDebug("Unknown pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
@@ -174,6 +177,7 @@ public:
 		//logTrace("Drop");
 		if (!_p) return;
 		static if (HasDebugAllocations && DebugUnique) {
+			mtx.lock(); scope(exit) mtx.unlock();
 			ptree._defaultInitialize();
 			assert(ptr in ptree);
 			ptree.remove(ptr);
@@ -208,7 +212,9 @@ private:
 
 	static if (HasDebugAllocations && DebugUnique) {
 		import memutils.rbtree;
-		static RBTree!(void*, "a < b", true, Malloc) ptree;
+		__gshared RBTree!(void*, "a < b", true, Malloc) ptree;
+		__gshared Mutex mtx;
+		shared static this() { mtx = new Mutex; }
 	}
 }
 

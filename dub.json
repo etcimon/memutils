@@ -5,7 +5,7 @@
 	"copyright": "Copyright © 2015, Etienne Cimon",
 	"authors": ["Etienne Cimon", "Sönke Ludwig", "others..."],
 	"target": "staticLibrary",
-	"versions": ["CryptoSafe", "SecurePool"],
+	"versions": ["CryptoSafe"],
     "configurations": [
         {
             "name": "secure"
