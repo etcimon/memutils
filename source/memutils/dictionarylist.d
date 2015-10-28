@@ -349,6 +349,7 @@ int icmp2(in string a, in string b)
 @safe pure {
 	import std.algorithm : min;
 	import std.utf : decode;
+	import std.uni : toLower;
 	size_t i = 0, j = 0;
 	
 	// fast skip equal prefix
@@ -372,8 +373,8 @@ int icmp2(in string a, in string b)
 			dchar acp = decode(a, i);
 			dchar bcp = decode(b, j);
 			if( acp != bcp ){
-				acp = std.uni.toLower(acp);
-				bcp = std.uni.toLower(bcp);
+				acp = toLower(acp);
+				bcp = toLower(bcp);
 				if( acp < bcp ) return -1;
 				else if( acp > bcp ) return 1;
 			}
