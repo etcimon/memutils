@@ -559,7 +559,7 @@ assert(equal(rbt[], [5]));
 		}
 	}
 
-	this(size_t elems = 0) {
+	this(size_t elems) {
 		_defaultInitialize();
 	}
 
