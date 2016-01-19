@@ -83,7 +83,6 @@ public auto getAllocator(int ALLOC)(bool is_freeing = false) {
 }
 
 R getAllocator(R)(bool is_freeing = false, bool kill_it = false) {
-	import memutils.unique : Unique;
 	version(TLSGC)
 		static R alloc;
 	else static __gshared R alloc;
