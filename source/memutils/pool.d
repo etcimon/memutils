@@ -1,4 +1,4 @@
-﻿/**
+/**
 	Memory pool with destructors, useful for scoped allocators.
 
     Copyright: © 2012-2013 RejectedSoftware e.K.
@@ -114,7 +114,7 @@ final class PoolAllocator(Base : Allocator)
 
 		size_t i;
 		// put all full Pools into the free pools list
-		for (Pool* p = cast(Pool*)m_fullPools, pnext; p && i < m_pools; (p = p.next), i++) {
+		for (Pool* p = cast(Pool*)m_fullPools, pnext; p && i < m_pools; (p = pnext), i++) {
 			pnext = p.next;
 			p.next = cast(Pool*)m_freePools;
 			m_freePools = cast(Pool*)p;
@@ -132,7 +132,7 @@ final class PoolAllocator(Base : Allocator)
 		freeAll();
 		Pool* pnext;
 		size_t i;
-		for (auto p = cast(Pool*)m_freePools; p && i < m_pools; (p = p.next), i++) {
+		for (auto p = cast(Pool*)m_freePools; p && i < m_pools; (p = pnext), i++) {
 			pnext = p.next;
 			m_baseAllocator.free(p.data);
 			m_baseAllocator.free((cast(void*)p)[0 .. AllocSize!Pool]);
