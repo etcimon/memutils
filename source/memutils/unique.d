@@ -17,6 +17,8 @@ import memutils.constants;
 import memutils.utils;
 import std.conv : to;
 
+version(GCCheck) extern (C) bool rt_isInGC();
+
 enum DebugUnique = true;
 
 // TODO: Move release() into Embed!, and add a releaseCheck() for refCounted (cannot release > 1 reference) 
@@ -136,25 +138,27 @@ public:
 			}
 		}
 		else {
-			if (_p) {
-				//logTrace("ptr in ptree: ", ptr in ptree);
+			version(GCCheck) {
+				if (!rt_isInGC()) {
+					if (_p) {
+						//logTrace("ptr in ptree: ", ptr in ptree);
 
-				static if (HasDebugAllocations && DebugUnique) {
-					mtx.lock(); scope(exit) mtx.unlock();
-					ptree._defaultInitialize();
-					if (ptr !in ptree){ 
-						logDebug("Unknown pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
-						assert(false);
+						static if (HasDebugAllocations && DebugUnique) {
+							mtx.lock(); scope(exit) mtx.unlock();
+							ptree._defaultInitialize();
+							if (ptr !in ptree){ 
+								logDebug("Unknown pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
+								assert(false);
+							}
+							ptree.remove(ptr);
+						}
+
+						static if (is(TR == T*)) .destroy(*_p);
+						else .destroy(_p);
 					}
-					ptree.remove(ptr);
 				}
-
-				static if (is(TR == T*)) .destroy(*_p);
-				else .destroy(_p);
 			}
 		}
-
-		_p = null;
 	}
 	/** Returns whether the resource exists. */
 	@property bool isEmpty() const
