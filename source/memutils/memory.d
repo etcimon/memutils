@@ -12,7 +12,7 @@ module memutils.memory;
 import memutils.allocators;
 import memutils.helpers;
 import std.algorithm : min;
-import std.c.stdlib;
+import core.stdc.stdlib;
 
 final class GCAllocator : Allocator {
 	import core.memory : GC;

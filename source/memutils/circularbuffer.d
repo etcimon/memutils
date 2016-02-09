@@ -81,7 +81,7 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	void putN(size_t n) { assert(m_fill+n <= m_buffer.length); m_fill += n; }
 	void popFront() { assert(!empty); m_start = mod(m_start+1); m_fill--; }
 	void popFrontN(size_t n) { 
-		import std.c.string : memset; 
+		import core.stdc.string : memset; 
 		assert(length >= n); 
 		m_start = mod(m_start + n);
 		m_fill -= n;
@@ -123,7 +123,7 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	}
 	void read(T[] dst)
 	{
-		import std.c.string : memset;
+		import core.stdc.string : memset;
 		assert(dst.length <= length);
 		if( !dst.length ) return;
 		if( mod(m_start) >= mod(m_start+dst.length) ){

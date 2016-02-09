@@ -3,7 +3,7 @@
 import core.thread : Fiber;	
 import std.traits : isPointer, hasIndirections, hasElaborateDestructor;
 import std.conv : emplace;
-import std.c.string : memset, memcpy;
+import core.stdc.string : memset, memcpy;
 import memutils.allocators;
 import std.algorithm : startsWith;
 import memutils.constants;

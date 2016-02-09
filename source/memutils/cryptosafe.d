@@ -75,7 +75,7 @@ public:
 		//logTrace("realloc P: ", mem.length, " & ", mem.ptr);
 		if (n <= mem.length)
 			return mem;
-		import std.c.string : memmove, memset;
+		import core.stdc.string : memmove, memset;
 
 		static if (HasSecurePool) {
 			if (ms_zeroise.has(mem)) {
@@ -99,7 +99,7 @@ public:
 			scope(exit) mtx.unlock_nothrow();
 		}
 		//logTrace("free P: ", mem.length, " & ", mem.ptr);
-		import std.c.string : memset;
+		import core.stdc.string : memset;
 		bool skip_zero;
 		if (mem.length > 1024) {
 			skip_zero = true;

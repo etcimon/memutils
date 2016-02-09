@@ -3,7 +3,7 @@
 import std.algorithm : swap, initializeAll;
 import std.range : empty;
 import std.traits;
-import std.c.string;
+import core.stdc.string;
 import std.range : isInputRange, isForwardRange, isRandomAccessRange, ElementType, refRange, RefRange, hasLength;
 import core.exception : RangeError;
 import std.exception : enforce;

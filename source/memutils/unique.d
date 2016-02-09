@@ -117,7 +117,7 @@ public:
 	~this()
 	{
 		//logDebug("Unique destructor of ", T.stringof, " : ", ptr);
-		import std.c.string : memset;
+		import core.stdc.string : memset;
 
 
 		static if (ALLOC.stringof != "void") {
