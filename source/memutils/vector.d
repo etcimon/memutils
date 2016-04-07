@@ -11,6 +11,7 @@ import memutils.allocators;
 import memutils.helpers;
 import memutils.utils;
 import memutils.refcounted;
+import std.conv : emplace, to;
 
 public alias SecureArray(T) = Array!(T, SecureMem);
 

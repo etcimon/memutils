@@ -7,6 +7,7 @@
 */
 module memutils.dictionarylist;
 
+import core.stdc.string : memset, memcpy;
 import memutils.helpers;
 import memutils.allocators;
 import memutils.refcounted;

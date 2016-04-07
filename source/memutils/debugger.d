@@ -2,6 +2,8 @@
 import memutils.allocators;
 import memutils.hashmap;
 import memutils.dictionarylist;
+import memutils.utils : Malloc;
+import std.conv : emplace, to;
 
 /**
 * Another proxy allocator used to aggregate statistics and to enforce correct usage.

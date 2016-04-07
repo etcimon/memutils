@@ -1,14 +1,13 @@
 ﻿module memutils.utils;
 
 import core.thread : Fiber;	
-import std.traits : isPointer, hasIndirections, hasElaborateDestructor;
+import std.traits : isPointer, hasIndirections, hasElaborateDestructor, isArray, ReturnType;
 import std.conv : emplace;
 import core.stdc.string : memset, memcpy;
 import memutils.allocators;
 import std.algorithm : startsWith;
 import memutils.constants;
 import memutils.vector : Array;
-import std.traits : isArray;
 import std.range : ElementType;
 import memutils.helpers : UnConst;
 

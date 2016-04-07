@@ -1,5 +1,7 @@
 ﻿module memutils.tests;
 import memutils.all;
+import core.thread : Fiber;	
+import std.conv : to;
 static if (HasUnittests && !SkipUnitTests && !DisableDebugAllocations):
 
 // Test hashmap, freelists

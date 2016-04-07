@@ -11,6 +11,7 @@ import memutils.unique;
 import memutils.hashmap;
 import memutils.freelist;
 import memutils.memory;
+import std.traits : hasElaborateDestructor, isArray;
 import std.algorithm : min;
 import std.exception;
 import core.exception;
