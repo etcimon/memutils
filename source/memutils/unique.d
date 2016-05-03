@@ -17,8 +17,14 @@ import memutils.constants;
 import memutils.utils;
 import std.conv : to;
 
-version(GCCheck) extern (C) bool rt_isInGC();
-
+static if (__VERSION__ >= 2071) {
+	extern (C) bool gc_inFinalizer();
+	enum HasGCCheck = true;
+}
+else version(GCCheck) {
+	extern(C) bool gc_inFinalizer();
+	enum HasGCCheck = true;
+} else enum HasGCCheck = false;
 enum DebugUnique = true;
 
 // TODO: Move release() into Embed!, and add a releaseCheck() for refCounted (cannot release > 1 reference) 
@@ -138,24 +144,22 @@ public:
 			}
 		}
 		else {
-			version(GCCheck) {
-				if (!rt_isInGC()) {
-					if (_p) {
-						//logTrace("ptr in ptree: ", ptr in ptree);
+			static if (HasGCCheck) if (!gc_inFinalizer()) {
+				if (_p) {
+					//logTrace("ptr in ptree: ", ptr in ptree);
 
-						static if (HasDebugAllocations && DebugUnique) {
-							mtx.lock(); scope(exit) mtx.unlock();
-							ptree._defaultInitialize();
-							if (ptr !in ptree){ 
-								logDebug("Unknown pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
-								assert(false);
-							}
-							ptree.remove(ptr);
+					static if (HasDebugAllocations && DebugUnique) {
+						mtx.lock(); scope(exit) mtx.unlock();
+						ptree._defaultInitialize();
+						if (ptr !in ptree){ 
+							logDebug("Unknown pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
+							assert(false);
 						}
-
-						static if (is(TR == T*)) .destroy(*_p);
-						else .destroy(_p);
+						ptree.remove(ptr);
 					}
+
+					static if (is(TR == T*)) .destroy(*_p);
+					else .destroy(_p);
 				}
 			}
 		}
