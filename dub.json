@@ -17,8 +17,7 @@
 		},
 		{
 			"name": "unittest",
-			"targetType": "executable",
-			"versions": ["EnableDebugger"]
+			"versions": ["EnableDebugger", "MemutilsTests"]
 		}
 	]
 }

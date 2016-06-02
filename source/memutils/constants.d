@@ -1,8 +1,7 @@
 ﻿module memutils.constants;
 
 package:
-version(unittest) enum HasUnittests = true;
-else			  enum HasUnittests = false;
+
 enum { // overhead allocator definitions, lazily loaded
 	NativeGC = 0x01, // instances are freed automatically when no references exist in the program's threads
 	LocklessFreeList = 0x02, // instances are owned by the creating thread thus must be freed by it
@@ -31,11 +30,11 @@ else					  const HasDebuggerEnabled = false;
 version(DisableDebugger)   const DisableDebugAllocations = true;
 else version(VibeNoDebug) const DisableDebugAllocations = true;
 else					const DisableDebugAllocations = false;
-
+public:
 static if (HasDebuggerEnabled && !DisableDebugAllocations ) const HasDebugAllocations = true;
-else static if (!DisableDebugAllocations && HasUnittests) const HasDebugAllocations = true;
+else static if (!DisableDebugAllocations) const HasDebugAllocations = true;
 else					  const HasDebugAllocations = false;
-
+package:
 version(SkipMemutilsTests) const SkipUnitTests = true;
 else					   const SkipUnitTests = false;
 
