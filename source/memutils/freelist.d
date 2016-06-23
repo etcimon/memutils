@@ -45,10 +45,10 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 			scope(exit) mtx.unlock_nothrow();
 		}
 		logTrace("AFL alloc ", sz);
-		if (sz > nthFreeListSize!(freeListCount-1)) return m_baseAlloc.alloc(sz);
 		foreach (i; iotaTuple!freeListCount)
 			if (sz <= nthFreeListSize!(i))
 				return m_freeLists[i].alloc().ptr[0 .. sz];
+		if (sz > nthFreeListSize!(freeListCount-1)) return m_baseAlloc.alloc(sz);
 		assert(false);
 	}
 
@@ -84,15 +84,15 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 			scope(exit) mtx.unlock_nothrow();
 		}
 		logTrace("AFL free ", data.length);
-		if (data.length > nthFreeListSize!(freeListCount-1)) {
-			m_baseAlloc.free(data);
-			return;
-		}
 		foreach(i; iotaTuple!freeListCount) {
 			if (data.length <= nthFreeListSize!i) {
 				m_freeLists[i].free(data.ptr[0 .. nthFreeListSize!i]);
 				return;
 			}
+		}
+		if (data.length > nthFreeListSize!(freeListCount-1)) {
+			m_baseAlloc.free(data);
+			return;
 		}
 		assert(false);
 	}

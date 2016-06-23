@@ -17,7 +17,7 @@ final class PoolAllocator(Base : Allocator)
 {
 	public int id = -1; // intrusive ID used for ScopedPools
 
-	static struct Pool { Pool* next; void[] data; void[] remaining; }
+	static align(8) struct Pool { Pool* next; void[] data; void[] remaining; }
 
 	private {
 		Allocator m_baseAllocator;

@@ -95,7 +95,7 @@ T[] allocArray(T, ALLOC = ThreadMem)(size_t n)
 
 	auto mem = allocator.alloc(T.sizeof * n);
 	// logTrace("alloc ", T.stringof, ": ", mem.ptr);
-	auto ret = cast(T[])mem;
+	auto ret = (cast(T*)mem.ptr)[0 .. n];
 	// logTrace("alloc ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
@@ -119,9 +119,9 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	// logTrace("realloc before ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
 
 	//logTrace("realloc fre ", T.stringof, ": ", array.ptr);
-	auto mem = allocator.realloc(cast(void[]) array, T.sizeof * n);
+	auto mem = allocator.realloc((cast(void*)array.ptr)[0 .. array.length * T.sizeof], T.sizeof * n);
 	//logTrace("realloc ret ", T.stringof, ": ", mem.ptr);
-	auto ret = cast(T[])mem;
+	auto ret = (cast(T*)mem.ptr)[0 .. n];
 	// logTrace("realloc after ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
 	
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
@@ -164,7 +164,7 @@ void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = si
 			i++;
 		}
 	}
-	allocator.free(cast(void[])array);
+	allocator.free((cast(void*)array.ptr)[0 .. array.length * T.sizeof]);
 	array = null;
 }
 

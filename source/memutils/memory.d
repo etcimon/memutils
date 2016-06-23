@@ -56,6 +56,7 @@ final class GCAllocator : Allocator {
 
 final class MallocAllocator : Allocator {
 	import core.exception : OutOfMemoryError;
+
 	void[] alloc(size_t sz)
 	{
 		static err = new immutable OutOfMemoryError;

@@ -73,6 +73,8 @@ version(TLSGC) { } else {
 	public import core.sync.mutex : Mutex;
 	__gshared Mutex mtx;
 }
+
+pragma(inline, true)
 public auto getAllocator(int ALLOC)(bool is_freeing = false) {
 	static if (ALLOC == LocklessFreeList) alias R = LocklessAllocator;
 	else static if (ALLOC == NativeGC) alias R = ProxyGCAllocator;
