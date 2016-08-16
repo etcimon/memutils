@@ -13,5 +13,6 @@ matrix:
   allow_failures:
     - d: dmd-2.068.1
     - d: dmd-2.068.0
+    - d: ldc-0.16.1
 
 sudo: false

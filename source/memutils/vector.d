@@ -671,13 +671,17 @@ struct Vector(T, ALLOC = ThreadMem)
 		_data._payload = _data._payload[0 .. $ - 1];
 	}
 	
+	@trusted
 	void removeFront() { 
 	
 		enforce(!empty);
 		static if (hasElaborateDestructor!T)
 			.destroy(_data._payload[0]);
-	
-		_data._payload = _data._payload[1 .. $];
+		if (_data._payload.length > 1) {
+			memmove(_data._payload.ptr, _data._payload.ptr + 1, T.sizeof * (_data._payload.length - 1));
+			memset(_data._payload.ptr + _data._payload.length - 1, 0, T.sizeof);
+		}
+		_data._payload.length -= 1;	
 	}
 	
 	/**
