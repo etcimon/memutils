@@ -94,8 +94,7 @@ public:
 			ptree._defaultInitialize();
 			if(cast(void*)p in ptree)
 			{
-				logDebug("Already owned pointer: " ~ p.to!string ~ " of type " ~ T.stringof);
-				assert(false);
+                assert(false, "Already owned pointer: " ~ (cast(void*)p).to!string ~ " of type " ~ T.stringof);
 			}
 			ptree.insert(cast(void*)p);
 		}
