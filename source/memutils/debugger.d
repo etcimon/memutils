@@ -57,6 +57,7 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 		auto ret = m_baseAlloc.alloc(sz);
 		synchronized(this) {
 			assert(ret.length == sz, "base.alloc() returned block with wrong size.");
+			assert( cast(size_t)ret.ptr !in m_blocks, "Returning already allocated pointer");
 			m_blocks[cast(size_t)ret.ptr] = sz;
 			m_bytes += sz;
 			if (m_allocSizeCallback)
@@ -87,6 +88,7 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 		}
 		ret = m_baseAlloc.realloc(mem, new_size);
 		synchronized(this) {
+			//assert( cast(size_t)ret.ptr !in m_blocks, "Returning from realloc already allocated pointer");
 			assert(ret.length == new_size, "base.realloc() returned block with wrong size.");
 			//assert(ret.ptr is mem.ptr || m_blocks.get(ret.ptr, size_t.max) == size_t.max, "base.realloc() returned block that is already allocated.");
 			m_bytes -= sz;

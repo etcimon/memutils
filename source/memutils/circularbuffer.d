@@ -41,6 +41,7 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	static if( N == 0 ){
 		@property void capacity(size_t new_size)
 		{
+			if (new_size <= length || new_size == capacity) return;
 			if( m_buffer.length ){
 				auto temp = allocArray!(T, ALLOC)(new_size);
 				size_t tmp_fill = m_fill;

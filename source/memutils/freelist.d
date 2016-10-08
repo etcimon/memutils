@@ -162,12 +162,15 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 	void[] alloc()
 	{
 		void[] mem;
+		if (m_nfree == 0) m_firstFree = null;
 		if( m_firstFree ){
 			auto slot = m_firstFree;
-			m_firstFree = slot.next;
-			slot.next = null;
+			if (--m_nfree == 0)
+				m_firstFree = null;
+			else {
+				m_firstFree = slot.next;
+			}
 			mem = (cast(void*)slot)[0 .. m_elemSize];
-			m_nfree--;
 		} else {
 			mem = m_baseAlloc.alloc(m_elemSize);
 			//logInfo("Alloc %d bytes: alloc: %d, free: %d", SZ, s_nalloc, s_nfree);
