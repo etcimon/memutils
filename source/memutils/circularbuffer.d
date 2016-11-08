@@ -9,7 +9,7 @@ module memutils.circularbuffer;
 import memutils.allocators;
 import memutils.constants;
 import std.algorithm;
-import std.traits : hasElaborateDestructor, isBasicType;
+import std.traits : hasElaborateDestructor, isBasicType, isPointer;
 import memutils.utils;
 
 struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
