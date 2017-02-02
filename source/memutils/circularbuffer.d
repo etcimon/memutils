@@ -62,6 +62,7 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 		m_start = 0;
 	}
 	void put()(T itm) { assert(m_fill < m_buffer.length); m_buffer[mod(m_start + m_fill++)] = itm; }
+	void forcePut()(T itm) { if (m_fill >= m_buffer.length) popBack(); m_buffer[mod(m_start + m_fill++)] = itm; }
 	void put(TC : T)(TC[] itms)
 	{
 		if( !itms.length ) return;
