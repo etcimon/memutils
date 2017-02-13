@@ -11,11 +11,6 @@
             "name": "secure"
 		},
 		{
-			"name": "32mscoff",
-			"dflags-windows-x86": ["-m32mscoff"],
-			"versions": ["mscoff"]
-		},
-		{
 			"name": "unittest",
 			"versions": ["EnableDebugger", "MemutilsTests"]
 		}
