@@ -7,12 +7,12 @@
 	"target": "staticLibrary",
 	"versions": ["CryptoSafe"],
     "configurations": [
-        {
-            "name": "secure"
-		},
-		{
-			"name": "unittest",
+	    {
+		    	"name": "secure"
+	    },
+	    {
+		    	"name": "unittest",
 			"versions": ["EnableDebugger", "MemutilsTests"]
-		}
+	    }
 	]
 }
