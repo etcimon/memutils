@@ -19,7 +19,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	private TR m_object;
 	private ulong* m_refCount;
 	private void function(void*) m_free;
-
+	
 	static RefCounted opCall(ARGS...)(auto ref ARGS args)
 	{
 		RefCounted ret;
@@ -120,6 +120,12 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	{
 		//try logTrace("RefCounted opcast: bool ", T.stringof); catch {}
 		return !(m_object is null && !m_refCount && !m_free);
+	}
+
+	U opCast(U : Object)() const nothrow
+		if (!__traits(hasMember, U, "isRefCounted"))
+	{
+		return cast(U) m_object;
 	}
 
 	U opCast(U)() const nothrow
