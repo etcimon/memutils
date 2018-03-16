@@ -32,7 +32,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		return ret;
 	}
 	
-	const ~this()
+	~this()
 	{
 		//logDebug("RefCounted dtor: ", T.stringof);
 		dtor((cast(RefCounted*)&this));
@@ -50,7 +50,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		}
 	}
 	
-	const this(this)
+	this(this)
 	{
 		//logDebug("RefCounted copy ctor");
 		(cast(RefCounted*)&this).copyctor();
