@@ -47,7 +47,8 @@ void vectorArrayTest(ALLOC)() {
 				string abc = "abcdefghijklmnop";
 				outbuf_ ~= cast(ubyte[])abc;
 				reference ~= cast(ubyte[]) abc;
-				assert(outbuf_[] == reference, "realloc error with " ~ typeof(ALLOC).stringof);
+
+				assert(outbuf_[] == reference, "realloc error");
 			}
 		}
 	}
