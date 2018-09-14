@@ -50,20 +50,20 @@ interface Allocator {
 	
 	void[] alloc(size_t sz)
 	out {
-		static if (!HasSecurePool && !HasBotan) assert((cast(size_t)__result.ptr & alignmentMask) == 0, "alloc() returned misaligned data.");
+		assert((cast(size_t)__result.ptr & alignmentMask) == 0, "alloc() returned misaligned data.");
 	}
 
 	void[] realloc(void[] mem, size_t new_sz)
 	in {
 		assert(mem.ptr !is null, "realloc() called with null array.");
-		static if (!HasSecurePool && !HasBotan) assert((cast(size_t)mem.ptr & alignmentMask) == 0, "misaligned pointer passed to realloc().");
+		assert((cast(size_t)mem.ptr & alignmentMask) == 0, "misaligned pointer passed to realloc().");
 	}
-	out { static if (!HasSecurePool && !HasBotan) assert((cast(size_t)__result.ptr & alignmentMask) == 0, "realloc() returned misaligned data."); }
+	out { assert((cast(size_t)__result.ptr & alignmentMask) == 0, "realloc() returned misaligned data."); }
 
 	void free(void[] mem)
 	in {
 		assert(mem.ptr !is null, "free() called with null array.");
-		static if (!HasSecurePool && !HasBotan) assert((cast(size_t)mem.ptr & alignmentMask) == 0, "misaligned pointer passed to free().");
+		assert((cast(size_t)mem.ptr & alignmentMask) == 0, "misaligned pointer passed to free().");
 	}
 }
 
