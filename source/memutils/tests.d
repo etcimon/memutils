@@ -38,6 +38,18 @@ void vectorArrayTest(ALLOC)() {
 		Vector!(Array!(ubyte, ALLOC), ALLOC) arr;
 		arr ~= data.dupr;
 		assert(arr[0] == data && arr[0][] == "Hello there");
+		
+		{
+			Vector!(ubyte, ALLOC) outbuf_;
+			ubyte[] reference;
+			int i;
+			for (i = 0; i < 4096; i++) {
+				string abc = "abcdefghijklmnop";
+				outbuf_ ~= cast(ubyte[])abc;
+				reference ~= cast(ubyte[]) abc;
+				assert(outbuf_[] == reference, "realloc error with " ~ typeof(ALLOC).stringof);
+			}
+		}
 	}
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
 }
@@ -287,7 +299,7 @@ void scopedTest() {
 	f.call();
 }
 
-unittest {
+unittest {	
 	propagateTests!hashmapFreeListTest();
 	propagateTests!vectorArrayTest();
 	propagateTests!hashmapComplexTest();
