@@ -642,8 +642,7 @@ struct Vector(T, ALLOC = ThreadMem)
 			return _data.pushBack(cast(T)stuff);
 		}
 		else static if (isInputRange!(Stuff) && isImplicitlyConvertible!(ForeachType!Stuff, T)) {
-			import std.array : array;
-			return _data.pushBack(stuff.array.to!(T[]));
+			return _data.pushBack(stuff);
 		}
 		else
 			return _data.pushBack(cast(T) stuff);
