@@ -100,7 +100,6 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 			if (m_allocSizeCallback)
 				m_allocSizeCallback(new_size);
 		}
-		assert(ret.length < 8 || (cast(ubyte*)(ret.ptr))[7] != 0x10, "ralloc 0x10?");
 		return ret;
 	}
 	
