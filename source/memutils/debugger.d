@@ -100,7 +100,6 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 			if (m_allocSizeCallback)
 				m_allocSizeCallback(new_size);
 		}
-		
 		return ret;
 	}
 	
