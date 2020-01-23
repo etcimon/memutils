@@ -1,18 +1,18 @@
 language: d
 d:
-  - dmd-2.071.0
+  - dmd-2.090.0
+  - dmd-2.085.0
+  - dmd-2.080.0
+  - dmd-2.075.0
   - dmd-2.070.0
   - dmd-2.069.0
   - dmd-2.068.2
   - dmd-2.068.1
-  - ldc-0.17.1
-  - ldc-0.17.0
-  - ldc-0.16.1
+  - ldc-1.20.0-beta1
+  - ldc-1.19.0
+  - ldc-1.16.0
+  - gdc-2.081
 
 matrix:
-  allow_failures:
-    - d: dmd-2.068.1
-    - d: dmd-2.068.0
-    - d: ldc-0.16.1
 
 sudo: false
