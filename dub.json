@@ -12,7 +12,7 @@
 	    },
 	    {
 		    	"name": "unittest",
-			"versions": ["EnableDebugger", "MemutilsTests"]
+			"versions": ["EnableDebugger", "MemutilsTests", "HasDebuggerEnabled"]
 	    }
 	]
 }

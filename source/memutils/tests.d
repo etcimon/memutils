@@ -32,18 +32,20 @@ void vectorArrayTest(ALLOC)() {
 		assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
 		Vector!(ubyte, ALLOC) data;
 		data ~= "Hello there";
+		
 		assert(getAllocator!(ALLOC.ident)().bytesAllocated() > 0);
 		assert(data[] == "Hello there");
 
 		Vector!(Array!(ubyte, ALLOC), ALLOC) arr;
 		arr ~= data.dupr;
 		assert(arr[0] == data && arr[0][] == "Hello there");
-		
+		assert(arr[0] == data);
+		assert(arr[0][] == "Hello there");
 		{
 			Vector!(ubyte, ALLOC) outbuf_;
 			ubyte[] reference;
 			int i;
-			for (i = 0; i < 4096; i++) {
+			for (i = 0; i < 16; i++) {
 				string abc = "abcdefghijklmnop";
 				outbuf_ ~= cast(ubyte[])abc;
 				reference ~= cast(ubyte[]) abc;
@@ -52,7 +54,8 @@ void vectorArrayTest(ALLOC)() {
 			}
 		}
 	}
-	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
+	scope(failure) getAllocator!(ALLOC.ident)().printMap();
+	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0, "we got " ~ getAllocator!(ALLOC.ident)().bytesAllocated().to!string ~ " bytes, expected 0");
 }
 
 // Test HashMap, FreeLists & Array

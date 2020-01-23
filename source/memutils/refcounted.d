@@ -3,7 +3,7 @@
 import memutils.allocators;
 import memutils.helpers;
 import std.conv : to, emplace;
-import std.traits : hasIndirections, Unqual, isImplicitlyConvertible;
+import std.traits;
 import memutils.utils;
 import std.algorithm : countUntil;
 
@@ -23,22 +23,18 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	static RefCounted opCall(ARGS...)(auto ref ARGS args)
 	{
 		RefCounted ret;
-
 		ret.m_object = ObjectAllocator!(T, ALLOC).alloc(args);
 		ret.m_refCount = ObjectAllocator!(ulong, ALLOC).alloc();
-		// logTrace("refcount: ", cast(void*)ret.m_refCount, " m_object: ", cast(void*)ret.m_object, " Type: ", T.stringof);
 		(*ret.m_refCount) = 1;
-		logTrace("Allocating: ", cast(void*)ret.m_object, " of ", T.stringof, " sz: ", ElemSize, " allocator: ", ALLOC.stringof);
 		return ret;
 	}
 	
-	~this()
+	nothrow ~this()
 	{
-		//logDebug("RefCounted dtor: ", T.stringof);
-		dtor(&this);
+		try dtor(&this); catch(Throwable e) {}
 	}
 	
-	static void dtor(U)(U* ctxt) {
+	static void  dtor(U)(U* ctxt) {
 		static if (!is (U == typeof(this))) {
 			typeof(this)* this_ = cast(typeof(this)*)ctxt;
 			this_.m_object = cast(typeof(this.m_object)) ctxt.m_object;
@@ -52,17 +48,16 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	
 	this(this)
 	{
-		//logDebug("RefCounted copy ctor");
 		copyctor();
 	}
 	
 	void copyctor() {
 		
+		if (m_object) (*m_refCount)++; 
 		if (!m_object)
 			defaultInit();
 
 		checkInvariants();
-		if (m_object) (*m_refCount)++; 
 		
 	}
 	
@@ -101,8 +96,6 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		checkInvariants();
 		if( m_object ){
 			if( --(*m_refCount) == 0 ){
-				//logTrace("RefCounted clear: ", T.stringof);
-				logTrace("Clearing Object: ", cast(void*)m_object);
 				if (m_free)
 					m_free(cast(void*)&this);
 				else {
@@ -122,65 +115,68 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		return !(m_object is null && !m_refCount && !m_free);
 	}
 
+	U opCast(U)() const nothrow
+		if (__traits(hasMember, U, "isRefCounted") && (isImplicitlyConvertible!(U.T, T) || isImplicitlyConvertible!(T, U.T)))
+	{
+		//try logTrace("RefCounted opcast: ", T.stringof, " => ", U.stringof); catch {}
+		static assert(U.sizeof == typeof(this).sizeof, "Error, U: "~ U.sizeof.to!string~ " != this: " ~ typeof(this).sizeof.to!string);
+	
+		U ret = U.init;
+		ret.m_object = cast(U.TR)this.m_object;
+
+		static if (!is (U == typeof(this))) {
+			if (!m_free) {
+				static void destr(void* ptr) {
+					dtor(cast(U*)ptr);
+				}
+				ret.m_free = &destr;
+			}
+			else
+				ret.m_free = m_free;
+		}
+		else ret.m_free = m_free;
+		
+		ret.m_refCount = cast(ulong*)this.m_refCount;
+		(*ret.m_refCount) += 1;
+		return ret;
+	}
+
 	U opCast(U : Object)() const nothrow
 		if (!__traits(hasMember, U, "isRefCounted"))
 	{
 		return cast(U) m_object;
 	}
 
-	U opCast(U)() const nothrow
-		if (__traits(hasMember, U, "isRefCounted") && (isImplicitlyConvertible!(U.T, T) || isImplicitlyConvertible!(T, U.T)))
-	{
-		//try logTrace("RefCounted opcast: ", T.stringof, " => ", U.stringof); catch {}
-		static assert(U.sizeof == typeof(this).sizeof, "Error, U: "~ U.sizeof.to!string~ " != this: " ~ typeof(this).sizeof.to!string);
-		try { 
-			U ret = U.init;
-			ret.m_object = cast(U.TR)this.m_object;
-
-			static if (!is (U == typeof(this))) {
-				if (!m_free) {
-					static void destr(void* ptr) {
-						dtor(cast(U*)ptr);
-					}
-					ret.m_free = &destr;
-				}
-				else
-					ret.m_free = m_free;
-			}
-			else ret.m_free = m_free;
-			
-			ret.m_refCount = cast(ulong*)this.m_refCount;
-			(*ret.m_refCount) += 1;
-			return ret;
-		} catch(Throwable e) { try logError("Error in catch: ", e.toString()); catch {} }
-		return U.init;
+	private @property ulong refCount() const {
+		if (!m_refCount) return 0;
+		return *m_refCount;
 	}
 
 	private void _deinit() {
-		//logTrace("Freeing: ", T.stringof, " ptr ", cast(void*) m_object, " sz: ", ElemSize, " allocator: ", ALLOC.stringof);
-		ObjectAllocator!(T, ALLOC).free(m_object);
-		//logTrace("Freeing refcount: ", cast(void*)m_refCount, " object: ", cast(void*)m_object, " Type: ", T.stringof);
+		TR obj_ptr = m_object;
+		static if (!isPointer!T) // call destructors but not for indirections...
+			.destroy(m_object);
+		
+		if (obj_ptr !is null)
+			ObjectAllocator!(T, ALLOC).free(obj_ptr);
+		
 		ObjectAllocator!(ulong, ALLOC).free(m_refCount);
 		m_refCount = null;
 		m_object = null;
 	}
 
 
-	private @property ulong refCount() const {
-		if (!m_refCount) return 0;
-		return *m_refCount;
-	}
 
-
-	private void defaultInit() const {
-		static if (__traits(compiles, { this.opCall(); }())) {
-			if (!m_object) {
-				auto newObj = this.opCall();
-				(cast(RefCounted*)&this).m_object = newObj.m_object;
-				(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
-				newObj.m_object = null;
-			}
+	private void defaultInit(ARGS...)(ARGS args) const {
+		
+		if (!m_object) {
+			auto newObj = this.opCall(args);
+			(cast(RefCounted*)&this).m_object = newObj.m_object;
+			(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
+			newObj.m_object = null;
+			newObj.m_refCount = null;
 		}
+
 		
 	}
 	

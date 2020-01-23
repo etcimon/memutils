@@ -197,7 +197,7 @@ struct Vector(T, ALLOC = ThreadMem)
 			if (isImplicitlyConvertible!(T, T) && isImplicitlyConvertible!(Stuff, T))
 		{
 			TRACE("Vector.append");
-			logTrace("Capacity: ", _capacity, " length: ", length);
+			//logTrace("Capacity: ", _capacity, " length: ", length);
 			if (_capacity == length)
 			{
 				reserve(1 + capacity * 3 / 2);
