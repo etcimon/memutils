@@ -10,7 +10,6 @@ d:
   - ldc-1.20.0-beta1
   - ldc-1.19.0
   - ldc-1.16.0
-  - gdc-2.081.0
 
 matrix:
 
