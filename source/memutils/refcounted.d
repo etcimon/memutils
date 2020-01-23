@@ -34,7 +34,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		try dtor(&this); catch(Throwable e) {}
 	}
 	
-	static void  dtor(U)(U* ctxt) {
+	static void dtor(U)(U* ctxt) {
 		static if (!is (U == typeof(this))) {
 			typeof(this)* this_ = cast(typeof(this)*)ctxt;
 			this_.m_object = cast(typeof(this.m_object)) ctxt.m_object;
