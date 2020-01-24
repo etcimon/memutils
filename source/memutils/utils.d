@@ -61,8 +61,9 @@ template ObjectAllocator(T, ALLOC)
 			else
 				GC.addRange(mem.ptr, ElemSize);	
 		}
-
-		return emplace!T(mem, args);
+		static if (!__traits(compiles, (){ emplace!T(mem,args); }))
+		return cast(TR)T.init;
+		else return cast(TR)emplace!T(mem, args);
 
 	}
 

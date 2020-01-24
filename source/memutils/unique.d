@@ -15,6 +15,9 @@ module memutils.unique;
 import memutils.allocators;
 import memutils.constants;
 import memutils.utils;
+import memutils.rbtree;
+
+	import memutils.helpers;
 import std.conv : to;
 
 static if (__VERSION__ >= 2071) {
@@ -30,8 +33,14 @@ enum DebugUnique = true;
 // TODO: Move release() into Embed!, and add a releaseCheck() for refCounted (cannot release > 1 reference) 
 struct Unique(T, ALLOC = void)
 {
-	/** Represents a reference to $(D T). Resolves to $(D T*) if $(D T) is a value type. */
 	alias TR = RefTypeOf!T;
+	private TR m_object;
+	
+	mixin Embed!(m_object, false);
+	static if (!is(ALLOC == AppMem)) enum NOGC = true;
+	enum isRefCounted = false;
+
+	enum ElemSize = AllocSize!T;
 	
 public:
 	/**
@@ -74,8 +83,8 @@ public:
 		if (is(u.TR:TR))
 	{
 		// logTrace("Unique constructor converting from ", U.stringof);
-		opAssign(u._p);
-		u._p = null;
+		opAssign(u.m_object);
+		u.m_object = null;
 	}
 	
 	void free()
@@ -86,7 +95,7 @@ public:
 	
 	void opAssign()(auto ref TR p)
 	{
-		if (_p) destroy(this);
+		if (m_object) destroy(this);
 		if (!p) return;
 		//logTrace("Unique ctor of ", T.stringof, " : ", ptr.to!string);
 		static if (HasDebugAllocations && DebugUnique) {
@@ -98,7 +107,7 @@ public:
 			}
 			ptree.insert(cast(void*)p);
 		}
-		_p = p;
+		m_object = p;
 		p = null;
 	}
 	/*
@@ -107,16 +116,16 @@ public:
         debug(Unique) logTrace("Unique opAssign converting from ", U.stringof);
         // first delete any resource we own
         destroy(this);
-        _p = cast(TR)u._p;
-        cast(TR)u._p = null;
+        m_object = cast(TR)u.m_object;
+        cast(TR)u.m_object = null;
     }*/
 	
 	/// Transfer ownership from a $(D Unique) of a type that is convertible to our type.
 	void opAssign(U)(Unique!U u)
 		if (is(u.TR:TR))
 	{
-		opAssign(u._p);
-		u._p = null;
+		opAssign(u.m_object);
+		u.m_object = null;
 	}
 	
 	~this()
@@ -126,7 +135,7 @@ public:
 
 
 		static if (ALLOC.stringof != "void") {
-			if (_p) {
+			if (m_object) {
 				//logTrace("ptr in ptree: ", ptr in ptree);
 
 				static if (HasDebugAllocations && DebugUnique) {
@@ -136,7 +145,7 @@ public:
 					ptree.remove(ptr);
 				}
 
-				ObjectAllocator!(T, ALLOC).free(_p);
+				ObjectAllocator!(T, ALLOC).free(m_object);
 
 				//static if (HasDebugAllocations && DebugUnique)
 				//	debug memset(ptr, 0, AllocSize!T);
@@ -144,7 +153,7 @@ public:
 		}
 		else {
 			static if (HasGCCheck) if (!gc_inFinalizer()) {
-				if (_p) {
+				if (m_object) {
 					//logTrace("ptr in ptree: ", ptr in ptree);
 
 					static if (HasDebugAllocations && DebugUnique) {
@@ -157,8 +166,8 @@ public:
 						ptree.remove(ptr);
 					}
 
-					static if (is(TR == T*)) .destroy(*_p);
-					else .destroy(_p);
+					static if (is(TR == T*)) .destroy(*m_object);
+					else .destroy(m_object);
 				}
 			}
 		}
@@ -166,15 +175,15 @@ public:
 	/** Returns whether the resource exists. */
 	@property bool isEmpty() const
 	{
-		return _p is null;
+		return m_object is null;
 	}
 	
 	/** Transfer ownership to a $(D Unique) rvalue. Nullifies the current contents. */
 	TR release()
 	{
 		//logTrace("Release");
-		if (!_p) return null;
-		auto ret = _p;
+		if (!m_object) return null;
+		auto ret = m_object;
         drop();
 		return ret;
 	}
@@ -182,24 +191,20 @@ public:
 	void drop()
 	{
 		//logTrace("Drop");
-		if (!_p) return;
+		if (!m_object) return;
 		static if (HasDebugAllocations && DebugUnique) {
 			mtx.lock(); scope(exit) mtx.unlock();
 			ptree._defaultInitialize();
 			assert(ptr in ptree);
 			ptree.remove(ptr);
 		}
-		_p = null;
+		m_object = null;
 	}
+
+	TR opUnary(string op)() if (op == "*") { return m_object; }
+	const(TR) opUnary(string op)() const if (op == "*") { return m_object; }
 	
-	/** Forwards member access to contents. */
-	TR opDot() { return _p; }
-	const(TR) opDot() const { return _p; }
-	
-	TR opUnary(string op)() if (op == "*") { return _p; }
-	const(TR) opUnary(string op)() const if (op == "*") { return _p; }
-	
-	TR get() { return _p; }
+	TR get() { return m_object; }
 	
 	bool opCast(T : bool)() const {
 		return !isEmpty;
@@ -211,10 +216,9 @@ public:
 	@disable this(this);
 	
 private:
-	TR _p;
 
 	@property void* ptr() const {
-		return cast(void*)_p;
+		return cast(void*)m_object;
 	}
 
 	static if (HasDebugAllocations && DebugUnique) {

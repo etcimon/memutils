@@ -1,5 +1,4 @@
 ﻿module memutils.helpers;
-
 public:
 
 template UnConst(T) {
@@ -14,6 +13,7 @@ template UnConst(T) {
 /// TODO: implement @override on underlying type T, and check for shadowed members.
 mixin template Embed(alias OBJ, alias OWNED)
 {
+	import std.traits : hasMember;
 	alias TR = typeof(OBJ);
 	static if (is(typeof(*OBJ) == struct))
 			alias T = typeof(*OBJ);
@@ -32,33 +32,62 @@ mixin template Embed(alias OBJ, alias OWNED)
 		void checkInvariants() const {}
 	}
 	
-	static if (!isSomeFunction!OBJ)
-	@property ref const(T) fallthrough() const
-	{
-		(cast(typeof(this)*)&this).defaultInit();
-		checkInvariants();
-		static if (is(TR == T*)) return *OBJ;
-		else return OBJ;
-	}
-	
-	static if (!isSomeFunction!OBJ)
-	@property ref T fallthrough() {
-		defaultInit();
-		checkInvariants();
-		static if (is(TR == T*)) return *OBJ;
-		else return OBJ;
-	}
+	static if (!isSomeFunction!OBJ) {
 
-	static if (!isSomeFunction!OBJ)
-	@property ref const(T) opUnary(string op)() if (op == "*")
+
+		@property ref const(T) fallthrough() const
+		{
+			static if (is(TR == T*) && hasMember!(typeof(*this), "defaultInit")) 
+				(*this).defaultInit();
+			static if (!is(TR == T*) && hasMember!(typeof(*this), "defaultInit"))
+				(cast(typeof(this)*) &this).defaultInit();
+			checkInvariants();
+			static if (is(TR == T*)) return *OBJ;
+			else return OBJ;
+		}
+		
+		@property ref T fallthrough()
+		{
+			static if (is(TR == T*) && hasMember!(typeof(*this), "defaultInit")) 
+				(*this).defaultInit();
+			static if (!is(TR == T*) && hasMember!(typeof(*this), "defaultInit"))
+				(cast(typeof(this)*) &this).defaultInit();
+			checkInvariants();
+			static if (is(TR == T*)) return *OBJ;
+			else return OBJ;
+		}
+
+		static if (is(TR == T*)) {
+			T opCast(TR)(TR t) {
+				return *t;
+			}
+		}
+	}
+	static if (isSomeFunction!OBJ)
+	{
+		@property ref const(T) fallthrough() const {
+			defaultInit();
+			checkInvariants();
+			static if (is(TR == T*)) return *OBJ;
+			else return OBJ;
+		}
+		
+		@property ref T fallthrough() {
+			defaultInit();
+			checkInvariants();
+			static if (is(TR == T*)) return *OBJ;
+			else return OBJ;
+		}
+	}
+	@property ref const(T) opUnary(string op)() const if (op == "*")
 	{
 		return fallthrough;
 	}
 	
-	static if (isSomeFunction!OBJ)
 	@property ref T opUnary(string op)() if (op == "*") {
 		return fallthrough;
 	}
+	
 	alias fallthrough this;
 	
 	static if (!isSomeFunction!OBJ)

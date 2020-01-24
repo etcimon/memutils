@@ -19,7 +19,7 @@ void hashmapFreeListTest(ALLOC)() {
 		}
 		hello(hm);
 		assert(hm["you"] == "hey");
-		destroy(hm);
+		hm.clear();
 		assert(hm.empty);
 	}
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
