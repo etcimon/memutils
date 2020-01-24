@@ -31,9 +31,9 @@ mixin template Embed(alias OBJ, alias OWNED)
 	static if (!__traits(hasMember, typeof(this), "checkInvariants")) {
 		void checkInvariants() const {}
 	}
-
+	
 	static if (!isSomeFunction!OBJ)
-	@property ref const(T) opStar() const
+	@property ref const(T) fallthrough() const
 	{
 		(cast(typeof(this)*)&this).defaultInit();
 		checkInvariants();
@@ -41,13 +41,26 @@ mixin template Embed(alias OBJ, alias OWNED)
 		else return OBJ;
 	}
 	
-	@property ref T opStar() {
+	static if (!isSomeFunction!OBJ)
+	@property ref T fallthrough() {
 		defaultInit();
 		checkInvariants();
 		static if (is(TR == T*)) return *OBJ;
 		else return OBJ;
 	}
 
+	static if (!isSomeFunction!OBJ)
+	@property ref const(T) opUnary(string op)() if (op == "*")
+	{
+		return fallthrough;
+	}
+	
+	static if (isSomeFunction!OBJ)
+	@property ref T opUnary(string op)() if (op == "*") {
+		return fallthrough;
+	}
+	alias fallthrough this;
+	
 	static if (!isSomeFunction!OBJ)
 	@property TR release() {
 		defaultInit();
@@ -57,45 +70,44 @@ mixin template Embed(alias OBJ, alias OWNED)
 		return ret;
 	}
 
-	alias opStar this;
 	
 	auto opBinaryRight(string op, Key)(Key key)
 	inout if (op == "in" && __traits(hasMember, typeof(OBJ), "opBinaryRight")) {
 		defaultInit();
-		return opStar().opBinaryRight!("in")(key);
+		return fallthrough().opBinaryRight!("in")(key);
 	}
 
 	bool opEquals(U)(auto ref U other) const
 	{
 		defaultInit();
-		return opStar().opEquals(other);
+		return fallthrough().opEquals(other);
 	}
 	
 	int opCmp(U)(auto ref U other) const
 	{
 		defaultInit();
-		return opStar().opCmp(other);
+		return fallthrough().opCmp(other);
 	}
 	
 	int opApply(U...)(U args)
 		if (__traits(hasMember, typeof(OBJ), "opApply"))
 	{
 		defaultInit();
-		return opStar().opApply(args);
+		return fallthrough().opApply(args);
 	}
 	
 	int opApply(U...)(U args) const
 		if (__traits(hasMember, typeof(OBJ), "opApply"))
 	{
 		defaultInit();
-		return opStar().opApply(args);
+		return fallthrough().opApply(args);
 	}
 	
 	void opSliceAssign(U...)(U args)
 		if (__traits(hasMember, typeof(OBJ), "opSliceAssign"))
 	{
 		defaultInit();
-		opStar().opSliceAssign(args);
+		fallthrough().opSliceAssign(args);
 	}
 
 	
@@ -104,49 +116,49 @@ mixin template Embed(alias OBJ, alias OWNED)
 	{
 		defaultInit();
 		static if (is(U == void))
-			return opStar().opSlice();
+			return fallthrough().opSlice();
 		else
-			return opStar().opSlice(args);
+			return fallthrough().opSlice(args);
 		
 	}
 
 	static if (__traits(hasMember, typeof(OBJ), "opDollar"))
 	size_t opDollar() const
 	{
-		return opStar().opDollar();
+		return fallthrough().opDollar();
 	}
 	
 	void opOpAssign(string op, U...)(auto ref U args)
-		if (__traits(compiles, opStar().opOpAssign!op(args)))
+		if (__traits(compiles, fallthrough().opOpAssign!op(args)))
 	{
 		defaultInit();
-		opStar().opOpAssign!op(args);
+		fallthrough().opOpAssign!op(args);
 	}
 	
 	auto opBinary(string op, U...)(auto ref U args)
-		if (__traits(compiles, opStar().opBinary!op(args)))
+		if (__traits(compiles, fallthrough().opBinary!op(args)))
 	{
 		defaultInit();
-		return opStar().opBinary!op(args);
+		return fallthrough().opBinary!op(args);
 	}
 	
 	void opIndexAssign(U, V)(auto const ref U arg1, auto const ref V arg2)
-		if (__traits(hasMember, typeof(opStar()), "opIndexAssign"))
+		if (__traits(hasMember, typeof(fallthrough()), "opIndexAssign"))
 	{		
 		defaultInit();
-		opStar().opIndexAssign(arg1, arg2);
+		fallthrough().opIndexAssign(arg1, arg2);
 	}
 	
 	auto ref opIndex(U...)(U args) inout
-		if (__traits(hasMember, typeof(opStar()), "opIndex"))
+		if (__traits(hasMember, typeof(fallthrough()), "opIndex"))
 	{
-		return opStar().opIndex(args);
+		return fallthrough().opIndex(args);
 	}
 	
-	static if (__traits(compiles, opStar().opBinaryRight!("in")(ReturnType!(opStar().front).init)))
+	static if (__traits(compiles, fallthrough().opBinaryRight!("in")(ReturnType!(fallthrough().front).init)))
 		bool opBinaryRight(string op, U)(auto ref U e) const if (op == "in") 
 	{
 		defaultInit();
-		return opStar().opBinaryRight!("in")(e);
+		return fallthrough().opBinaryRight!("in")(e);
 	}
 }

@@ -2,7 +2,7 @@
 
 import memutils.allocators;
 import memutils.helpers;
-import std.conv : to, emplace;
+import std.conv;
 import std.traits;
 import memutils.utils;
 import std.algorithm : countUntil;
@@ -22,8 +22,9 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	
 	static RefCounted opCall(ARGS...)(auto ref ARGS args)
 	{
-		RefCounted ret;
-		ret.m_object = ObjectAllocator!(T, ALLOC).alloc(args);
+		RefCounted!(T, ALLOC) ret;
+		if (!ret.m_object)
+			ret.m_object = ObjectAllocator!(T, ALLOC).alloc(args);
 		ret.m_refCount = ObjectAllocator!(ulong, ALLOC).alloc();
 		(*ret.m_refCount) = 1;
 		return ret;

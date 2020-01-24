@@ -10,6 +10,7 @@ import memutils.constants;
 import memutils.vector : Array;
 import std.range : ElementType;
 import memutils.helpers : UnConst;
+import std.conv;
 
 struct AppMem {
 	mixin ConvenienceAllocators!(NativeGC, typeof(this));
