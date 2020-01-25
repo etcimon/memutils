@@ -158,7 +158,7 @@ static:
 		}
 		// else
 		auto top = m_tstack.top;
-		assert(top, "Can't find a pool to pop");
+		//assert(top, "Can't find a pool to pop");
 		//logTrace("Pop ThreadStack");
 		if (m_tstack.hasTop)
 			return m_tstack.pop();

@@ -32,7 +32,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	
 	nothrow ~this()
 	{
-		try dtor(&this); catch(Throwable e) {}
+		try dtor((cast(RefCounted*)&this)); catch(Throwable e) {}
 	}
 	
 	static void dtor(U)(U* ctxt) {
@@ -49,17 +49,17 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	
 	this(this)
 	{
-		copyctor();
+		(cast(RefCounted*)&this).copyctor();
 	}
 	
 	void copyctor() {
 		
-		if (m_object) (*m_refCount)++; 
 		if (!m_object)
 			defaultInit();
-
+ 
 		checkInvariants();
-		
+
+		if (m_object) (*m_refCount)++;		
 	}
 	
 	void opAssign(U : RefCounted)(in U other) const
@@ -113,7 +113,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	bool opCast(U : bool)() const nothrow
 	{
 		//try logTrace("RefCounted opcast: bool ", T.stringof); catch {}
-		return !(m_object is null && !m_refCount && !m_free);
+		return !(m_object is null || !m_refCount || !m_free);
 	}
 
 	U opCast(U)() const nothrow
@@ -166,8 +166,6 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		m_object = null;
 	}
 
-
-
 	private void defaultInit(ARGS...)(ARGS args) const {
 		
 		if (!m_object) {
@@ -177,8 +175,17 @@ struct RefCounted(T, ALLOC = ThreadMem)
 			newObj.m_object = null;
 			newObj.m_refCount = null;
 		}
-
+	}
+	
+	private void defaultInit() const {
 		
+		if (!m_object) {
+			auto newObj = this.opCall();
+			(cast(RefCounted*)&this).m_object = newObj.m_object;
+			(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
+			newObj.m_object = null;
+			newObj.m_refCount = null;
+		}
 	}
 	
 	private void checkInvariants()

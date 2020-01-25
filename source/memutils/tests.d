@@ -53,6 +53,8 @@ void vectorArrayTest(ALLOC)() {
 				assert(outbuf_[] == reference, "realloc error");
 			}
 		}
+		Array!ubyte def_buf;
+        def_buf.reserve(8);
 	}
 	scope(failure) getAllocator!(ALLOC.ident)().printMap();
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0, "we got " ~ getAllocator!(ALLOC.ident)().bytesAllocated().to!string ~ " bytes, expected 0");

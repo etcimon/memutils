@@ -32,56 +32,26 @@ mixin template Embed(alias OBJ, alias OWNED)
 		void checkInvariants() const {}
 	}
 	
-	static if (!isSomeFunction!OBJ) {
-
-
-		@property ref const(T) fallthrough() const
-		{
-			static if (is(TR == T*) && hasMember!(typeof(*this), "defaultInit")) 
-				(*this).defaultInit();
-			static if (!is(TR == T*) && hasMember!(typeof(*this), "defaultInit"))
-				(cast(typeof(this)*) &this).defaultInit();
-			checkInvariants();
-			static if (is(TR == T*)) return *OBJ;
-			else return OBJ;
-		}
-		
-		@property ref T fallthrough()
-		{
-			static if (is(TR == T*) && hasMember!(typeof(*this), "defaultInit")) 
-				(*this).defaultInit();
-			static if (!is(TR == T*) && hasMember!(typeof(*this), "defaultInit"))
-				(cast(typeof(this)*) &this).defaultInit();
-			checkInvariants();
-			static if (is(TR == T*)) return *OBJ;
-			else return OBJ;
-		}
-
-		static if (is(TR == T*)) {
-			T opCast(TR)(TR t) {
-				return *t;
-			}
-		}
-	}
-	static if (isSomeFunction!OBJ)
+	static if (!isSomeFunction!OBJ)
+	@property ref const(T) fallthrough() const
 	{
-		@property ref const(T) fallthrough() const {
-			defaultInit();
-			checkInvariants();
-			static if (is(TR == T*)) return *OBJ;
-			else return OBJ;
-		}
-		
-		@property ref T fallthrough() {
-			defaultInit();
-			checkInvariants();
-			static if (is(TR == T*)) return *OBJ;
-			else return OBJ;
-		}
+		(cast(typeof(this)*)&this).defaultInit();
+		checkInvariants();
+		static if (is(TR == T*)) return *OBJ;
+		else return OBJ;
 	}
+
+	@property ref T fallthrough()
+	{
+		defaultInit();
+		checkInvariants();
+		static if (is(TR == T*)) return *OBJ;
+		else return OBJ;
+	}
+	
 	@property ref const(T) opUnary(string op)() const if (op == "*")
 	{
-		return fallthrough;
+		return (cast(typeof(this)*)&this).fallthrough;
 	}
 	
 	@property ref T opUnary(string op)() if (op == "*") {
