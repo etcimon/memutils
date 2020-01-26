@@ -29,6 +29,15 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		(*ret.m_refCount) = 1;
 		return ret;
 	}
+	static RefCounted opCall()
+	{
+		RefCounted!(T, ALLOC) ret;
+		if (!ret.m_object)
+			ret.m_object = ObjectAllocator!(T, ALLOC).alloc();
+		ret.m_refCount = ObjectAllocator!(ulong, ALLOC).alloc();
+		(*ret.m_refCount) = 1;
+		return ret;
+	}
 	
 	nothrow ~this()
 	{
