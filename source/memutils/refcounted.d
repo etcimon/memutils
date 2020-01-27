@@ -7,6 +7,8 @@ import std.traits;
 import memutils.utils;
 import std.algorithm : countUntil;
 
+import std.stdio : writeln;
+
 struct RefCounted(T, ALLOC = ThreadMem)
 {
 	import core.memory : GC;
@@ -20,28 +22,25 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	private ulong* m_refCount;
 	private void function(void*) m_free;
 	
-	static RefCounted opCall(ARGS...)(auto ref ARGS args)
+	//@inline
+	static RefCounted opCall(ARGS...)(auto ref ARGS args) nothrow
 	{
-		RefCounted!(T, ALLOC) ret;
-		if (!ret.m_object)
-			ret.m_object = ObjectAllocator!(T, ALLOC).alloc(args);
-		ret.m_refCount = ObjectAllocator!(ulong, ALLOC).alloc();
-		(*ret.m_refCount) = 1;
-		return ret;
-	}
-	static RefCounted opCall()
-	{
-		RefCounted!(T, ALLOC) ret;
-		if (!ret.m_object)
-			ret.m_object = ObjectAllocator!(T, ALLOC).alloc();
-		ret.m_refCount = ObjectAllocator!(ulong, ALLOC).alloc();
-		(*ret.m_refCount) = 1;
-		return ret;
+		try { 
+			RefCounted!(T, ALLOC) ret;
+			if (!ret.m_object)
+				ret.m_object = ObjectAllocator!(T, ALLOC).alloc(args);
+			ret.m_refCount = ObjectAllocator!(ulong, ALLOC).alloc();
+			(*ret.m_refCount) = 1;
+			return ret;
+		} catch (Throwable e) { assert(false, "RefCounted.opCall(args) Throw: " ~ e.toString()); }
+		assert(false, "Count not return from opCall");
 	}
 	
 	nothrow ~this()
 	{
-		try dtor((cast(RefCounted*)&this)); catch(Throwable e) {}
+		try 
+			dtor((cast(RefCounted*)&this)); 
+		catch(Throwable e) { assert(false, "RefCounted.~this Throw: " ~ e.toString()); }
 	}
 	
 	static void dtor(U)(U* ctxt) {
@@ -61,29 +60,34 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		(cast(RefCounted*)&this).copyctor();
 	}
 	
+	//@inline
 	void copyctor() {
 		
-		if (!m_object)
-			defaultInit();
- 
-		checkInvariants();
+		if (!m_object) {
+			defaultInit(); 
+			checkInvariants();
+		}
 
 		if (m_object) (*m_refCount)++;		
 	}
 	
-	void opAssign(U : RefCounted)(in U other) const
+	void opAssign(U : RefCounted)(in U other) const nothrow
 	{
-		if (other.m_object is this.m_object) return;
-		static if (is(U == RefCounted))
-			(cast(RefCounted*)&this).opAssignImpl(*cast(U*)&other);
+		try {
+			if (other.m_object is this.m_object) return;
+				static if (is(U == RefCounted))
+					(cast(RefCounted*)&this).opAssignImpl(other);
+		} catch (Throwable e) { assert(false, "Throw in opAssign 1: " ~ e.toString()); }
 	}
 	
-	ref typeof(this) opAssign(U : RefCounted)(in U other) const
+	ref typeof(this) opAssign(U : RefCounted)(in U other) const nothrow
 	{
-		if (other.m_object is this.m_object) return;
-		static if (is(U == RefCounted))
-			(cast(RefCounted*)&this).opAssignImpl(*cast(U*)&other);
-		return this;
+		try { 
+			if (other.m_object is this.m_object) return;
+			static if (is(U == RefCounted))
+				(cast(RefCounted*)&this).opAssignImpl(other);
+			return this;
+		} catch (Throwable e) { assert(false, "Throw in opAssign: " ~ e.toString()); }
 	}
 	
 	private void opAssignImpl(U)(U other) {
@@ -122,13 +126,12 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	bool opCast(U : bool)() const nothrow
 	{
 		//try logTrace("RefCounted opcast: bool ", T.stringof); catch {}
-		return !(m_object is null || !m_refCount || !m_free);
+		return !(!m_object || !m_refCount);
 	}
 
 	U opCast(U)() const nothrow
-		if (__traits(hasMember, U, "isRefCounted") && (isImplicitlyConvertible!(U.T, T) || isImplicitlyConvertible!(T, U.T)))
+		if (__traits(hasMember, U, "isRefCounted"))
 	{
-		//try logTrace("RefCounted opcast: ", T.stringof, " => ", U.stringof); catch {}
 		static assert(U.sizeof == typeof(this).sizeof, "Error, U: "~ U.sizeof.to!string~ " != this: " ~ typeof(this).sizeof.to!string);
 	
 		U ret = U.init;
@@ -154,9 +157,11 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	U opCast(U : Object)() const nothrow
 		if (!__traits(hasMember, U, "isRefCounted"))
 	{
+		// todo: check this
 		return cast(U) m_object;
 	}
 
+	//@inline
 	private @property ulong refCount() const {
 		if (!m_refCount) return 0;
 		return *m_refCount;
@@ -186,6 +191,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		}
 	}
 	
+	//@inline
 	private void defaultInit() const {
 		
 		if (!m_object) {

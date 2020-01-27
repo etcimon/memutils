@@ -66,12 +66,15 @@ struct Vector(T, ALLOC = ThreadMem)
 		}
 		
 		// Destructor releases array memory
-		~this() const
+		~this() const nothrow
 		{
-			if (_capacity == 0 || _payload.ptr is null)
-				return;
-			T[] data = cast(T[]) _payload.ptr[0 .. _capacity];
-			freeArray!(T, ALLOC)(data, _payload.length); // calls destructors and frees memory
+			try {
+				if (_capacity == 0 || _payload.ptr is null)
+					return;
+				T[] data = cast(T[]) _payload.ptr[0 .. _capacity];
+				freeArray!(T, ALLOC)(data, _payload.length); // calls destructors and frees memory
+			} 
+			catch (Throwable e) { assert(false, "Vector.~this Exception: " ~ e.toString()); }
 		}
 		
 		void opAssign(Payload rhs)

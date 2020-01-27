@@ -106,9 +106,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	{
 		auto keysum = computeCheckSumI(key);
 		if (m_fieldCount < m_fields.length) {
-			logTrace("Appending: ", value);
 			m_fields[m_fieldCount++] = Field(keysum, *cast(KeyType*) &key, value);
-			logTrace("Now have: ", m_fields, " with ", m_fieldCount);
 		}
 		else {
 			grow(1);
@@ -286,7 +284,6 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 			size_t oldsz = m_extendedFields.length;
 			m_extendedFields = m_extendedFields.ptr[0 .. m_extendedFieldCount];
 			m_extendedFieldCount = (m_extendedFieldCount + n)*3/2;
-			logTrace("Extended field count: ", m_extendedFieldCount);
 			m_extendedFields = reallocArray!(Field, ALLOC)(m_extendedFields, m_extendedFieldCount)[0 .. oldsz + n];
 			memset(m_extendedFields.ptr + oldsz, 0, (m_extendedFieldCount-oldsz)*Field.sizeof);
 		}

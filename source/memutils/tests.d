@@ -151,7 +151,7 @@ void refCountedCastTest(ALLOC)() {
 			a = cast(ARef) b;
 			static void doIncr(ARef a_ref) { a_ref.incr(); }
 			doIncr(a);
-			assert(a.get() == 3);
+			assert(a.get() == 3, "Got: " ~ a.get().to!string);
 		}
 		ARef c = a;
 		assert(c.get() == 3);
@@ -305,7 +305,28 @@ void scopedTest() {
 	f.call();
 }
 
-unittest {	
+alias StringObjRef = RefCounted!StringObj;
+import std.stdio : writeln;
+final class StringObj
+{
+	void check_value(ref StringObjRef str_obj) {
+		writeln(str_obj.m_str);
+	}
+	this(string a = "") {
+		m_str = a;
+	}
+	string m_str;
+}
+
+void test() {
+	StringObjRef str_ref = StringObjRef();
+	StringObjRef str_ref2 = StringObjRef("abc");
+	str_ref2 = str_ref;
+	str_ref.check_value(str_ref2);
+}
+
+unittest {
+	test();	
 	propagateTests!hashmapFreeListTest();
 	propagateTests!vectorArrayTest();
 	propagateTests!hashmapComplexTest();
