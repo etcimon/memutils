@@ -19,32 +19,25 @@ mixin template Embed(alias OBJ, alias OWNED)
 			alias T = typeof(*OBJ);
 	else
 		alias T = TR;
-	import std.traits : isSomeFunction;
-	static if (!isSomeFunction!OBJ && is(typeof(OWNED) == bool)) ~this() {
-		if (OWNED && OBJ !is null)
-			destroy(OBJ);
-	}
 
-	static if (!__traits(hasMember, typeof(this), "defaultInit")) {
-		void defaultInit() const {}
-	}
-	static if (!__traits(hasMember, typeof(this), "checkInvariants")) {
-		void checkInvariants() const {}
-	}
-	
+	import std.traits : isSomeFunction;
 	static if (!isSomeFunction!OBJ)
 	@property ref const(T) fallthrough() const
 	{
-		(cast(typeof(this)*)&this).defaultInit();
-		checkInvariants();
+		static if (__traits(hasMember, typeof(this), "defaultInit")) {
+			(cast(typeof(this)*)&this).defaultInit();
+			checkInvariants();
+		}
 		static if (is(TR == T*)) return *OBJ;
 		else return OBJ;
 	}
 
 	@property ref T fallthrough()
 	{
-		defaultInit();
-		checkInvariants();
+		static if (__traits(hasMember, typeof(this), "defaultInit")) {
+			defaultInit();
+			checkInvariants();
+		}
 		static if (is(TR == T*)) return *OBJ;
 		else return OBJ;
 	}
@@ -54,22 +47,20 @@ mixin template Embed(alias OBJ, alias OWNED)
 		return (cast(typeof(this)*)&this).fallthrough;
 	}
 	
-	@property ref T opUnary(string op)() if (op == "*") {
-		return fallthrough;
-	}
 	
 	alias fallthrough this;
 	
 	static if (!isSomeFunction!OBJ)
 	@property TR release() {
-		defaultInit();
-		checkInvariants();
+		static if (__traits(hasMember, typeof(this), "defaultInit")) {
+			defaultInit();
+			checkInvariants();
+		}
 		TR ret = OBJ;
 		OBJ = null;
 		return ret;
 	}
 
-	
 	auto opBinaryRight(string op, Key)(Key key)
 	inout if (op == "in" && __traits(hasMember, typeof(OBJ), "opBinaryRight")) {
 		defaultInit();
@@ -114,10 +105,7 @@ mixin template Embed(alias OBJ, alias OWNED)
 		if (__traits(hasMember, typeof(OBJ), "opSlice"))
 	{
 		defaultInit();
-		static if (is(U == void))
-			return fallthrough().opSlice();
-		else
-			return fallthrough().opSlice(args);
+		return (cast()fallthrough()).opSlice(args);
 		
 	}
 

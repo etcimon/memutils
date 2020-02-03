@@ -22,7 +22,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	private ulong* m_refCount;
 	private void function(void*) m_free;
 	
-	//@inline
+	pragma(inline)
 	static RefCounted opCall(ARGS...)(auto ref ARGS args) nothrow
 	{
 		try { 
@@ -169,8 +169,8 @@ struct RefCounted(T, ALLOC = ThreadMem)
 
 	private void _deinit() {
 		TR obj_ptr = m_object;
-		static if (!isPointer!T) // call destructors but not for indirections...
-			.destroy(m_object);
+		//static if (!isPointer!T) // call destructors but not for indirections...
+		//	.destroy(m_object);
 		
 		if (obj_ptr !is null)
 			ObjectAllocator!(T, ALLOC).free(obj_ptr);
@@ -180,6 +180,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		m_object = null;
 	}
 
+	pragma(inline)
 	private void defaultInit(ARGS...)(ARGS args) const {
 		
 		if (!m_object) {
@@ -191,7 +192,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		}
 	}
 	
-	//@inline
+	pragma(inline)
 	private void defaultInit() const {
 		
 		if (!m_object) {
@@ -202,7 +203,8 @@ struct RefCounted(T, ALLOC = ThreadMem)
 			newObj.m_refCount = null;
 		}
 	}
-	
+
+	pragma(inline)
 	private void checkInvariants()
 	const {
 		assert(!m_object || refCount > 0, (!m_object) ? "No m_object" : "Zero Refcount: " ~ refCount.to!string ~ " for " ~ T.stringof);

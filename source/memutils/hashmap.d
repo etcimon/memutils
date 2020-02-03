@@ -37,10 +37,12 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		bool m_resizing;
 	}
 	
-	~this()
+	nothrow ~this()
 	{
-		clear();
-		if (m_table) freeArray!(TableEntry, ALLOC)(m_table);
+		try {
+			clear();
+			if (m_table) freeArray!(TableEntry, ALLOC)(m_table);
+		} catch(Throwable e) { assert(false, e.toString()); }
 	}
 
 	@property bool empty() const { return length == 0; }
@@ -89,10 +91,10 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 	void clear()
 	{
 		foreach (i; 0 .. m_table.length)
-		if (!Traits.equals(m_table[i].key, Traits.clearValue)) {
-			m_table[i].key = Traits.clearValue;
-			m_table[i].value = Value.init;
-		}
+			if (!Traits.equals(m_table[i].key, Traits.clearValue)) {
+				m_table[i].key = Traits.clearValue;
+				m_table[i].value = Value.init;
+			}
 		m_length = 0;
 	}
 	

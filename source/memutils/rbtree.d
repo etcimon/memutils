@@ -21,6 +21,17 @@ import memutils.utils;
 
 alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, ALLOC = ThreadMem) = RefCounted!(RBTree!(T, less, allowDuplicates, ALLOC));
 
+template isImplicitlyConvertibleLegacy(From, To)
+{
+    enum bool isImplicitlyConvertibleLegacy = is(typeof({
+        void fun(ref From v)
+        {
+            void gun(To) {}
+            gun(v);
+        }
+    }));
+}
+
 /**
  * All inserts, removes, searches, and any function in general has complexity
  * of $(BIGOH lg(n)).
@@ -289,7 +300,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = Thre
      *
      * Complexity: $(BIGOH log(n))
      */
-	size_t insert(Stuff)(Stuff stuff) if (isImplicitlyConvertible!(Stuff, Elem))
+	size_t insert(Stuff)(Stuff stuff) if (isImplicitlyConvertibleLegacy!(Stuff, Elem))
 	{
 		_defaultInitialize();
 		static if(allowDuplicates)
@@ -309,7 +320,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = Thre
      *
      * Complexity: $(BIGOH m * log(n))
      */
-	size_t insert(Stuff)(Stuff stuff) if(isInputRange!Stuff && isImplicitlyConvertible!(ElementType!Stuff, Elem))
+	size_t insert(Stuff)(Stuff stuff) if(isInputRange!Stuff && isImplicitlyConvertibleLegacy!(ElementType!Stuff, Elem))
 	{
 		_defaultInitialize();
 		size_t result = 0;
@@ -412,7 +423,7 @@ assert(equal(rbt[], [5]));
 	
 	/++ Ditto +/
 	size_t remove(U)(U[] elems)
-		if(isImplicitlyConvertible!(U, Elem))
+		if(isImplicitlyConvertibleLegacy!(U, Elem))
 	{
 		_defaultInitialize();
 		immutable lenBefore = length;
@@ -436,7 +447,7 @@ assert(equal(rbt[], [5]));
 	/++ Ditto +/
 	size_t remove(Stuff)(Stuff stuff)
 		if(isInputRange!Stuff &&
-			isImplicitlyConvertible!(ElementType!Stuff, Elem) &&
+			isImplicitlyConvertibleLegacy!(ElementType!Stuff, Elem) &&
 			!isDynamicArray!Stuff)
 	{
 		_defaultInitialize();
@@ -449,7 +460,7 @@ assert(equal(rbt[], [5]));
 	//Helper for removeKey.
 	private template isImplicitlyConvertibleToElem(U)
 	{
-		enum isImplicitlyConvertibleToElem = isImplicitlyConvertible!(U, Elem);
+		enum isImplicitlyConvertibleToElem = isImplicitlyConvertibleLegacy!(U, Elem);
 	}
 	
 	/**
@@ -580,7 +591,7 @@ assert(equal(rbt[], [5]));
 	/**
      * Constructor. Pass in a range of elements to initialize the tree with.
      */
-	this(Stuff)(Stuff stuff) if (isInputRange!Stuff && isImplicitlyConvertible!(ElementType!Stuff, Elem))
+	this(Stuff)(Stuff stuff) if (isInputRange!Stuff && isImplicitlyConvertibleLegacy!(ElementType!Stuff, Elem))
 	{
 		_defaultInitialize();
 		insert(stuff);

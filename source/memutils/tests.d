@@ -10,6 +10,7 @@ static if (!SkipUnitTests && !DisableDebugAllocations):
 void hashmapFreeListTest(ALLOC)() {
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
 	{
+		import std.stdio;
 		HashMapRef!(string, string, ALLOC) hm;
 		hm["hey"] = "you";
 		assert(getAllocator!(ALLOC.ident)().bytesAllocated() > 0);
@@ -132,31 +133,34 @@ void refCountedCastTest(ALLOC)() {
 			a += 3;
 		}
 	}
-
 	alias ARef = RefCounted!(A, ALLOC);
 	alias BRef = RefCounted!(B, ALLOC);
 
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
 	{
-		ARef a;
-		a = ARef();
-		a.incr();
-		assert(a.get() == 1);
-		destroy(a); /// destruction test
-		assert(!a);
-		assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
-
-		{ /// cast test
-			BRef b = BRef();
-			a = cast(ARef) b;
-			static void doIncr(ARef a_ref) { a_ref.incr(); }
-			doIncr(a);
-			assert(a.get() == 3, "Got: " ~ a.get().to!string);
+		{
+			ARef a = ARef();
+			a.incr();
+			assert(a.get() == 1);
+			destroy(a); /// destruction test
+			assert(!a);
 		}
-		ARef c = a;
-		assert(c.get() == 3);
-		destroy(c);
-		assert(a);
+		{
+			ARef a;
+			assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
+
+			{ /// cast test
+				BRef b = BRef();
+				a = cast(ARef) b;
+				static void doIncr(ARef a_ref) { a_ref.incr(); }
+				doIncr(a);
+				assert(a.get() == 3, "Got: " ~ a.get().to!string);
+			}
+			ARef c = a;
+			assert(c.get() == 3);
+			destroy(c);
+			assert(a);
+		}
 	}
 	// The B object allocates a lot more. If A destructor called B's dtor we get 0 here.
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
@@ -306,11 +310,10 @@ void scopedTest() {
 }
 
 alias StringObjRef = RefCounted!StringObj;
-import std.stdio : writeln;
 final class StringObj
 {
 	void check_value(ref StringObjRef str_obj) {
-		writeln(str_obj.m_str);
+		assert(str_obj.m_str == m_str);
 	}
 	this(string a = "") {
 		m_str = a;
@@ -318,15 +321,31 @@ final class StringObj
 	string m_str;
 }
 
-void test() {
+void stringObjRefTest(ALLOC)() {
 	StringObjRef str_ref = StringObjRef();
 	StringObjRef str_ref2 = StringObjRef("abc");
 	str_ref2 = str_ref;
 	str_ref.check_value(str_ref2);
 }
+void rbTreeTestTwo(ALLOC)() {
+	auto m_trusted_hashes = RBTree!string();
+
+
+	m_trusted_hashes.insert("SHA-224");
+	m_trusted_hashes.insert("SHA-256");
+	m_trusted_hashes.insert("SHA-384");
+	m_trusted_hashes.insert("SHA-512");
+	string[] strings = ["SHA-224","SHA-256","SHA-384","SHA-512"];
+	int i;
+	foreach(str; m_trusted_hashes)
+	{
+		assert(str == strings[i], "invalid string: " ~ str);
+		i++;
+	}
+}
 
 unittest {
-	test();	
+	propagateTests!stringObjRefTest();	
 	propagateTests!hashmapFreeListTest();
 	propagateTests!vectorArrayTest();
 	propagateTests!hashmapComplexTest();
@@ -335,8 +354,11 @@ unittest {
 	propagateTests!refCountedCastTest();
 	propagateTests!circularBufferTest();
 	propagateTests!dictionaryListTest();
+	propagateTests!rbTreeTestTwo();
 
 	scopedTest();
 
 	highLevelAllocTest();
+
+	
 }

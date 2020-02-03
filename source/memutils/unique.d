@@ -39,6 +39,7 @@ struct Unique(T, ALLOC = void)
 	mixin Embed!(m_object, false);
 	static if (!is(ALLOC == AppMem)) enum NOGC = true;
 	enum isRefCounted = false;
+	enum isUnique = true;
 
 	enum ElemSize = AllocSize!T;
 	
@@ -206,8 +207,22 @@ public:
 	
 	TR get() { return m_object; }
 	
-	bool opCast(T : bool)() const {
+	bool opCast(U : bool)() const {
 		return !isEmpty;
+	}
+	
+	U opCast(U)() const nothrow
+		if (__traits(hasMember, U, "isUnique"))
+	{
+		if (!m_object) return Unique!(T, ALLOC)();
+		return Unique!(U, ALLOC)(cast(U)this.m_object.release());
+	}
+	
+	U opCast(U)() const nothrow
+		if (!__traits(hasMember, U, "isUnique"))
+	{
+		if (!m_object) return cast(U)typeof(m_object).init;
+		return cast(U)this.m_object;
 	}
 
 	/**

@@ -13,6 +13,18 @@ import memutils.utils;
 import memutils.refcounted;
 import std.conv : emplace, to;
 
+template isImplicitlyConvertibleLegacy(From, To)
+{
+    enum bool isImplicitlyConvertibleLegacy = is(typeof({
+        void fun(ref From v)
+        {
+            void gun(To) {}
+            gun(v);
+        }
+    }));
+}
+
+
 public alias SecureArray(T) = Array!(T, SecureMem);
 
 template Array(T, ALLOC = ThreadMem) 
@@ -51,7 +63,7 @@ struct Vector(T, ALLOC = ThreadMem)
 
 			length = p.length;
 
-			static if (isImplicitlyConvertible!(T, T)) {
+			static if (isImplicitlyConvertibleLegacy!(T, T)) {
 				if (_payload.ptr is p.ptr && _payload.length == p.length) {
 					p = null;
 				}
@@ -124,7 +136,7 @@ struct Vector(T, ALLOC = ThreadMem)
 				auto startEmplace = length;
 				reserve(newLength);
 				_payload = _payload.ptr[0 .. newLength];
-				static if (!isImplicitlyConvertible!(T, T)) {
+				static if (!isImplicitlyConvertibleLegacy!(T, T)) {
 					T t = T();
 					foreach (size_t i; startEmplace .. length) 
 						memmove(_payload.ptr + i, &t, T.sizeof); 
@@ -177,7 +189,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		}
 
 		size_t pushBack(Stuff)(auto ref Stuff stuff)
-			if (!isImplicitlyConvertible!(T, T) && is(T == Stuff))
+			if (!isImplicitlyConvertibleLegacy!(T, T) && is(T == Stuff))
 		{
 			TRACE("Vector.append @disabled this(this)");
 			if (_capacity == length)
@@ -197,7 +209,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		
 		// Insert one item
 		size_t pushBack(Stuff)(auto ref Stuff stuff)
-			if (isImplicitlyConvertible!(T, T) && isImplicitlyConvertible!(Stuff, T))
+			if (isImplicitlyConvertibleLegacy!(T, T) && isImplicitlyConvertibleLegacy!(Stuff, T))
 		{
 			TRACE("Vector.append");
 			//logTrace("Capacity: ", _capacity, " length: ", length);
@@ -213,7 +225,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		
 		/// Insert a range of items
 		size_t pushBack(Stuff)(auto ref Stuff stuff)
-			if (isInputRange!Stuff && (isImplicitlyConvertible!(ElementType!Stuff, T) || is(T == ElementType!Stuff)))
+			if (isInputRange!Stuff && (isImplicitlyConvertibleLegacy!(ElementType!Stuff, T) || is(T == ElementType!Stuff)))
 		{
 			TRACE("Vector.append 2");
 			static if (hasLength!Stuff)
@@ -246,7 +258,7 @@ struct Vector(T, ALLOC = ThreadMem)
         Constructor taking a number of items
      */
 	this(U)(U[] values...)
-		if (isImplicitlyConvertible!(U, T))
+		if (isImplicitlyConvertibleLegacy!(U, T))
 	{
 		// TODO: This doesn't work with refcounted
 		_data = Data(cast(T[])values);
@@ -256,7 +268,7 @@ struct Vector(T, ALLOC = ThreadMem)
         Constructor taking an input range
      */
 	this(Stuff)(Stuff stuff)
-		if (isInputRange!Stuff && isImplicitlyConvertible!(UnConst!(ElementType!Stuff), T) && !is(Stuff == T[]))
+		if (isInputRange!Stuff && isImplicitlyConvertibleLegacy!(UnConst!(ElementType!Stuff), T) && !is(Stuff == T[]))
 	{
 		insertBack(stuff);
 	}
@@ -308,6 +320,9 @@ struct Vector(T, ALLOC = ThreadMem)
 		import std.algorithm : swap;
 		.swap(_data._payload, other._data._payload);
 		.swap(_data._capacity, other._data._capacity);
+	}
+	void swap(T[] other) {
+		this[] = other;
 	}
 	
 	@property Vector!(T, ALLOC) move() {
@@ -460,7 +475,7 @@ struct Vector(T, ALLOC = ThreadMem)
 			_data.length = value._data.length;
 			_data._payload[] = value._data._payload[];
 		}
-		else static if (isImplicitlyConvertible!(T, ElementType!Stuff)) {
+		else static if (isImplicitlyConvertibleLegacy!(T, ElementType!Stuff)) {
 			_data.length = value.length;
 			_data._payload[] = cast(T[]) value;
 		} else static assert(false, "Can't convert " ~ Stuff.stringof ~ " to " ~ T.stringof ~ "[]");
@@ -635,16 +650,15 @@ struct Vector(T, ALLOC = ThreadMem)
     */
 	size_t insertBack(Stuff)(auto ref Stuff stuff)
 	{
-		import std.traits : isImplicitlyConvertible;
-		static if (isImplicitlyConvertible!(Stuff, T[]))
+		static if (isImplicitlyConvertibleLegacy!(Stuff, T[]))
 			return _data.pushBack(cast(T[])stuff);
-		else static if (isSomeString!(Stuff) && !isImplicitlyConvertible!(Stuff, T)) {
+		else static if (isSomeString!(Stuff) && !isImplicitlyConvertibleLegacy!(Stuff, T)) {
 			return _data.pushBack(cast(T[])stuff);
 		}
-		else static if (isSomeString!(Stuff) && isImplicitlyConvertible!(Stuff, T)) {
+		else static if (isSomeString!(Stuff) && isImplicitlyConvertibleLegacy!(Stuff, T)) {
 			return _data.pushBack(cast(T)stuff);
 		}
-		else static if (isInputRange!(Stuff) && isImplicitlyConvertible!(ForeachType!Stuff, T)) {
+		else static if (isInputRange!(Stuff) && isImplicitlyConvertibleLegacy!(ForeachType!Stuff, T)) {
 			return _data.pushBack(stuff);
 		}
 		else
@@ -714,7 +728,7 @@ struct Vector(T, ALLOC = ThreadMem)
         Complexity: $(BIGOH n + m), where $(D m) is the length of $(D stuff)
      */
 	void insertBefore(Stuff)(size_t i, Stuff stuff)
-		if (isImplicitlyConvertible!(Stuff, T))
+		if (isImplicitlyConvertibleLegacy!(Stuff, T))
 	{
 		enforce(i <= length);
 		reserve(length + 1);
@@ -729,7 +743,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	
 	/// ditto
 	size_t insertBefore(Stuff)(size_t i, Stuff stuff)
-		if (isInputRange!Stuff && isImplicitlyConvertible!(ElementType!Stuff, T))
+		if (isInputRange!Stuff && isImplicitlyConvertibleLegacy!(ElementType!Stuff, T))
 	{
 		enforce(i <= length);
 		static if (isForwardRange!Stuff)
