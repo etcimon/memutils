@@ -274,6 +274,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = Thre
 
        Complexity: $(BIGOH log(n))
      +/
+	pragma(inline, true)
 	bool opBinaryRight(string op)(Elem e) const if (op == "in") 
 	{
 		return _find(e) !is null;
@@ -300,6 +301,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = Thre
      *
      * Complexity: $(BIGOH log(n))
      */
+	pragma(inline, true)
 	size_t insert(Stuff)(Stuff stuff) if (isImplicitlyConvertibleLegacy!(Stuff, Elem))
 	{
 		_defaultInitialize();
@@ -320,6 +322,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = Thre
      *
      * Complexity: $(BIGOH m * log(n))
      */
+	pragma(inline, true)
 	size_t insert(Stuff)(Stuff stuff) if(isInputRange!Stuff && isImplicitlyConvertibleLegacy!(ElementType!Stuff, Elem))
 	{
 		_defaultInitialize();
