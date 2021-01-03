@@ -15,7 +15,6 @@ import core.stdc.stdlib;
 import core.memory;
 import core.sync.mutex;
 import std.conv;
-import std.exception : enforceEx;
 import std.traits;
 import std.algorithm;
 import std.traits : ReturnType;

@@ -172,7 +172,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		}
 
 		static if (is(T == char))
-		size_t pushBack(Stuff)(Stuff stuff) 
+		pragma(inline, true) size_t pushBack(Stuff)(Stuff stuff) 
 			if (is(Stuff == char[]) || is(Stuff == string))
 		{
 			TRACE("Vector.append @disabled this(this)");
@@ -188,7 +188,7 @@ struct Vector(T, ALLOC = ThreadMem)
 			return 1;
 		}
 
-		size_t pushBack(Stuff)(auto ref Stuff stuff)
+		pragma(inline, true) size_t pushBack(Stuff)(auto ref Stuff stuff)
 			if (!isImplicitlyConvertibleLegacy!(T, T) && is(T == Stuff))
 		{
 			TRACE("Vector.append @disabled this(this)");
@@ -208,7 +208,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		}
 		
 		// Insert one item
-		size_t pushBack(Stuff)(auto ref Stuff stuff)
+		pragma(inline, true) size_t pushBack(Stuff)(auto ref Stuff stuff)
 			if (isImplicitlyConvertibleLegacy!(T, T) && isImplicitlyConvertibleLegacy!(Stuff, T))
 		{
 			TRACE("Vector.append");
@@ -224,7 +224,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		}
 		
 		/// Insert a range of items
-		size_t pushBack(Stuff)(auto ref Stuff stuff)
+		pragma(inline, true) size_t pushBack(Stuff)(auto ref Stuff stuff)
 			if (isInputRange!Stuff && (isImplicitlyConvertibleLegacy!(ElementType!Stuff, T) || is(T == ElementType!Stuff)))
 		{
 			TRACE("Vector.append 2");
@@ -559,7 +559,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	/**
         Forwards to $(D pushBack(stuff)).
      */
-	void opOpAssign(string op, Stuff)(auto ref Stuff stuff)
+	pragma(inline, true) void opOpAssign(string op, Stuff)(auto ref Stuff stuff)
 		if (op == "~")
 	{
 		static if (is (Stuff == RefCounted!(typeof(this)))) {
@@ -599,12 +599,12 @@ struct Vector(T, ALLOC = ThreadMem)
 
         Postcondition: $(D length == newLength)
      */
-	@property void length(size_t newLength)
+	pragma(inline, true) @property void length(size_t newLength)
 	{
 		_data.length = newLength;
 	}
 	
-	void resize(size_t newLength)
+	pragma(inline, true) void resize(size_t newLength)
 	{
 		this.length = newLength;
 	}
@@ -621,19 +621,19 @@ struct Vector(T, ALLOC = ThreadMem)
 			return 0;
 	}
 
-	size_t pushBack(Stuff...)(Stuff stuff) 
+	pragma(inline, true) size_t pushBack(Stuff...)(Stuff stuff) 
 		if (!isNumeric!Stuff || !is ( T == ubyte ))
 	{
 		return insertBack(stuff);
 	}
 	
-	size_t pushBack(Stuff...)(Stuff stuff) 
+	pragma(inline, true) size_t pushBack(Stuff...)(Stuff stuff) 
 		if (isNumeric!Stuff && is(T == ubyte))
 	{
 		return insertBack(cast(T) stuff);
 	}
 
-	size_t insert(Stuff...)(Stuff stuff) {
+	pragma(inline, true) size_t insert(Stuff...)(Stuff stuff) {
 		return insertBack(stuff);
 	}
 	
@@ -648,7 +648,7 @@ struct Vector(T, ALLOC = ThreadMem)
         Complexity: $(BIGOH m * log(n)), where $(D m) is the number of
         elements in $(D stuff)
     */
-	size_t insertBack(Stuff)(auto ref Stuff stuff)
+	pragma(inline, true) size_t insertBack(Stuff)(auto ref Stuff stuff)
 	{
 		static if (isImplicitlyConvertibleLegacy!(Stuff, T[]))
 			return _data.pushBack(cast(T[])stuff);
