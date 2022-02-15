@@ -1,5 +1,7 @@
 ﻿module memutils.constants;
 
+import std.traits : isNumeric;
+void function(string) nothrow @safe writeln;
 package:
 
 enum { // overhead allocator definitions, lazily loaded
@@ -10,19 +12,7 @@ enum { // overhead allocator definitions, lazily loaded
 
 enum Mallocator = 0x05; // For use by the DebugAllocator.
 
-const LogLevel = Error;
-version(CryptoSafe) 	const HasCryptoSafe = true;
-else					const HasCryptoSafe = false;
-
-/// uses a swap protected pool on top of CryptoSafeAllocator
-/// otherwise, uses a regular lockless freelist
-version(SecurePool)		const HasSecurePool = true;
-else				const HasSecurePool = false;
-
-const SecurePool_MLock_Max = 524_287;
-
-version(Have_botan) 	const HasBotan = true; 
-else			const HasBotan = false;
+const LogLevel = Trace;
 version(DictionaryDebugger) const HasDictionaryDebugger = true;
 else					const HasDictionaryDebugger = false;
 version(EnableDebugger) const HasDebuggerEnabled = true;
@@ -45,32 +35,73 @@ enum { // LogLevel
 	Error,
 	None
 }
+nothrow:
 
-void logTrace(ARGS...)(lazy ARGS args) {
+string charFromInt = "0123456789";
+__gshared bool recursing = true;
+
+void logTrace(ARGS...)(ARGS args) {
 	static if (LogLevel <= Trace) {
-		import std.stdio: writeln;
-		writeln("T: ", args);
+		if (recursing) return;
+		recursing = true;
+		scope(exit) recursing = false;
+		import memutils.vector;
+		Vector!char app = Vector!char();
+		foreach (arg; args) {
+			static if (isNumeric!(typeof(arg)))
+				app ~= charFromInt[arg%10];
+			else app ~= arg;
+		}
+		writeln(cast(string)app[]);
 	}
 }
 
-void logInfo(ARGS...)(lazy ARGS args) {
+void logInfo(ARGS...)(ARGS args) {
 	static if (LogLevel <= Info) {
-		import std.stdio: writeln;
-		writeln("I: ", args);
+		if (recursing) return;
+		recursing = true;
+		scope(exit) recursing = false;
+		import memutils.vector;
+		Vector!char app = Vector!char();
+		foreach (arg; args) {
+			static if (isNumeric!(typeof(arg)))
+				app ~= charFromInt[arg%10];
+			else app ~= arg;
+		}
+		writeln(cast(string)app[]);
 	}
 }
 
-void logDebug(ARGS...)(lazy ARGS args) {
+void logDebug(ARGS...)(ARGS args) {
 	
 	static if (LogLevel <= Debug) {
-		import std.stdio: writeln;
-		writeln("D: ", args);
+		if (recursing) return;
+		recursing = true;
+		scope(exit) recursing = false;
+		import memutils.vector;
+		Vector!char app = Vector!char();
+		foreach (arg; args) {
+			static if (isNumeric!(typeof(arg)))
+				app ~= charFromInt[arg%10];
+			else app ~= arg;
+		}
+			
+		writeln(cast(string)app[]);
 	}
 }
 
-void logError(ARGS...)(lazy ARGS args) {
+void logError(ARGS...)(ARGS args) {
 	static if (LogLevel <= Error) {
-		import std.stdio: writeln, stderr;
-		stderr.writeln("E: ", args);
+		if (recursing) return;
+		recursing = true;
+		scope(exit) recursing = false;
+		import memutils.vector;
+		Vector!char app = Vector!char();
+		foreach (arg; args) {
+			static if (isNumeric!(typeof(arg)))
+				app ~= charFromInt[arg%10];
+			else app ~= arg;
+		}
+		writeln(cast(string)app[]);
 	}
 }

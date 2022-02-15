@@ -2,52 +2,48 @@
 
 import memutils.allocators;
 import memutils.helpers;
-import std.conv;
-import std.traits;
 import memutils.utils;
-import std.algorithm : countUntil;
-
-import std.stdio : writeln;
 
 struct RefCounted(T, ALLOC = ThreadMem)
 {
-	import core.memory : GC;
+	
+nothrow:
+@trusted:
 	mixin Embed!(m_object, false);
-	static if (!is(ALLOC == AppMem)) enum NOGC = true;
+	enum NOGC = true;
 	enum isRefCounted = true;
-
+	alias ThisType = RefCounted!(T, ALLOC);
 	enum ElemSize = AllocSize!T;
 	alias TR = RefTypeOf!T;	
 	private TR m_object;
 	private ulong* m_refCount;
 	private void function(void*) m_free;
-	
 	pragma(inline)
 	static RefCounted opCall(ARGS...)(auto ref ARGS args) nothrow
 	{
-		try { 
+		logTrace("RefCounted opCall");
+		//try { 
 			RefCounted!(T, ALLOC) ret;
 			if (!ret.m_object)
 				ret.m_object = ObjectAllocator!(T, ALLOC).alloc(args);
 			ret.m_refCount = ObjectAllocator!(ulong, ALLOC).alloc();
 			(*ret.m_refCount) = 1;
 			return ret;
-		} catch (Throwable e) { assert(false, "RefCounted.opCall(args) Throw: " ~ e.toString()); }
+		//} catch (Throwable e) { assert(false, "RefCounted.opCall(args) Throw: " ~ e.toString()); }
 		assert(false, "Count not return from opCall");
 	}
 	
-	nothrow ~this()
+	~this()
 	{
-		try 
-			dtor((cast(RefCounted*)&this)); 
-		catch(Throwable e) { assert(false, "RefCounted.~this Throw: " ~ e.toString()); }
+		dtor((cast(RefCounted*)&this)); 
 	}
 	
 	static void dtor(U)(U* ctxt) {
+		logTrace("Call dtor ", U.stringof, " for ", typeof(this).stringof);
 		static if (!is (U == typeof(this))) {
-			typeof(this)* this_ = cast(typeof(this)*)ctxt;
-			this_.m_object = cast(typeof(this.m_object)) ctxt.m_object;
-			this_.m_refCount = cast(typeof(this.m_refCount)) ctxt.m_refCount;
+			ThisType* this_ = cast(ThisType*)ctxt;
+			this_.m_object = cast(TR) ctxt.m_object;
+			this_.m_refCount = cast(ulong*) ctxt.m_refCount;
 			this_._deinit();
 		}
 		else {
@@ -57,6 +53,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	
 	this(this)
 	{
+		logTrace("this(this)");
 		(cast(RefCounted*)&this).copyctor();
 	}
 	
@@ -68,45 +65,48 @@ struct RefCounted(T, ALLOC = ThreadMem)
 			checkInvariants();
 		}
 
-		if (m_object) (*m_refCount)++;		
+		if (m_object) {
+			logTrace("copyctr ++", *m_refCount);
+			(*m_refCount)++;
+		} 	
 	}
 	
 	void opAssign(U : RefCounted)(in U other) const nothrow
 	{
-		try {
-			if (other.m_object is this.m_object) return;
-				static if (is(U == RefCounted))
-					(cast(RefCounted*)&this).opAssignImpl(other);
-		} catch (Throwable e) { assert(false, "Throw in opAssign 1: " ~ e.toString()); }
+		if (other.m_object is this.m_object) return;
+			static if (is(U == RefCounted))
+				(cast(RefCounted*)&this).opAssignImpl(other);
 	}
 	
 	ref typeof(this) opAssign(U : RefCounted)(in U other) const nothrow
 	{
-		try { 
-			if (other.m_object is this.m_object) return;
-			static if (is(U == RefCounted))
-				(cast(RefCounted*)&this).opAssignImpl(other);
-			return this;
-		} catch (Throwable e) { assert(false, "Throw in opAssign: " ~ e.toString()); }
+		if (other.m_object is this.m_object) return;
+		static if (is(U == RefCounted))
+			(cast(RefCounted*)&this).opAssignImpl(other);
+		return this;
 	}
 	
 	private void opAssignImpl(U)(U other) {
 		_clear();
-		m_object = cast(typeof(this.m_object))other.m_object;
+		m_object = other.m_object;
 		m_refCount = other.m_refCount;
 		static if (!is (U == typeof(this))) {
 			static void destr(void* ptr) {
-				U.dtor(cast(typeof(&this))ptr);
+				U.dtor(cast(ThisType*)ptr);
 			}
 			m_free = &destr;
 		} else
 			m_free = other.m_free;
-		if( m_object )
+		if( m_object ) {
 			(*m_refCount)++;
+			logTrace("Incr: ", U.stringof, " = ", *m_refCount);
+		}
 	}
 	
 	private void _clear()
 	{
+		
+		logTrace("Clear: ", T.stringof, " = ", m_object ? *m_refCount : 9);
 		checkInvariants();
 		if( m_object ){
 			if( --(*m_refCount) == 0 ){
@@ -132,7 +132,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	U opCast(U)() const nothrow
 		if (__traits(hasMember, U, "isRefCounted"))
 	{
-		static assert(U.sizeof == typeof(this).sizeof, "Error, U: "~ U.sizeof.to!string~ " != this: " ~ typeof(this).sizeof.to!string);
+		//static assert(U.sizeof == typeof(this).sizeof, "Error, U:  != this: ");
 	
 		U ret = U.init;
 		ret.m_object = cast(U.TR)this.m_object;
@@ -150,6 +150,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		else ret.m_free = m_free;
 		
 		ret.m_refCount = cast(ulong*)this.m_refCount;
+		logTrace("OpCast++ ", *ret.m_refCount);
 		(*ret.m_refCount) += 1;
 		return ret;
 	}
@@ -161,6 +162,12 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		return cast(U) m_object;
 	}
 
+	U opCast(U : TR)() nothrow
+		if (!__traits(hasMember, U, "isRefCounted"))
+	{
+		// todo: check this
+		return m_object;
+	}
 	//@inline
 	private @property ulong refCount() const {
 		if (!m_refCount) return 0;
@@ -168,6 +175,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	}
 
 	private void _deinit() {
+		logTrace("_deinit");
 		TR obj_ptr = m_object;
 		//static if (!isPointer!T) // call destructors but not for indirections...
 		//	.destroy(m_object);
@@ -184,6 +192,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	private void defaultInit(ARGS...)(ARGS args) const {
 		
 		if (!m_object) {
+			logTrace("DefaultInit1");
 			auto newObj = this.opCall(args);
 			(cast(RefCounted*)&this).m_object = newObj.m_object;
 			(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
@@ -196,6 +205,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	private void defaultInit() const {
 		
 		if (!m_object) {
+			logTrace("DefaultInit2");
 			auto newObj = this.opCall();
 			(cast(RefCounted*)&this).m_object = newObj.m_object;
 			(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
@@ -207,6 +217,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 	pragma(inline)
 	private void checkInvariants()
 	const {
-		assert(!m_object || refCount > 0, (!m_object) ? "No m_object" : "Zero Refcount: " ~ refCount.to!string ~ " for " ~ T.stringof);
+		logTrace("Check invariants, m_object ", m_object ? '1' : '0', " refcount ", refCount);
+		assert(!m_object || refCount > 0);
 	}
 }

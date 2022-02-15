@@ -9,33 +9,35 @@
 module memutils.pool;
 
 import memutils.allocators;
-import std.conv : emplace;
-import std.algorithm : min, max;
 import memutils.vector;
+import memutils.helpers;
 
-final class PoolAllocator(Base : Allocator)
+struct PoolAllocator(Base)
 {
+nothrow:
+@trusted:
 	public int id = -1; // intrusive ID used for ScopedPools
 
 	static align(8) struct Pool { Pool* next; void[] data; void[] remaining; }
 
 	private {
-		Allocator m_baseAllocator;
+		Base* m_baseAllocator;
 		Pool* m_freePools;
 		Pool* m_fullPools;
-		Vector!(void delegate()) m_destructors;
+		Vector!(void delegate() nothrow @trusted) m_destructors;
 		int m_pools;
 	}
-	public size_t m_poolSize;
-	
-	this(size_t pool_size = 64*1024)
+	public size_t m_poolSize = 64*1024;
+	this(size_t pool_size)
 	{
-		m_poolSize = pool_size;
-		m_baseAllocator = getAllocator!Base();
+		if (pool_size > 0)
+			m_poolSize = pool_size;
 	}
 
 	void[] alloc(size_t sz)
 	{
+		if (!m_baseAllocator)
+			m_baseAllocator = getAllocator!Base();
 		auto aligned_sz = alignedSize(sz);
 
 		Pool* pprev = null;
@@ -49,8 +51,7 @@ final class PoolAllocator(Base : Allocator)
 		
 		if( !p || p.remaining.length == 0 || p.remaining.length < aligned_sz ) {
 			auto pmem = m_baseAllocator.alloc(AllocSize!Pool);
-			
-			p = emplace!Pool(pmem);
+			p = cast(Pool*)pmem;
 			p.data = m_baseAllocator.alloc(max(aligned_sz, m_poolSize));
 			p.remaining = p.data;
 			p.next = cast(Pool*)m_freePools;
@@ -58,9 +59,9 @@ final class PoolAllocator(Base : Allocator)
 			m_pools++;
 			pprev = null;
 		}
-		logTrace("0 .. ", aligned_sz, " but remaining: ", p.remaining.length);
+		//logTrace("0 .. ", aligned_sz, " but remaining: ", p.remaining.length);
 		auto ret = p.remaining[0 .. aligned_sz];
-		logTrace("p.remaining: ", aligned_sz, " .. ", p.remaining.length);
+		//logTrace("p.remaining: ", aligned_sz, " .. ", p.remaining.length);
 		p.remaining = p.remaining[aligned_sz .. $];
 		if( !p.remaining.length ){
 			if( pprev ) {
@@ -80,7 +81,7 @@ final class PoolAllocator(Base : Allocator)
 	{
 		auto aligned_sz = alignedSize(arr.length);
 		auto aligned_newsz = alignedSize(newsize);
-		logTrace("realloc: ", arr.ptr, " sz ", arr.length, " aligned: ", aligned_sz, " => ", newsize, " aligned: ", aligned_newsz);
+		//logTrace("realloc: ", arr.ptr, " sz ", arr.length, " aligned: ", aligned_sz, " => ", newsize, " aligned: ", aligned_newsz);
 		if( aligned_newsz <= aligned_sz ) return arr.ptr[0 .. newsize];
 		
 		auto pool = m_freePools;
@@ -89,6 +90,7 @@ final class PoolAllocator(Base : Allocator)
 			pool.remaining = pool.remaining[aligned_newsz-aligned_sz .. $];
 			arr = arr.ptr[0 .. aligned_newsz];
 			assert(arr.ptr+arr.length == pool.remaining.ptr, "Last block does not align with the remaining space!?");
+			memset(arr.ptr, 0, newsize);
 			return arr[0 .. newsize];
 		} else {
 			auto ret = alloc(newsize);
@@ -100,17 +102,24 @@ final class PoolAllocator(Base : Allocator)
 	
 	void free(void[] mem)
 	{
-
+		
 	}
 	
 	void freeAll()
 	{
-		//logDebug("Destroying ", totalSize(), " of data, allocated: ", allocatedSize());
+		logDebug("Calling ", m_destructors.length, " dtors, Destroy pools: ", m_pools);
 		// destroy all initialized objects
-		foreach_reverse (ref dtor; m_destructors[])
-			dtor();
+		if (m_destructors.length > 0) {
+			foreach_reverse (ref dtor; m_destructors[]) {
+				logTrace("Dtor is null? ", dtor ? 'n' : 'y');
+				dtor();
+			}
+				
+			logTrace("Called dtor(), destroying array");
 
-		destroy(m_destructors);
+			destructRecurse(m_destructors);
+			m_destructors.length = 0;
+		}
 
 		size_t i;
 		// put all full Pools into the free pools list
@@ -141,16 +150,18 @@ final class PoolAllocator(Base : Allocator)
 		
 	}
 
-	package void onDestroy(void delegate() dtor) {
+	package void onDestroy(void delegate() nothrow @trusted dtor) {
+		logTrace("Adding to onDestroy null ? ", dtor ? 'n' : 'y', " dtors length: ", m_destructors.length);
 		m_destructors ~= dtor;
 	}
 
-	package void removeArrayDtors(void delegate() last_dtor, size_t n) {
+	package void removeArrayDtors(void delegate() nothrow @trusted last_dtor, size_t n) {
 		bool found;
+		logTrace("removeArrayDtors");
 		foreach_reverse(i, ref el; m_destructors[]) {
 			if (el == last_dtor)
 			{
-				Vector!(void delegate()) arr;
+				Vector!(void delegate() nothrow @trusted) arr;
 				if (n >= i)
 					arr ~= m_destructors[0 .. i-n+1];
 				if (i != m_destructors.length - 1)

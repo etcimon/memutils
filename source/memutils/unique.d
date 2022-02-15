@@ -17,27 +17,19 @@ import memutils.constants;
 import memutils.utils;
 import memutils.rbtree;
 
-	import memutils.helpers;
-import std.conv : to;
+import memutils.helpers;
 
-static if (__VERSION__ >= 2071) {
-	extern (C) bool gc_inFinalizer();
-	enum HasGCCheck = true;
-}
-else version(GCCheck) {
-	extern(C) bool gc_inFinalizer();
-	enum HasGCCheck = true;
-} else enum HasGCCheck = false;
-enum DebugUnique = true;
 
 // TODO: Move release() into Embed!, and add a releaseCheck() for refCounted (cannot release > 1 reference) 
-struct Unique(T, ALLOC = void)
+struct Unique(T, ALLOC = ThreadMem)
 {
+nothrow:
+@trusted:
 	alias TR = RefTypeOf!T;
 	private TR m_object;
 	
 	mixin Embed!(m_object, false);
-	static if (!is(ALLOC == AppMem)) enum NOGC = true;
+	enum NOGC = true;
 	enum isRefCounted = false;
 	enum isUnique = true;
 
@@ -96,18 +88,9 @@ public:
 	
 	void opAssign()(auto ref TR p)
 	{
-		if (m_object) destroy(this);
+		if (m_object) destructRecurse(this);
 		if (!p) return;
 		//logTrace("Unique ctor of ", T.stringof, " : ", ptr.to!string);
-		static if (HasDebugAllocations && DebugUnique) {
-			mtx.lock(); scope(exit) mtx.unlock();
-			ptree._defaultInitialize();
-			if(cast(void*)p in ptree)
-			{
-                assert(false, "Already owned pointer: " ~ (cast(void*)p).to!string ~ " of type " ~ T.stringof);
-			}
-			ptree.insert(cast(void*)p);
-		}
 		m_object = p;
 		p = null;
 	}
@@ -132,44 +115,17 @@ public:
 	~this()
 	{
 		//logDebug("Unique destructor of ", T.stringof, " : ", ptr);
-		import core.stdc.string : memset;
 
 
 		static if (ALLOC.stringof != "void") {
 			if (m_object) {
 				//logTrace("ptr in ptree: ", ptr in ptree);
 
-				static if (HasDebugAllocations && DebugUnique) {
-					mtx.lock(); scope(exit) mtx.unlock();
-					ptree._defaultInitialize();
-					assert(ptr in ptree);
-					ptree.remove(ptr);
-				}
 
 				ObjectAllocator!(T, ALLOC).free(m_object);
 
 				//static if (HasDebugAllocations && DebugUnique)
 				//	debug memset(ptr, 0, AllocSize!T);
-			}
-		}
-		else {
-			static if (HasGCCheck) if (!gc_inFinalizer()) {
-				if (m_object) {
-					//logTrace("ptr in ptree: ", ptr in ptree);
-
-					static if (HasDebugAllocations && DebugUnique) {
-						mtx.lock(); scope(exit) mtx.unlock();
-						ptree._defaultInitialize();
-						if (ptr !in ptree){ 
-							logDebug("Unknown pointer: " ~ ptr.to!string ~ " of type " ~ T.stringof);
-							assert(false);
-						}
-						ptree.remove(ptr);
-					}
-
-					static if (is(TR == T*)) .destroy(*m_object);
-					else .destroy(m_object);
-				}
 			}
 		}
 	}
@@ -193,12 +149,6 @@ public:
 	{
 		//logTrace("Drop");
 		if (!m_object) return;
-		static if (HasDebugAllocations && DebugUnique) {
-			mtx.lock(); scope(exit) mtx.unlock();
-			ptree._defaultInitialize();
-			assert(ptr in ptree);
-			ptree.remove(ptr);
-		}
 		m_object = null;
 	}
 
@@ -236,12 +186,6 @@ private:
 		return cast(void*)m_object;
 	}
 
-	static if (HasDebugAllocations && DebugUnique) {
-		import memutils.rbtree;
-		__gshared RBTree!(void*, "a < b", true, Malloc) ptree;
-		__gshared Mutex mtx;
-		shared static this() { mtx = new Mutex; }
-	}
 }
 
 auto unique(T)(T obj) {

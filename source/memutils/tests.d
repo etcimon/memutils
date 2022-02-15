@@ -1,11 +1,6 @@
 ﻿module memutils.tests;
 import memutils.all;
-import core.thread : Fiber;	
-import std.conv : to;
-
-version(MemutilsTests):
-static if (!SkipUnitTests && !DisableDebugAllocations):
-
+version(none):
 // Test hashmap, freelists
 void hashmapFreeListTest(ALLOC)() {
 	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
@@ -142,7 +137,7 @@ void refCountedCastTest(ALLOC)() {
 			ARef a = ARef();
 			a.incr();
 			assert(a.get() == 1);
-			destroy(a); /// destruction test
+			destructRecurse(a); /// destruction test
 			assert(!a);
 		}
 		{
@@ -158,7 +153,7 @@ void refCountedCastTest(ALLOC)() {
 			}
 			ARef c = a;
 			assert(c.get() == 3);
-			destroy(c);
+			destructRecurse(c);
 			assert(a);
 		}
 	}
@@ -237,8 +232,6 @@ void dictionaryListTest(ALLOC)()
 
 void propagateTests(alias fct)() {
 	logDebug("Testing ", fct.stringof);
-	fct!AppMem();
-	fct!SecureMem();
 	fct!ThreadMem();
 }
 
@@ -257,7 +250,7 @@ void highLevelAllocTest() {
 	assert(!a);
 
 	A appAllocated() {
-		A c = AppMem.alloc!A();
+		A c = ThreadMem.alloc!A();
 		c.a = 10;
 		return c;
 	}
@@ -304,21 +297,18 @@ void scopedTest() {
 	}
 
 
-	Fiber f;
-	f = new Fiber(delegate { auto pool = ScopedPool(); pool.freeze(); pool.unfreeze(); PoolStack.disable(); PoolStack.enable(); });
-	f.call();
 }
 
 alias StringObjRef = RefCounted!StringObj;
-final class StringObj
+struct StringObj
 {
 	void check_value(ref StringObjRef str_obj) {
 		assert(str_obj.m_str == m_str);
 	}
-	this(string a = "") {
+	this(string a) {
 		m_str = a;
 	}
-	string m_str;
+	string m_str = "abc";
 }
 
 void stringObjRefTest(ALLOC)() {

@@ -9,17 +9,16 @@
 */
 module memutils.rbtree;
 
-import std.functional; // : binaryFun;
-import std.traits;
-import std.range;
-import std.algorithm : countUntil;
 import memutils.allocators;
 import memutils.refcounted;
 import memutils.vector;
 import memutils.constants;
 import memutils.utils;
+import std.functional;
+import std.traits;
+import std.range;
 
-alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, ALLOC = ThreadMem, bool NOGC_ = false) = RefCounted!(RBTree!(T, less, allowDuplicates, ALLOC, NOGC_));
+alias RBTreeRef(T,  alias less = "a < b", bool allowDuplicates = true, ALLOC = ThreadMem, bool NOGC_ = true) = RefCounted!(RBTree!(T, less, allowDuplicates, ALLOC, NOGC_));
 
 template isImplicitlyConvertibleLegacy(From, To)
 {
@@ -53,11 +52,11 @@ template isImplicitlyConvertibleLegacy(From, To)
 struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = ThreadMem, bool NOGC_ = false)
 	if(is(typeof(binaryFun!less(T.init, T.init))))
 {
+	nothrow:
+	@trusted:
 	@disable this(this);
 
-	import std.range : Take;
-	import std.typetuple : allSatisfy;
-	import std.traits;
+	//import std.typetuple : allSatisfy;
 	
 	alias _less = binaryFun!less;
 	
@@ -129,7 +128,7 @@ struct RBTree(T, alias less = "a < b", bool allowDuplicates = true, ALLOC = Thre
 		}
 		else
 		{
-			import std.typecons : Tuple;
+			//import std.typecons : Tuple;
 			
 			if(added)
 			{
@@ -454,7 +453,7 @@ assert(equal(rbt[], [5]));
 			!isDynamicArray!Stuff)
 	{
 		_defaultInitialize();
-		import std.array : array;
+		//import std.array : array;
 		//We use array in case stuff is a Range from this RedBlackTree - either
 		//directly or indirectly.
 		return remove(array(stuff));
@@ -471,7 +470,7 @@ assert(equal(rbt[], [5]));
      *
      * Complexity: $(BIGOH n*log(n))
      */
-	bool opEquals(ref RBTree rhs)
+	/*bool opEquals(ref RBTree rhs)
 	{
 		_defaultInitialize();
 		import std.algorithm : equal;
@@ -483,7 +482,7 @@ assert(equal(rbt[], [5]));
 		auto thisRange = this[];
 		auto thatRange = rhs[];
 		return equal!(function(Elem a, Elem b) => !_less(a,b) && !_less(b,a))(thisRange, thatRange);
-	}
+	}*/
 	
 	// find the first node where the value is > e
 	private Node _firstGreater(Elem e)

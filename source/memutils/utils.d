@@ -1,28 +1,18 @@
 ﻿module memutils.utils;
 
-import core.thread : Fiber;	
-import std.traits : isPointer, hasIndirections, hasElaborateDestructor, isArray, ReturnType;
-import std.conv : emplace;
-import core.stdc.string : memset, memcpy;
 import memutils.allocators;
-import std.algorithm : startsWith;
 import memutils.constants;
 import memutils.vector : Array;
-import std.range : ElementType;
-import memutils.helpers : UnConst;
-import std.conv;
+import memutils.helpers : UnConst, memset, memcpy;
 
-struct AppMem {
-	mixin ConvenienceAllocators!(NativeGC, typeof(this));
-}
+import std.traits : isPointer, hasIndirections, hasElaborateDestructor, isArray, ReturnType;
 
 struct ThreadMem {
-	mixin ConvenienceAllocators!(LocklessFreeList, typeof(this));
+	nothrow:
+	@trusted:
+	mixin ConvenienceAllocators!(LocklessFreeList, ThreadMem);
 }
 
-struct SecureMem {
-	mixin ConvenienceAllocators!(CryptoSafe, typeof(this));
-}
 // Reserved for containers
 struct Malloc {
 	enum ident = Mallocator;
@@ -30,21 +20,19 @@ struct Malloc {
 
 package:
 
+nothrow:
 
-template ObjectAllocator(T, ALLOC)
+template ObjectAllocator(T, ALLOC = ThreadMem)
 {
-	import std.traits : ReturnType;
-	import core.memory : GC;
+nothrow:
 	enum ElemSize = AllocSize!T;
 
 	static if (ALLOC.stringof == "PoolStack") {
 		ReturnType!(ALLOC.top) function() m_getAlloc = &ALLOC.top;
 	}
-	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
-	else enum NOGC = false;
+	enum NOGC = true;
 
 	alias TR = RefTypeOf!T;
-
 
 	TR alloc(ARGS...)(auto ref ARGS args)
 	{
@@ -54,33 +42,32 @@ template ObjectAllocator(T, ALLOC)
 		}
 		else
 			auto mem = m_getAlloc().alloc(ElemSize);
-		static if ( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) 
-		{
-			static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
-				GC.addRange(mem.ptr, ElemSize, typeid(T));
-			else
-				GC.addRange(mem.ptr, ElemSize);	
-		}
-		static if (!__traits(compiles, (){ emplace!T(mem,args); }))
-		return cast(TR)T.init;
-		else return cast(TR)emplace!T(mem, args);
+		TR omem = cast(TR)mem;
+		
+		logTrace("ObjectAllocator.alloc initialize");
+		*omem = T(args);
+		return omem;
 
 	}
 
 	void free(TR obj)
 	{
 
-		static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
-			GC.removeRange(cast(void*)obj);
-		}
 
 		TR objc = obj;
-		static if (is(TR == T*)) .destroy(*objc);
-		else .destroy(objc);
+		import memutils.helpers : destructRecurse;
+		static if (is(TR == T*) && hasElaborateDestructor!T) {
+			logTrace("ObjectAllocator.free Pointer destr ", T.stringof);
+			destructRecurse(*objc);
+		} 
+		else static if (hasElaborateDestructor!TR) {
+			logTrace("ObjectAllocator.free other destr ", T.stringof);
+			destructRecurse(objc);
+		} 
 
 		static if (ALLOC.stringof != "PoolStack") {
-			if (auto a = getAllocator!(ALLOC.ident)(true))
-				a.free((cast(void*)obj)[0 .. ElemSize]);
+			auto a = getAllocator!(ALLOC.ident)(true);
+			a.free((cast(void*)obj)[0 .. ElemSize]);
 		}
 		else
 			m_getAlloc().free((cast(void*)obj)[0 .. ElemSize]);
@@ -91,87 +78,69 @@ template ObjectAllocator(T, ALLOC)
 /// Allocates an array without touching the memory.
 T[] allocArray(T, ALLOC = ThreadMem)(size_t n)
 {
-	import core.memory : GC;
+	static enum TSize = T.sizeof;
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
 
-	auto mem = allocator.alloc(T.sizeof * n);
+	auto mem = allocator.alloc(TSize * n);
 	// logTrace("alloc ", T.stringof, ": ", mem.ptr);
 	auto ret = (cast(T*)mem.ptr)[0 .. n];
 	// logTrace("alloc ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
-	
-	static if( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
-		static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
-			GC.addRange(mem.ptr, mem.length, typeid(T));
-		else
-			GC.addRange(mem.ptr, mem.length);
-	}
 
 	// don't touch the memory - all practical uses of this function will handle initialization.
 	return ret;
 }
 
 T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
-	import core.memory : GC;
+	static enum TSize = T.sizeof;
 	assert(n > array.length, "Cannot reallocate to smaller sizes");
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
 	// logTrace("realloc before ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
 
 	//logTrace("realloc fre ", T.stringof, ": ", array.ptr);
-	auto mem = allocator.realloc((cast(void*)array.ptr)[0 .. array.length * T.sizeof], T.sizeof * n);
+	auto mem = allocator.realloc((cast(void*)array.ptr)[0 .. array.length * TSize], TSize * n);
 	//logTrace("realloc ret ", T.stringof, ": ", mem.ptr);
 	auto ret = (cast(T*)mem.ptr)[0 .. n];
 	// logTrace("realloc after ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
 	
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
-	
-	static if (ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
-		GC.removeRange(array.ptr);
-		static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
-                GC.addRange(mem.ptr, mem.length, typeid(T));
-        else
-                GC.addRange(mem.ptr, mem.length);
-		// Zero out unused capacity to prevent gc from seeing false pointers
-		memset(mem.ptr + (array.length * T.sizeof), 0, (n - array.length) * T.sizeof);
-	}
-	
+		
 	return ret;
 }
 
-void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = size_t.max, size_t offset = 0)
+nothrow void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = size_t.max, size_t offset = 0)
 {
-	import core.memory : GC;
+	static enum TSize = T.sizeof;
 	mixin(translateAllocator());
 	auto allocator = thisAllocator(true); // freeing. Avoid allocating in a dtor
-	if (!allocator) return;
+	if (allocator == ReturnType!thisAllocator.init) return;
 
 	// logTrace("free ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
 	static if (__traits(hasMember, T, "NOGC")) enum NOGC = T.NOGC;
 	else enum NOGC = false;
 	
-	static if (ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
-		GC.removeRange(array.ptr);
-	}
 
 	static if (hasElaborateDestructor!T) { // calls destructors, but not for indirections...
 		size_t i;
 		foreach (ref e; array) {
 			if (i < offset) { i++; continue; }
 			if (i + offset == max_destroy) break;
-			static if (is(T == struct) && !isPointer!T) .destroy(e);
+			import memutils.helpers : destructRecurse;
+			destructRecurse(e);
 			i++;
 		}
 	}
-	allocator.free((cast(void*)array.ptr)[0 .. array.length * T.sizeof]);
+	allocator.free((cast(void*)array.ptr)[0 .. array.length * TSize]);
 	array = null;
 }
 
 mixin template ConvenienceAllocators(alias ALLOC, alias THIS) {
 	package enum ident = ALLOC;
+nothrow:
 static:
 	// objects
 	auto alloc(T, ARGS...)(auto ref ARGS args) 
@@ -206,8 +175,9 @@ static:
 		if (isArray!T)
 	{
 		alias ElType = UnConst!(typeof(arr[0]));
+		alias ElSize = ElType.sizeof;
 		auto arr_copy = allocArray!(ElType, THIS)(arr.length);
-		memcpy(arr_copy.ptr, arr.ptr, arr.length * ElType.sizeof);
+		memcpy(arr_copy.ptr, arr.ptr, arr.length * ElSize);
 
 		return cast(T)arr_copy;
 	}

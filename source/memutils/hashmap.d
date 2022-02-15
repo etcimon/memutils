@@ -7,20 +7,20 @@
 */
 module memutils.hashmap;
 
-import std.conv : emplace, to;
-import std.traits;
-import std.algorithm : countUntil;
 import memutils.refcounted;
 import memutils.constants;
 import memutils.helpers;
 import memutils.allocators;
 import memutils.utils;
+import std.traits : isPointer;
 
 
 alias HashMapRef(Key, Value, ALLOC = ThreadMem) = RefCounted!(HashMap!(Key, Value, ALLOC), ALLOC);
 
 struct HashMap(Key, Value, ALLOC = ThreadMem)
 {
+@trusted:
+nothrow:
 	@disable this(this);
 
 	alias Traits = DefaultHashMapTraits!Key;
@@ -37,12 +37,12 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		bool m_resizing;
 	}
 	
-	nothrow ~this()
+	~this()
 	{
-		try {
-			clear();
-			if (m_table) freeArray!(TableEntry, ALLOC)(m_table);
-		} catch(Throwable e) { assert(false, e.toString()); }
+		//try {
+		clear();
+		if (m_table) freeArray!(TableEntry, ALLOC)(m_table);
+		//} catch(Throwable e) { assert(false, e.toString()); }
 	}
 
 	@property bool empty() const { return length == 0; }
@@ -71,22 +71,22 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		}
 	}
 	
-	Value get(in Key key, lazy Value default_value = Value.init) const
+	Value get(in Key key, Value default_value = Value.init) const
 	{
 		auto idx = this.findIndex(key);
 		if (idx == size_t.max) return default_value;
 		const Value ret = m_table[idx].value;
 		return *cast(Value*)&ret;
 	}
-	/*	
+	
 	static if (!is(typeof({ Value v; const(Value) vc; v = vc; }))) {
-		const(Value) get(Key key, lazy const(Value) default_value = Value.init)
+		const(Value) get(Key key, const(Value) default_value = Value.init)
 		{
 			auto idx = findIndex(key);
 			if (idx == size_t.max) return default_value;
 			return m_table[idx].value;
 		}
-	}*/
+	}
 	
 	void clear()
 	{
@@ -114,13 +114,13 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 	
 	ref inout(Value) opIndex(Key key) inout {
 		auto idx = findIndex(key);
-		assert (idx != size_t.max, "Accessing non-existent key type: " ~ Key.stringof ~ " value: " ~ key.to!string);
+		assert (idx != size_t.max);
 		return m_table[idx].value;
 	}
 	
 	Value opIndex(Key key) const {
 		auto idx = findIndex(key);
-		assert (idx != size_t.max, "Accessing non-existent key type: " ~ Key.stringof ~ " value: " ~ key.to!string);
+		assert (idx != size_t.max);
 		const Value ret = m_table[idx].value;
 		return *cast(Value*) &ret;
 	}
@@ -132,7 +132,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		return &m_table[idx].value;
 	}
 	
-	int opApply(int delegate(ref Value) del)
+	int opApply(int delegate(ref Value) nothrow del)
 	{
 		foreach (i; 0 .. m_table.length)
 			if (!Traits.equals(m_table[i].key, Traits.clearValue))
@@ -141,7 +141,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		return 0;
 	}
 	
-	int opApply(int delegate(in ref Value) del)
+	int opApply(int delegate(in ref Value) nothrow del)
 	const {
 		foreach (i; 0 .. m_table.length)
 			if (!Traits.equals(m_table[i].key, Traits.clearValue))
@@ -150,7 +150,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		return 0;
 	}
 	
-	int opApply(int delegate(const ref Key, ref Value) del)
+	int opApply(int delegate(const ref Key, ref Value) nothrow del)
 	{
 		foreach (i; 0 .. m_table.length)
 			if (!Traits.equals(m_table[i].key, Traits.clearValue))
@@ -159,7 +159,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		return 0;
 	}
 	
-	int opApply(int delegate(in ref Key, in ref Value) del)
+	int opApply(int delegate(in ref Key, in ref Value) nothrow del)
 	const {
 		foreach (i; 0 .. m_table.length)
 			if (!Traits.equals(m_table[i].key, Traits.clearValue))
@@ -224,21 +224,14 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 
 		/// fixme: Use initializeAll ?
 		/// 
-		foreach (ref el; m_table) {
-			static if (is(Key == struct)) {
-				emplace(cast(UnConst!Key*)&el.key);
-				static if (Traits.clearValue !is Key.init)
-					el.key = cast(UnConst!Key)Traits.clearValue;
-			} else el.key = cast(UnConst!Key)Traits.clearValue;
-			emplace(&el.value);
-		}
+		initializeAll(m_table.ptr[0 .. m_table.length]);
 		foreach (ref el; oldtable)
 		if (!Traits.equals(el.key, Traits.clearValue)) {
 			auto idx = findInsertIndex(el.key);
 			(cast(ubyte[])(&m_table[idx])[0 .. 1])[] = (cast(ubyte[])(&el)[0 .. 1])[];
 		}
 
-		if (oldtable) freeArray!(TableEntry, ALLOC)(oldtable, 0);
+		if (oldtable.length > 0) freeArray!(TableEntry, ALLOC)(oldtable, 0);
 		logTrace("Now have ", m_table.length);
 	}
 
@@ -248,8 +241,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		static if ((__traits(hasMember, Key, "isRefCounted") && __traits(hasMember, typeof(*(Key())), "toArray") ) ||
 			__traits(hasMember, Key, "toArray"))
 		{
-			m_hasher = (Key k) {
-				import std.typecons : scoped;
+			m_hasher = (Key k) nothrow {
 				import memutils.vector : Array;
 				Array!ubyte s = k.toArray();
 				size_t hash = hashOf(s[], 0);
@@ -259,43 +251,32 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		else static if ((__traits(hasMember, Key, "isRefCounted") && __traits(hasMember, typeof(*(Key())), "toVector") ) ||
 			__traits(hasMember, Key, "toVector"))
 		{
-			m_hasher = (Key k) {
-				import std.typecons : scoped;
+			m_hasher = (Key k) nothrow {
 				import memutils.vector : Vector;
 				Vector!char s = k.toVector();
 				size_t hash = hashOf(s[], 0);
 				return hash;
 			};
 		}
-		else static if (( __traits(hasMember, Key, "isRefCounted") && __traits(hasMember, typeof(*(Key())), "toString") ) ||
-			__traits(hasMember, Key, "toString"))
-		{
-			m_hasher = (Key k) {
-				string s = k.toString();
-				size_t hash = typeid(string).getHash(&s);
-				// logTrace("string ", s, " hash:" , hash);
-				return hash;
-			};
-		}
-		
 		else static if (__traits(compiles, (){ Key t; size_t hash = t.toHash(); }())) {
 			static if (isPointer!Key || is(Unqual!Key == class)) m_hasher = k => k ? k.toHash() : 0;
 			else m_hasher = k => k.toHash();
 		} else static if (__traits(compiles, (){ Key t; size_t hash = t.toHashShared(); }())) {
 			static if (isPointer!Key || is(Unqual!Key == class)) m_hasher = k => k ? k.toHashShared() : 0;
 			else m_hasher = k => k.toHashShared();
-		} 
-		else static if (__traits(hasMember, Key, "isRefCounted")) {
-			m_hasher = (k) { return typeid(typeof(*(Key()))).getHash(&k); };
-		}
-		else {
-			m_hasher = (k) { return typeid(Key).getHash(&k); };
-		}
+		} else {								
+			m_hasher = (Key k) nothrow {
+				size_t hash = hashOf(k, 0);
+				return hash;
+			};
+		}	
+		
 	}
 }
 
 
 struct DefaultHashMapTraits(Key) {
+nothrow:
 	enum clearValue = Key.init;
 	static bool equals(in Key a, in Key b)
 	{

@@ -7,15 +7,14 @@
 */
 module memutils.dictionarylist;
 
-import core.stdc.string : memset, memcpy;
 import memutils.helpers;
 import memutils.allocators;
 import memutils.refcounted;
 import memutils.utils;
 import memutils.vector;
-import std.conv : to;
-import std.exception : enforce;
 
+nothrow:
+@trusted:
 alias DictionaryListRef(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, ALLOC, case_sensitive, NUM_STATIC_FIELDS), ALLOC);
 
 /**
@@ -29,6 +28,8 @@ alias DictionaryListRef(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = tru
     Insertion and lookup has O(n) complexity.
 */
 struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) {
+	nothrow:
+	@trusted:
 	@disable this(this);
 
 	import std.typecons : Tuple;
@@ -71,7 +72,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 			m_fieldCount--;
 		} else {
 			idx = getIndex(m_extendedFields, key, keysum);
-			enforce(idx >= 0);
+			if (idx < 0) return;
 			removeFromArrayIdx(m_extendedFields, idx);
 		}
 	}
@@ -118,12 +119,12 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 
         If no field is found, def_val is returned.
     */
-	ValueType get(KeyType key, lazy ValueType def_val = ValueType.init) {
+	ValueType get(KeyType key, ValueType def_val = ValueType.init) {
 		if (auto pv = key in this) return *pv;
 		return def_val;
 	}
 	
-	const(ValueType) get(in KeyType key, lazy const(ValueType) def_val = const(ValueType).init) const
+	const(ValueType) get(in KeyType key, const(ValueType) def_val = const(ValueType).init) const
 	{
 		if (auto pv = key in this) return *pv;
 		return def_val;
@@ -135,7 +136,6 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
     */
 	Vector!(ValueType, ALLOC) getValuesAt()(auto const ref KeyType key)
 	const {
-		import std.array;
 		auto ret = Vector!(ValueType, ALLOC)(0);
 		this.opApply( (k, const ref v) {
 				// static if (is(ValueType == string)) logTrace("Checking field: ", v);
@@ -151,7 +151,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	}
 	
 	/// ditto
-	void getValuesAt(in KeyType key, scope void delegate(const(ValueType)) del)
+	void getValuesAt(in KeyType key, scope void delegate(const(ValueType)) nothrow del)
 	const {
 		uint keysum = computeCheckSumI(key);
 		foreach (ref f; m_fields[0 .. m_fieldCount]) {
@@ -169,7 +169,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	inout(ValueType) opIndex(KeyType key)
 	inout {
 		auto pitm = key in this;
-		enforce(pitm !is null, "Accessing non-existent key '"~ key.to!string ~"'.");
+		if (pitm is null) return "?";
 		return *pitm;
 	}
 	
@@ -210,7 +210,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	
 	/** Iterates over all fields, including duplicates.
     */
-	int opApply(int delegate(KeyType key, ref ValueType val) del)
+	int opApply(int delegate(KeyType key, ref ValueType val) nothrow del)
 	{
 		foreach (ref kv; m_fields[0 .. m_fieldCount]) {
 			if (kv == Field.init) return 0;
@@ -224,7 +224,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 		return 0;
 	}
 	
-	int opApply(int delegate(const ref KeyType key, const ref ValueType val) del) const
+	int opApply(int delegate(const ref KeyType key, const ref ValueType val) nothrow del) const
 	{
 		foreach (ref kv; m_fields[0 .. m_fieldCount]) {
 			if (kv == Field.init) return 0;
@@ -239,7 +239,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	}
 	
 	/// ditto
-	int opApply(int delegate(ref ValueType val) del)
+	int opApply(int delegate(ref ValueType val) nothrow del)
 	{
 		return this.opApply((KeyType key, ref ValueType val) { return del(val); });
 	}
@@ -247,13 +247,13 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	/// ditto
 	int opApply(int delegate(KeyType key, ref const(ValueType) val) del) const
 	{
-		return (cast() this).opApply(cast(int delegate(KeyType, ref ValueType)) del);
+		return (cast() this).opApply(cast(int delegate(KeyType, ref ValueType) nothrow) del);
 	}
 	
 	/// ditto
 	int opApply(int delegate(ref const(ValueType) val) del) const
 	{
-		return (cast() this).opApply(cast(int delegate(ref ValueType)) del);
+		return (cast() this).opApply(cast(int delegate(ref ValueType) nothrow) del);
 	}
 
 	bool opEquals(const ref DictionaryList!(KEY, VALUE, ALLOC) other) const
@@ -326,28 +326,130 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	
 	private static uint computeCheckSumI(T)(ref T obj)
 	@trusted {
-		return cast(uint)typeid(obj).getHash(&obj);
+		return cast(uint)hashOf(obj, 0);
 	}
 }
 
 private:
-
+nothrow:
 void removeFromArrayIdx(T)(ref T[] array, size_t idx)
 {
-	import std.algorithm : swap;
 	foreach( j; idx+1 .. array.length) { 
 		array[j-1] = array[j];
 	}
-	array[array.length-1].destroy();
+	array[array.length-1].destructRecurse();
 	array = array.ptr[0 .. array.length-1];
 }
+/* =================== Decode ======================= */
 
+/***************
+ * Decodes and returns character starting at s[idx]. idx is advanced past the
+ * decoded character. If the character is not well formed, a UtfException is
+ * thrown and idx remains unchanged.
+ */
+ @safe @nogc pure nothrow
+bool isValidDchar(dchar c)
+{
+    /* Note: FFFE and FFFF are specifically permitted by the
+     * Unicode standard for application internal use, but are not
+     * allowed for interchange.
+     * (thanks to Arcane Jill)
+     */
+
+    return c < 0xD800 ||
+        (c > 0xDFFF && c <= 0x10FFFF /*&& c != 0xFFFE && c != 0xFFFF*/);
+}
+
+@safe pure nothrow
+dchar decode(const scope char[] s, ref size_t idx)
+    in
+    {
+        assert(idx >= 0 && idx < s.length);
+    }
+    out (result)
+    {
+        assert(isValidDchar(result));
+    }
+    do
+    {
+        size_t len = s.length;
+        dchar V;
+        size_t i = idx;
+        char u = s[i];
+
+        if (u & 0x80)
+        {   uint n;
+            char u2;
+
+            /* The following encodings are valid, except for the 5 and 6 byte
+             * combinations:
+             *  0xxxxxxx
+             *  110xxxxx 10xxxxxx
+             *  1110xxxx 10xxxxxx 10xxxxxx
+             *  11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+             *  111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+             *  1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+             */
+            for (n = 1; ; n++)
+            {
+                if (n > 4)
+                    goto Lerr;          // only do the first 4 of 6 encodings
+                if (((u << n) & 0x80) == 0)
+                {
+                    if (n == 1)
+                        goto Lerr;
+                    break;
+                }
+            }
+
+            // Pick off (7 - n) significant bits of B from first byte of octet
+            V = cast(dchar)(u & ((1 << (7 - n)) - 1));
+
+            if (i + (n - 1) >= len)
+                goto Lerr;                      // off end of string
+
+            /* The following combinations are overlong, and illegal:
+             *  1100000x (10xxxxxx)
+             *  11100000 100xxxxx (10xxxxxx)
+             *  11110000 1000xxxx (10xxxxxx 10xxxxxx)
+             *  11111000 10000xxx (10xxxxxx 10xxxxxx 10xxxxxx)
+             *  11111100 100000xx (10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx)
+             */
+            u2 = s[i + 1];
+            if ((u & 0xFE) == 0xC0 ||
+                (u == 0xE0 && (u2 & 0xE0) == 0x80) ||
+                (u == 0xF0 && (u2 & 0xF0) == 0x80) ||
+                (u == 0xF8 && (u2 & 0xF8) == 0x80) ||
+                (u == 0xFC && (u2 & 0xFC) == 0x80))
+                goto Lerr;                      // overlong combination
+
+            for (uint j = 1; j != n; j++)
+            {
+                u = s[i + j];
+                if ((u & 0xC0) != 0x80)
+                    goto Lerr;                  // trailing bytes are 10xxxxxx
+                V = (V << 6) | (u & 0x3F);
+            }
+            if (!isValidDchar(V))
+                goto Lerr;
+            i += n;
+        }
+        else
+        {
+            V = cast(dchar) u;
+            i++;
+        }
+
+        idx = i;
+        return V;
+
+      Lerr:
+      return '?';
+    //return V; // dummy return
+    }
 /// Special version of icmp() with optimization for ASCII characters
 int icmp2(in string a, in string b)
 @safe pure {
-	import std.algorithm : min;
-	import std.utf : decode;
-	import std.uni : toLower;
 	size_t i = 0, j = 0;
 	
 	// fast skip equal prefix
@@ -371,6 +473,7 @@ int icmp2(in string a, in string b)
 			dchar acp = decode(a, i);
 			dchar bcp = decode(b, j);
 			if( acp != bcp ){
+				import std.string : toLower;
 				acp = toLower(acp);
 				bcp = toLower(bcp);
 				if( acp < bcp ) return -1;

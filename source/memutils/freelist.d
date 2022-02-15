@@ -11,61 +11,57 @@ module memutils.freelist;
 
 import memutils.allocators;
 import memutils.memory;
-import std.algorithm : min;
+import memutils.helpers : destructRecurse, min, memset;
+import memutils.utils : ObjectAllocator, Malloc;
+import std.typetuple;
 
-final class AutoFreeListAllocator(Base : Allocator) : Allocator {
-	import std.typetuple;
-	
+nothrow:
+@trusted:
+static enum minExponent = 3;
+static enum freeListCount = 12;
+
+struct AutoFreeListAllocator(Base) {
+nothrow:
+@trusted:
 	private {
-		enum minExponent = 3;
-		enum freeListCount = 12;
-		static if (is(Base == MallocAllocator) && __VERSION__ >= 2072)
-			FreeListMallocAllocator[freeListCount] m_freeLists;
+		static if (is(Base == MallocAllocator))
+			FreeListMallocAllocator*[freeListCount] m_freeLists;
 		else
-			FreeListAlloc!Base[freeListCount] m_freeLists;
-		Base m_baseAlloc;
-	}
-	
-	this()
-	{
-		version(TLSGC) { } else {
-			if (!mtx) mtx = new Mutex;
-		}
-		m_baseAlloc = getAllocator!Base();
-		foreach (i; iotaTuple!freeListCount) {
-			static if (is(Base == MallocAllocator) && __VERSION__ >= 2072)
-				m_freeLists[i] = new FreeListMallocAllocator(nthFreeListSize!(i));
-			else
-				m_freeLists[i] = new FreeListAlloc!Base(nthFreeListSize!(i));
-		}
+			FreeListAlloc!(Base)*[freeListCount] m_freeLists;
+		Base* m_baseAlloc;
 	}
 
 	~this() {
 		foreach(fl; m_freeLists)
-			destroy(fl);
+			destructRecurse(*fl);
 	}
 	
 	void[] alloc(size_t sz)
 	{
-
-		version(TLSGC) { } else {
-			mtx.lock_nothrow();
-			scope(exit) mtx.unlock_nothrow();
+		if (!m_baseAlloc){
+			m_baseAlloc = getAllocator!Base();
+			foreach (i; iotaTuple!freeListCount) {
+				static if (is(Base == MallocAllocator))
+					m_freeLists[i] = ObjectAllocator!(FreeListMallocAllocator, Malloc).alloc(nthFreeListSize!(i));
+				else
+					m_freeLists[i] = ObjectAllocator!(FreeListAlloc!Base, Malloc).alloc(nthFreeListSize!(i));
+			}
+			recursing = false;
 		}
 		logTrace("AFL alloc ", sz);
 		foreach (i; iotaTuple!freeListCount)
-			if (sz <= nthFreeListSize!(i))
-				return m_freeLists[i].alloc().ptr[0 .. sz];
-		if (sz > nthFreeListSize!(freeListCount-1)) return m_baseAlloc.alloc(sz);
-		assert(false);
+			if (sz <= nthFreeListSize!(i)) {
+				auto ret = m_freeLists[i].alloc().ptr[0 .. sz];
+				memset(ret.ptr, 0, sz);
+				return ret;
+			}
+		if (sz > nthFreeListSize!(freeListCount-1)) 
+			return m_baseAlloc.alloc(sz);
+		assert(false, "Alloc failed");
 	}
 
 	void[] realloc(void[] data, size_t sz)
 	{
-		version(TLSGC) { } else {
-			mtx.lock_nothrow();
-			scope(exit) mtx.unlock_nothrow();
-		}
 		foreach (fl; m_freeLists) {
 			if (data.length <= fl.elementSize) {
 				// just grow the slice if it still fits into the free list slot
@@ -77,6 +73,8 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 				assert(newd.ptr+sz <= data.ptr || newd.ptr >= data.ptr+data.length, "New block overlaps old one!?");
 				auto len = min(data.length, sz);
 				newd[0 .. len] = data[0 .. len];
+				
+				memset(newd.ptr + len, 0, sz - len);
 				free(data);
 				return newd;
 			}
@@ -87,10 +85,6 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 
 	void free(void[] data)
 	{
-		version(TLSGC) { } else {
-			mtx.lock_nothrow();
-			scope(exit) mtx.unlock_nothrow();
-		}
 		logTrace("AFL free ", data.length);
 		foreach(i; iotaTuple!freeListCount) {
 			if (data.length <= nthFreeListSize!i) {
@@ -102,7 +96,7 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 			m_baseAlloc.free(data);
 			return;
 		}
-		assert(false);
+		assert(false, "Free failed");
 	}
 	
 	private static pure size_t nthFreeListSize(size_t i)() { return 1 << (i + minExponent); }
@@ -112,31 +106,31 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 	}
 }
 
-final class FreeListAlloc(Base : Allocator) : Allocator
+struct FreeListAlloc(Base)
 {
 	import memutils.vector : Vector;
 	import memutils.utils : Malloc;
 	private static struct FreeListSlot { FreeListSlot* next; }
 	private {
 		immutable size_t m_elemSize;
-		Base m_baseAlloc;
+		Base* m_baseAlloc;
 		FreeListSlot* m_firstFree = null;
 		size_t space;
 		version(DebugLeaks) HashMap!(size_t, size_t, Malloc) m_owned;
 		size_t m_nalloc = 0;
 		size_t m_nfree = 0;
 	}
-
+nothrow:
+@trusted:
 	~this() {
-		import core.thread : thread_isMainThread;
 		version(DebugLeaks)//if (!thread_isMainThread)
 		{
 			if (m_owned.length > 0)
 			{
-				import std.stdio : writeln;
-				foreach(const ref size_t ptr, const ref size_t size; m_owned)
-					writeln( cast(void*)ptr, " : ", size);
-				asm { int 3; }
+				//import std.stdio : writeln;
+				//foreach(const ref size_t ptr, const ref size_t size; m_owned)
+				//	writeln( cast(void*)ptr, " : ", size);
+				//asm { int 3; }
 			}
 		}
 		while ( m_firstFree ){
@@ -147,13 +141,13 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 			m_nfree--;
 		}
 		//foreach(size_t slot; m_owned[])
-			//	m_baseAlloc.free( (cast(void*)slot)[0 .. m_elemSize]);
+		//	m_baseAlloc.free( (cast(void*)slot)[0 .. m_elemSize]);
 	
 	}
 	
 	this(size_t elem_size)
 	{
-		assert(elem_size >= size_t.sizeof);
+		//assert(elem_size >= size_t.sizeof);
 		m_elemSize = elem_size;
 		m_baseAlloc = getAllocator!Base();
 		//logTrace("Create FreeListAlloc %d", m_elemSize);
@@ -195,6 +189,7 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 		}
 		m_nalloc++;
 		//logInfo("Alloc %d bytes: alloc: %d, free: %d", SZ, s_nalloc, s_nfree);
+		
 		return mem;
 	}
 
@@ -210,6 +205,7 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 	void free(void[] mem)
 	{
 		assert(mem.length == m_elemSize, "Memory block passed to free has wrong size.");
+		
 		auto s = cast(FreeListSlot*)mem.ptr;
 		s.next = m_firstFree;
 
@@ -221,33 +217,31 @@ final class FreeListAlloc(Base : Allocator) : Allocator
 	}
 }
 
-// workaround for 2.072.0 regression preventing FreeListAlloc template instantiation
 private 
-final class FreeListMallocAllocator
+struct FreeListMallocAllocator
 {
-	import memutils.vector : Vector;
+nothrow:
+@trusted:
 	import memutils.utils : Malloc;
 	private static struct FreeListSlot { FreeListSlot* next; }
 	private {
-		immutable size_t m_elemSize;
-		MallocAllocator m_baseAlloc;
+		size_t m_elemSize;
+		MallocAllocator* m_baseAlloc;
 		FreeListSlot* m_firstFree = null;
 		size_t space;
 		version(DebugLeaks) HashMap!(size_t, size_t, Malloc) m_owned;
 		size_t m_nalloc = 0;
 		size_t m_nfree = 0;
 	}
-
 	~this() {
-		import core.thread : thread_isMainThread;
 		version(DebugLeaks)//if (!thread_isMainThread)
 		{
 			if (m_owned.length > 0)
 			{
-				import std.stdio : writeln;
-				foreach(const ref size_t ptr, const ref size_t size; m_owned)
-					writeln( cast(void*)ptr, " : ", size);
-				asm { int 3; }
+				//import std.stdio : writeln;
+				//foreach(const ref size_t ptr, const ref size_t size; m_owned)
+				//	writeln( cast(void*)ptr, " : ", size);
+				//asm { int 3; }
 			}
 		}
 		while ( m_firstFree ){
@@ -264,7 +258,7 @@ final class FreeListMallocAllocator
 	
 	this(size_t elem_size)
 	{
-		assert(elem_size >= size_t.sizeof);
+		//assert(elem_size >= size_t.sizeof);
 		m_elemSize = elem_size;
 		m_baseAlloc = getAllocator!MallocAllocator();
 		//logTrace("Create FreeListAlloc %d", m_elemSize);
@@ -306,6 +300,7 @@ final class FreeListMallocAllocator
 		}
 		m_nalloc++;
 		//logInfo("Alloc %d bytes: alloc: %d, free: %d", SZ, s_nalloc, s_nfree);
+		
 		return mem;
 	}
 
@@ -321,6 +316,7 @@ final class FreeListMallocAllocator
 	void free(void[] mem)
 	{
 		assert(mem.length == m_elemSize, "Memory block passed to free has wrong size.");
+		
 		auto s = cast(FreeListSlot*)mem.ptr;
 		s.next = m_firstFree;
 

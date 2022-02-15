@@ -8,9 +8,8 @@ module memutils.circularbuffer;
 
 import memutils.allocators;
 import memutils.constants;
-import std.algorithm;
-import std.traits : hasElaborateDestructor, isBasicType, isPointer;
 import memutils.utils;
+import memutils.helpers : memset;
 
 struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	@disable this(this);
@@ -83,7 +82,6 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	void putN(size_t n) { assert(m_fill+n <= m_buffer.length); m_fill += n; }
 	void popFront() { assert(!empty); m_start = mod(m_start+1); m_fill--; }
 	void popFrontN(size_t n) { 
-		import core.stdc.string : memset; 
 		assert(length >= n); 
 		m_start = mod(m_start + n);
 		m_fill -= n;
@@ -114,8 +112,8 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 		}
 		m_fill--;
 		static if (hasElaborateDestructor!T) { // calls destructors
-			static if (is(T == struct) && isPointer!T) .destroy(*m_buffer[mod(m_start+m_fill)]);
-			else .destroy(m_buffer[mod(m_start+m_fill)]);
+			static if (is(T == struct) && isPointer!T) destructRecurse(*m_buffer[mod(m_start+m_fill)]);
+			else destructRecurse(m_buffer[mod(m_start+m_fill)]);
 		}
 	}
 	inout(T)[] peek() inout { return m_buffer[m_start .. min(m_start+m_fill, m_buffer.length)]; }
@@ -125,7 +123,6 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	}
 	void read(T[] dst)
 	{
-		import core.stdc.string : memset;
 		assert(dst.length <= length);
 		if( !dst.length ) return;
 		if( mod(m_start) >= mod(m_start+dst.length) ){
@@ -206,7 +203,7 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 		}
 	}
 }
-
+version(none):
 unittest {
 	import std.range : isInputRange, isOutputRange;
 	static assert(isInputRange!(CircularBuffer!int) && isOutputRange!(CircularBuffer!int, int));

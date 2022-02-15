@@ -1,18 +1,15 @@
 ﻿module memutils.vector;
 
-import std.algorithm : swap, initializeAll;
-import std.range : empty;
-import std.traits;
-import core.stdc.string;
-import std.range : isInputRange, isForwardRange, isRandomAccessRange, ElementType, refRange, RefRange, hasLength;
-import core.exception : RangeError;
-import std.exception : enforce;
+import std.algorithm : swap;
+import std.traits : ForeachType, isNumeric, isSomeString, hasElaborateDestructor, isPointer, hasIndirections;
+import std.range : popFront, front, ElementEncodingType, empty, isInputRange, isForwardRange, isRandomAccessRange, ElementType, refRange, RefRange, hasLength;
+
 import memutils.allocators;
 import memutils.helpers;
 import memutils.utils;
 import memutils.refcounted;
-import std.conv : emplace, to;
 
+@trusted:
 template isImplicitlyConvertibleLegacy(From, To)
 {
     enum bool isImplicitlyConvertibleLegacy = is(typeof({
@@ -25,22 +22,19 @@ template isImplicitlyConvertibleLegacy(From, To)
 }
 
 
-public alias SecureArray(T) = Array!(T, SecureMem);
-
 template Array(T, ALLOC = ThreadMem) 
-	if (!is (T == RefCounted!(Vector!(T, ALLOC), ALLOC)))
 {
 	alias Array = RefCounted!(Vector!(T, ALLOC), ALLOC);
 }
 
-public alias SecureVector(T) = Vector!(T, SecureMem);
 // TODO: Remove implicit string casting for Vector!ubyte! Encourage use of Vector!char [].idup instead.
 
 /// An array that uses a custom allocator.
 struct Vector(T, ALLOC = ThreadMem)
 {	
-	@disable this(this);
-	static if (!is(ALLOC == AppMem)) enum NOGC = true;
+nothrow:
+	enum NOGC = true;
+	static enum TSize = T.sizeof;
 	void opAssign()(auto ref Vector!(T, ALLOC) other) {
 		if (other.ptr !is this.ptr)
 			this.swap(other);
@@ -53,6 +47,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	// Payload cannot be copied
 	private struct Payload
 	{
+		nothrow:
 		size_t _capacity;
 		T[] _payload;
 		
@@ -68,25 +63,29 @@ struct Vector(T, ALLOC = ThreadMem)
 					p = null;
 				}
 				else {
-					_payload[] = p[0 .. $]; // todo: use emplace?
+					foreach (i, ref item; _payload) {
+						item = p[i];
+					}
 				}
 			}
 			else
 			{
-				memmove(_payload.ptr, p.ptr, T.sizeof*p.length);
+				foreach (i, ref item; _payload) {
+					item = p[i];
+				}
 			}
 		}
 		
 		// Destructor releases array memory
 		~this() const nothrow
 		{
-			try {
+			//try {
 				if (_capacity == 0 || _payload.ptr is null)
 					return;
 				T[] data = cast(T[]) _payload.ptr[0 .. _capacity];
 				freeArray!(T, ALLOC)(data, _payload.length); // calls destructors and frees memory
-			} 
-			catch (Throwable e) { assert(false, "Vector.~this Exception: " ~ e.toString()); }
+			//} 
+			//catch (Throwable e) { assert(false, "Vector.~this Exception: " ~ e.toString()); }
 		}
 		
 		void opAssign(Payload rhs)
@@ -118,14 +117,15 @@ struct Vector(T, ALLOC = ThreadMem)
 				// shorten
 				static if (hasElaborateDestructor!T) {
 					foreach (ref e; _payload.ptr[newLength .. _payload.length]) {
-						static if (is(T == struct) && !isPointer!T) // call destructors but not for indirections...
-							.destroy(e);
+						static if (is(T == struct) && !isPointer!T) { // call destructors but not for indirections...
+							logTrace("Destructing Vector item(s) ", T.stringof, " for newLength ", newLength);
+							destructRecurse(e);
+						}
 					}
 					
 					// Zero out unused capacity to prevent gc from seeing
 					// false pointers
-					static if (hasIndirections!T)
-						memset(_payload.ptr + newLength, 0, (_payload.length - newLength) * T.sizeof);
+					memset(_payload.ptr + newLength, 0, (_payload.length - newLength) * TSize);
 				}
 				_payload = _payload.ptr[0 .. newLength];
 				return;
@@ -136,13 +136,15 @@ struct Vector(T, ALLOC = ThreadMem)
 				auto startEmplace = length;
 				reserve(newLength);
 				_payload = _payload.ptr[0 .. newLength];
-				static if (!isImplicitlyConvertibleLegacy!(T, T)) {
-					T t = T();
-					foreach (size_t i; startEmplace .. length) 
-						memmove(_payload.ptr + i, &t, T.sizeof); 
+				static if (!isImplicitlyConvertibleLegacy!(T, T)) {					
+					foreach (size_t i; startEmplace .. length) {
+						T t = T();
+						memmove(_payload.ptr + i, &t, TSize); 
+					}
 					
-				} else
+				} else {
 					initializeAll(_payload.ptr[startEmplace .. length]);
+				}
 			}
 		}
 		
@@ -158,7 +160,7 @@ struct Vector(T, ALLOC = ThreadMem)
 			if (elements <= capacity) return;
 			// TODO: allow vector to become smaller?
 
-			TRACE("Reserve ", length, " => ", elements, " elements.");
+			logTrace("Reserve ", length, " => ", elements, " elements.");
 
 			if (_capacity > 0) {
 				size_t len = _payload.length;
@@ -175,7 +177,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		pragma(inline, true) size_t pushBack(Stuff)(Stuff stuff) 
 			if (is(Stuff == char[]) || is(Stuff == string))
 		{
-			TRACE("Vector.append @disabled this(this)");
+			logTrace("Vector.append @disabled this(this)");
 			if (_capacity <= length + stuff.length)
 			{
 				reserve(1 + (length + stuff.length) * 3 / 2);
@@ -191,18 +193,15 @@ struct Vector(T, ALLOC = ThreadMem)
 		pragma(inline, true) size_t pushBack(Stuff)(auto ref Stuff stuff)
 			if (!isImplicitlyConvertibleLegacy!(T, T) && is(T == Stuff))
 		{
-			TRACE("Vector.append @disabled this(this)");
+			logTrace("Vector.append @disabled this(this)");
 			if (_capacity == length)
 			{
 				reserve(1 + capacity * 3 / 2);
 			}
 			assert(capacity > length && _payload.ptr);
-			
-			T* t = &stuff;
-			
-			memmove(_payload.ptr + _payload.length, t, T.sizeof);
-			memset(t, 0, T.sizeof);
+						
 			_payload = _payload.ptr[0 .. _payload.length + 1];
+			_payload[_payload.length - 1] = cast(T)stuff;
 			
 			return 1;
 		}
@@ -211,15 +210,16 @@ struct Vector(T, ALLOC = ThreadMem)
 		pragma(inline, true) size_t pushBack(Stuff)(auto ref Stuff stuff)
 			if (isImplicitlyConvertibleLegacy!(T, T) && isImplicitlyConvertibleLegacy!(Stuff, T))
 		{
-			TRACE("Vector.append");
+			logTrace("Vector.append");
 			//logTrace("Capacity: ", _capacity, " length: ", length);
 			if (_capacity == length)
 			{
 				reserve(1 + capacity * 3 / 2);
 			}
-			assert(capacity > length && _payload.ptr, "Payload pointer " ~ _payload.ptr.to!string ~ "'s capacity: " ~ capacity.to!string ~ " must be more than " ~ length.to!string);
-			emplace(_payload.ptr + _payload.length, stuff);
+			assert(capacity > length && _payload.ptr, "Payload pointer capacity is wrong");
+			//emplace(_payload.ptr + _payload.length, stuff);
 			_payload = _payload.ptr[0 .. _payload.length + 1];
+			_payload[_payload.length - 1] = stuff;
 			return 1;
 		}
 		
@@ -227,7 +227,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		pragma(inline, true) size_t pushBack(Stuff)(auto ref Stuff stuff)
 			if (isInputRange!Stuff && (isImplicitlyConvertibleLegacy!(ElementType!Stuff, T) || is(T == ElementType!Stuff)))
 		{
-			TRACE("Vector.append 2");
+			logTrace("Vector.append 2");
 			static if (hasLength!Stuff)
 			{
 				immutable oldLength = length;
@@ -303,11 +303,13 @@ struct Vector(T, ALLOC = ThreadMem)
 			// swap each element with a duplicate
 			foreach (size_t i, ref el; _data._payload) {
 				T t = el.dup;
-				memmove(vec._data._payload.ptr + i, &t, T.sizeof);
-				memset(&t, 0, T.sizeof);
+				memmove(vec._data._payload.ptr + i, &t, TSize);
+				memset(&t, 0, TSize);
 			}
 			return vec.move();
-		} else static assert(false, "Cannot dup() the element: " ~ T.stringof);
+		} else {
+			static assert(false, "Cannot dup() the element" ~ T.stringof);
+		}
 	}
 	
 	/// ditto
@@ -403,7 +405,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		//static if (is(T[] == ubyte[]))
 		//	return cast(string) _data._payload;
 		//else
-		return *cast(T[]*)&_data._payload;
+		return _data._payload;
 	}
 	
 	/**
@@ -415,7 +417,8 @@ struct Vector(T, ALLOC = ThreadMem)
      */
 	T[] opSlice(size_t i, size_t j) const
 	{
-		version (assert) if (i > j || j > length) throw new RangeError();
+		logTrace("Slicing Vector i=", i, ", j=", j);
+		assert(!(i > j || j > length), "invalid opslice attempt");
 		return (cast(T[])_data._payload)[i .. j];
 	}
 	
@@ -451,11 +454,12 @@ struct Vector(T, ALLOC = ThreadMem)
 	
 	void opIndexAssign(U)(auto ref U val, size_t i)
 	{
+		static enum USize = U.sizeof;
 		static if (__traits(compiles, {_data._payload[i] = cast(T) val; }()))
 			_data._payload[i] = cast(T) val;
 		else { // swap
-			memmove(_data._payload.ptr + i, &val, U.sizeof);
-			memset(&val, 0, U.sizeof);
+			memmove(_data._payload.ptr + i, &val, USize);
+			memset(&val, 0, USize);
 		}
 	}
 	/**
@@ -470,14 +474,22 @@ struct Vector(T, ALLOC = ThreadMem)
 		static if (isRandomAccessRange!Stuff)
 		{
 			_data.length = value.length;
-			_data._payload.ptr[0 .. value.length] = value[0 .. $];
+			foreach (i, ref item; value){
+				_data._payload[i] = item;
+			}
 		} else static if (is(UnConst!Stuff == Vector!(T, ALLOC))) {
 			_data.length = value._data.length;
-			_data._payload[] = value._data._payload[];
+			
+			foreach (i, ref item; value._data._payload){
+				_data._payload[i] = item;
+			}
 		}
-		else static if (isImplicitlyConvertibleLegacy!(T, ElementType!Stuff)) {
+		else static if (is(T[] == UnConst!Stuff) || isImplicitlyConvertibleLegacy!(T, ElementType!Stuff)) {
 			_data.length = value.length;
-			_data._payload[] = cast(T[]) value;
+			
+			foreach (i, ref item; cast(T[])value){
+				_data._payload[i] = item;
+			}
 		} else static assert(false, "Can't convert " ~ Stuff.stringof ~ " to " ~ T.stringof ~ "[]");
 	}
 	
@@ -525,7 +537,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	auto opBinary(string op, Stuff)(Stuff stuff)
 		if (op == "~")
 	{
-		TRACE("Appending stuff");
+		logTrace("Appending stuff");
 		RefCounted!(Vector!(T, ALLOC), ALLOC) result;
 		// @@@BUG@@ result ~= this[] doesn't work
 		auto r = this[];
@@ -562,10 +574,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	pragma(inline, true) void opOpAssign(string op, Stuff)(auto ref Stuff stuff)
 		if (op == "~")
 	{
-		static if (is (Stuff == RefCounted!(typeof(this)))) {
-			insertBack(cast(T[]) stuff[]);
-		}
-		else static if (is (Stuff == typeof(this))) {
+		static if (is (Stuff == typeof(this))) {
 			insertBack(cast(T[]) stuff[]);
 		}
 		else
@@ -584,7 +593,7 @@ struct Vector(T, ALLOC = ThreadMem)
      */
 	void clear()
 	{
-		TRACE("Vector.clear()");
+		logTrace("Vector.clear()");
 		_data.length = 0;
 	}
 	
@@ -609,7 +618,6 @@ struct Vector(T, ALLOC = ThreadMem)
 		this.length = newLength;
 	}
 	
-	import std.traits : isNumeric;
 	
 	int opCmp(Alloc)(auto const ref Vector!(T, Alloc) other) const 
 	{
@@ -676,24 +684,24 @@ struct Vector(T, ALLOC = ThreadMem)
     */
 	void removeBack()
 	{
-		enforce(!empty);
+		assert(!empty);
 		static if (hasElaborateDestructor!T)
-			.destroy(_data._payload[$ - 1]);
-		
-		_data._payload = _data._payload[0 .. $ - 1];
+			destructRecurse(_data._payload[$ - 1]);
+		memset(_data._payload.ptr + _data._payload.length - 1, 0, TSize);
+		_data._payload = _data._payload.ptr[0 .. _data._payload.length - 1];
 	}
 	
 	@trusted
 	void removeFront() { 
 	
-		enforce(!empty);
+		assert(!empty);
 		static if (hasElaborateDestructor!T)
-			.destroy(_data._payload[0]);
+			destructRecurse(_data._payload[0]);
 		if (_data._payload.length > 1) {
-			memmove(_data._payload.ptr, _data._payload.ptr + 1, T.sizeof * (_data._payload.length - 1));
-			memset(_data._payload.ptr + _data._payload.length - 1, 0, T.sizeof);
+			memmove(_data._payload.ptr, _data._payload.ptr + 1, TSize * (_data._payload.length - 1));
+			memset(_data._payload.ptr + _data._payload.length - 1, 0, TSize);
 		}
-		_data._payload.length -= 1;	
+		_data._payload = _data._payload.ptr[0 .. _data._payload.length - 1];	
 	}
 	
 	/**
@@ -714,8 +722,8 @@ struct Vector(T, ALLOC = ThreadMem)
 		if (howMany > length) howMany = length;
 		static if (hasElaborateDestructor!T)
 			foreach (ref e; _data._payload[$ - howMany .. $])
-				.destroy(e);
-		
+				destructRecurse(e);
+		memset(_data._payload.ptr + _data._payload.length - howMany, 0, howMany*TSize);
 		_data._payload = _data._payload[0 .. $ - howMany];
 		return howMany;
 	}
@@ -730,14 +738,16 @@ struct Vector(T, ALLOC = ThreadMem)
 	void insertBefore(Stuff)(size_t i, Stuff stuff)
 		if (isImplicitlyConvertibleLegacy!(Stuff, T))
 	{
-		enforce(i <= length);
+		assert(i <= length);
 		reserve(length + 1);
 
 		// Move elements over by one slot
 		memmove(_data._payload.ptr + i + 1,
 				_data._payload.ptr + i,
-				T.sizeof * (length - i));
-		emplace(_data._payload.ptr + i, stuff);
+				TSize * (length - i));
+		//emplace(_data._payload.ptr + i, stuff);
+		T* slot = _data._payload.ptr + i;
+		*slot = stuff;
 		_data._payload = _data._payload.ptr[0 .. _data._payload.length + 1];
 	}
 	
@@ -745,7 +755,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	size_t insertBefore(Stuff)(size_t i, Stuff stuff)
 		if (isInputRange!Stuff && isImplicitlyConvertibleLegacy!(ElementType!Stuff, T))
 	{
-		enforce(i <= length);
+		assert(i <= length);
 		static if (isForwardRange!Stuff)
 		{
 			// Can find the length in advance
@@ -755,11 +765,12 @@ struct Vector(T, ALLOC = ThreadMem)
 			// Move elements over by extra slots
 			memmove(_data._payload.ptr + i + extra,
 				_data._payload.ptr + i,
-				T.sizeof * (length - i));
+				TSize * (length - i));
 			foreach (p; _data._payload.ptr + i ..
 				_data._payload.ptr + i + extra)
 			{
-				emplace(p, stuff.front);
+				*p = stuff.front;
+				//emplace(p, stuff.front);
 				stuff.popFront();
 			}
 			_data._payload = _data._payload.ptr[0 .. _data._payload.length + extra];
@@ -767,9 +778,9 @@ struct Vector(T, ALLOC = ThreadMem)
 		}
 		else
 		{
-			enforce(_data);
+			assert(_data);
 			immutable offset = i;
-			enforce(offset <= length);
+			assert(offset <= length);
 			auto result = pushBack(stuff);
 			bringToFront(this[offset .. length - result],
 						 this[length - result .. length]);
@@ -780,26 +791,14 @@ struct Vector(T, ALLOC = ThreadMem)
 	/// ditto
 	size_t insertAfter(Stuff)(size_t i, Stuff stuff)
 	{
-		enforce(r._outer._data is _data);
+		assert(r._outer._data is _data);
 		// TODO: optimize
 		immutable offset = i;
-		enforce(offset <= length);
+		assert(offset <= length);
 		auto result = pushBack(stuff);
 		bringToFront(this[offset .. length - result],
 					 this[length - result .. length]);
 		return result;
-	}
-
-	bool opEquals()(auto const ref RefCounted!(Vector!(T, ALLOC), ALLOC) other_) const {
-		import memutils.constants : logTrace;
-		if (other_.empty && empty())
-			return true;
-		else if (other_.empty)
-			return false;
-		if (other_.length != length)
-			return false;
-		// TODO: use the true types
-		return _data._payload[0 .. length] == other_._data._payload[0 .. length];
 	}
 
 	bool opEquals()(auto const ref Vector!(T, ALLOC) other_) const {
@@ -828,9 +827,4 @@ auto array(T)(T[] val)
 auto vector(T)(T[] val)
 {
 	return Vector!(Unqual!T)(val);
-}
-
-void TRACE(T...)(T t) {
-	//import std.stdio : writeln;
-	//writeln(t);
 }
