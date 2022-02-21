@@ -52,7 +52,6 @@ nothrow:
 		foreach (i; iotaTuple!freeListCount)
 			if (sz <= nthFreeListSize!(i)) {
 				auto ret = m_freeLists[i].alloc().ptr[0 .. sz];
-				memset(ret.ptr, 0, sz);
 				return ret;
 			}
 		if (sz > nthFreeListSize!(freeListCount-1)) 
@@ -60,7 +59,7 @@ nothrow:
 		assert(false, "Alloc failed");
 	}
 
-	void[] realloc(void[] data, size_t sz)
+	void[] realloc(void[] data, size_t sz, bool must_zeroise = true)
 	{
 		foreach (fl; m_freeLists) {
 			if (data.length <= fl.elementSize) {
@@ -74,8 +73,7 @@ nothrow:
 				auto len = min(data.length, sz);
 				newd[0 .. len] = data[0 .. len];
 				
-				memset(newd.ptr + len, 0, sz - len);
-				free(data);
+				free(data, must_zeroise);
 				return newd;
 			}
 		}
@@ -83,7 +81,7 @@ nothrow:
 		return m_baseAlloc.realloc(data, sz);
 	}
 
-	void free(void[] data)
+	void free(void[] data, bool must_zeroise = true)
 	{
 		logTrace("AFL free ", data.length);
 		foreach(i; iotaTuple!freeListCount) {
@@ -93,7 +91,7 @@ nothrow:
 			}
 		}
 		if (data.length > nthFreeListSize!(freeListCount-1)) {
-			m_baseAlloc.free(data);
+			m_baseAlloc.free(data, must_zeroise);
 			return;
 		}
 		assert(false, "Free failed");
@@ -193,7 +191,7 @@ nothrow:
 		return mem;
 	}
 
-	void[] realloc(void[] mem, size_t sz)
+	void[] realloc(void[] mem, size_t sz, bool must_zeroise = true)
 	{
 		version(DebugLeaks)//if (!thread_isMainThread)
 			m_owned[cast(size_t)mem.ptr] = sz;
@@ -202,10 +200,10 @@ nothrow:
 		return mem;
 	}
 
-	void free(void[] mem)
+	void free(void[] mem, bool must_zeroise = true)
 	{
 		assert(mem.length == m_elemSize, "Memory block passed to free has wrong size.");
-		
+		if (must_zeroise) memset(mem.ptr, 0, mem.length);
 		auto s = cast(FreeListSlot*)mem.ptr;
 		s.next = m_firstFree;
 
@@ -304,7 +302,7 @@ nothrow:
 		return mem;
 	}
 
-	void[] realloc(void[] mem, size_t sz)
+	void[] realloc(void[] mem, size_t sz, bool must_zeroise = true)
 	{
 		version(DebugLeaks)//if (!thread_isMainThread)
 			m_owned[cast(size_t)mem.ptr] = sz;
@@ -313,10 +311,11 @@ nothrow:
 		return mem;
 	}
 
-	void free(void[] mem)
+	void free(void[] mem, bool must_zeroise = true)
 	{
 		assert(mem.length == m_elemSize, "Memory block passed to free has wrong size.");
 		
+		if (must_zeroise) memset(mem.ptr, 0, mem.length);
 		auto s = cast(FreeListSlot*)mem.ptr;
 		s.next = m_firstFree;
 

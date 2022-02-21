@@ -22,14 +22,17 @@ nothrow:
 
 	int id;
 	/// Initializes a scoped pool with max_mem
-	/// max_mem doesn't do anything at the moment
 	this(size_t max_mem) {
 		PoolStack.push(max_mem);
 		id = PoolStack.top.id;
 	}
 
+	this(ManagedPool pool) {
+		PoolStack.push(pool);
+	}
+
 	~this() {
-		//if(id != PoolStack.top.id) unfreeze();
+		if (id != PoolStack.top.id) return;
 		PoolStack.pop();
 	}
 
@@ -113,7 +116,10 @@ nothrow:
 	@property ManagedPool top() {
 		return m_tstack.top;
 	}
-
+	void push(ManagedPool pool) {
+		logTrace("Push ManagedPool ThreadStack");
+		m_tstack.push(pool);
+	}
 	/// creates a new pool as the fiber stack top or the thread stack top
 	void push(size_t max_mem = 0) {
 		//logTrace("Pushing PoolStack");
@@ -232,7 +238,7 @@ nothrow:
 	@property size_t length() const { return m_pools.length; }
 	@property bool empty() const { return length == 0; }
 	size_t opDollar() const { return length; }
-	@property bool hasTop() { return length > 0 && cnt-1 == top.id; }
+	@property bool hasTop() { return length > 0 && cnt == top.id; }
 
 
 	ManagedPool opIndex(size_t n) {
@@ -255,17 +261,22 @@ nothrow:
 		assert(!empty);
 		logTrace("Pop Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 		auto pool = m_pools.back;
-		assert(pool.id == cnt-1);
+		assert(pool.id == cnt);
 		--cnt;
 		m_pools.removeBack();
 		logTrace("Popped Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.length > 0 ? charFromInt[m_pools.back.id] : '?');
 	}
 
+	void push(ManagedPool pool) {
+		pool.id = ++cnt;
+		m_pools.pushBack(pool);
+	}
+	
 	void push(size_t max_mem = 0) {
 		if (!m_pools.empty) logTrace("Push Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 		else logTrace("Push Thread Pool of ", length, " top: ", cnt);
 		ManagedPool pool = ManagedPool(max_mem);
-		pool.id = cnt++;
+		pool.id = ++cnt;
 		m_pools.pushBack(pool);
 		logTrace("Pushed Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 	}

@@ -17,10 +17,53 @@ struct ThreadMem {
 struct Malloc {
 	enum ident = Mallocator;
 }
+/*
+template PoolAllocator(T)
+{
+nothrow:
+	enum ElemSize = AllocSize!T;
+	Pool m_allocator;
 
-package:
+	this(Pool allocator) {
+		m_allocator = allocator;
+	}
+
+
+	alias TR = RefTypeOf!T;
+
+	TR alloc(ARGS...)(auto ref ARGS args)
+	{
+		auto mem = m_allocator.alloc(ElemSize);
+		TR omem = cast(TR)mem;
+		
+		logTrace("PoolObjectAllocator.alloc initialize");
+		*omem = T(args);
+		return omem;
+
+	}
+
+	void free(TR obj)
+	{
+
+		TR objc = obj;
+		import memutils.helpers : destructRecurse;
+		static if (is(TR == T*) && hasElaborateDestructor!T) {
+			logTrace("ObjectAllocator.free Pointer destr ", T.stringof);
+			destructRecurse(*objc);
+		} 
+		else static if (hasElaborateDestructor!TR) {
+			logTrace("ObjectAllocator.free other destr ", T.stringof);
+			destructRecurse(objc);
+		} 
+
+		m_allocator.free((cast(void*)obj)[0 .. ElemSize]);
+
+	}
+}
+*/
 
 nothrow:
+
 
 template ObjectAllocator(T, ALLOC = ThreadMem)
 {
@@ -101,7 +144,7 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	// logTrace("realloc before ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
 
 	//logTrace("realloc fre ", T.stringof, ": ", array.ptr);
-	auto mem = allocator.realloc((cast(void*)array.ptr)[0 .. array.length * TSize], TSize * n);
+	auto mem = allocator.realloc((cast(void*)array.ptr)[0 .. array.length * TSize], TSize * n, hasIndirections!T);
 	//logTrace("realloc ret ", T.stringof, ": ", mem.ptr);
 	auto ret = (cast(T*)mem.ptr)[0 .. n];
 	// logTrace("realloc after ", ALLOC.stringof, ": ", mem.ptr, ":", mem.length);
@@ -134,7 +177,10 @@ nothrow void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_dest
 			i++;
 		}
 	}
-	allocator.free((cast(void*)array.ptr)[0 .. array.length * TSize]);
+	// zeroise if array contains pointers, otherwise it's probably a string
+	// if the string is from a pool through a vector this will let references hold
+	// otherwise we also optimize a bit by leaving the strings untouched
+	allocator.free((cast(void*)array.ptr)[0 .. array.length * TSize], hasIndirections!T);
 	array = null;
 }
 
@@ -167,8 +213,12 @@ static:
 	auto alloc(T)(size_t n)
 		if (isArray!T)
 	{
-		alias ElType = UnConst!(typeof(T.init[0]));
-		return allocArray!(ElType, THIS)(n);
+		static if (is(T == void[])) {
+			return getAllocator!ALLOC().alloc(n);
+		} else {
+			alias ElType = UnConst!(typeof(T.init[0]));
+			return allocArray!(ElType, THIS)(n);
+		}
 	}
 
 	auto copy(T)(auto ref T arr)
@@ -182,21 +232,29 @@ static:
 		return cast(T)arr_copy;
 	}
 
-	auto realloc(T)(auto ref T arr, size_t n)
+	auto realloc(T)(auto ref T arr, size_t n, bool zeroise_mem = false)
 		if (isArray!T)
 	{
-		alias ElType = UnConst!(typeof(arr[0]));
-		scope(exit) arr = null;
-		auto arr_copy = reallocArray!(typeof(arr[0]), THIS)(arr, n);
-		return cast(T) arr_copy;
+		static if (is(T == void[])) {
+			return getAllocator!ALLOC().realloc(arr, n, zeroise_mem);
+		} else {
+			alias ElType = UnConst!(typeof(arr[0]));
+			scope(exit) arr = null;
+			auto arr_copy = reallocArray!(typeof(arr[0]), THIS)(arr, n);
+			return cast(T) arr_copy;
+		}
 	}
 	
-	void free(T)(auto ref T arr)
+	void free(T)(auto ref T arr, bool zeroise_mem = false)
 		if (isArray!T)
 	{
-		alias ElType = typeof(arr[0]);
-		scope(exit) arr = null;
-		freeArray!(ElType, THIS)(arr);
+		static if (is(T == void[])) {
+			return getAllocator!ALLOC().free(arr, zeroise_mem);
+		} else {
+			alias ElType = typeof(arr[0]);
+			scope(exit) arr = null;
+			freeArray!(ElType, THIS)(arr);
+		}
 	}
 
 }
@@ -204,12 +262,12 @@ static:
 string translateAllocator() { /// requires (ALLOC) template parameter
 	return `
 	static if (ALLOC.stringof != "PoolStack") {
-		ReturnType!(getAllocator!(ALLOC.ident)) thisAllocator(bool is_freeing = false) {
+		ReturnType!(getAllocator!(ALLOC.ident)) thisAllocator(bool is_freeing = false) nothrow {
 			return getAllocator!(ALLOC.ident)(is_freeing);
 		}
 	}
 	else {
-		ReturnType!(ALLOC.top) function() thisAllocator = &ALLOC.top;
+		ReturnType!(ALLOC.top) function() nothrow thisAllocator = &ALLOC.top;
 	}
 	`;
 }

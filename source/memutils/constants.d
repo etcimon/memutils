@@ -2,6 +2,7 @@
 
 import std.traits : isNumeric;
 void function(string) nothrow @safe writeln;
+char[] function(long) nothrow @safe parseInt;
 package:
 
 enum { // overhead allocator definitions, lazily loaded
@@ -47,9 +48,10 @@ void logTrace(ARGS...)(ARGS args) {
 		scope(exit) recursing = false;
 		import memutils.vector;
 		Vector!char app = Vector!char();
+		app.reserve(32);
 		foreach (arg; args) {
 			static if (isNumeric!(typeof(arg)))
-				app ~= charFromInt[arg%10];
+				app ~= parseInt(cast(long)arg);
 			else app ~= arg;
 		}
 		writeln(cast(string)app[]);
@@ -63,9 +65,10 @@ void logInfo(ARGS...)(ARGS args) {
 		scope(exit) recursing = false;
 		import memutils.vector;
 		Vector!char app = Vector!char();
+		app.reserve(32);
 		foreach (arg; args) {
 			static if (isNumeric!(typeof(arg)))
-				app ~= charFromInt[arg%10];
+				app ~= parseInt(cast(long)arg);
 			else app ~= arg;
 		}
 		writeln(cast(string)app[]);
@@ -80,9 +83,10 @@ void logDebug(ARGS...)(ARGS args) {
 		scope(exit) recursing = false;
 		import memutils.vector;
 		Vector!char app = Vector!char();
+		app.reserve(32);
 		foreach (arg; args) {
 			static if (isNumeric!(typeof(arg)))
-				app ~= charFromInt[arg%10];
+				app ~= parseInt(cast(long)arg);
 			else app ~= arg;
 		}
 			
@@ -97,9 +101,10 @@ void logError(ARGS...)(ARGS args) {
 		scope(exit) recursing = false;
 		import memutils.vector;
 		Vector!char app = Vector!char();
+		app.reserve(32);
 		foreach (arg; args) {
 			static if (isNumeric!(typeof(arg)))
-				app ~= charFromInt[arg%10];
+				app ~= parseInt(cast(long)arg);
 			else app ~= arg;
 		}
 		writeln(cast(string)app[]);

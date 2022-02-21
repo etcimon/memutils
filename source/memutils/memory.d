@@ -11,12 +11,14 @@ module memutils.memory;
 
 import memutils.allocators;
 import memutils.helpers;
+import memutils.constants;
 
 struct MallocAllocator {
 nothrow:
 @trusted:
 	void[] alloc(size_t sz)
 	{
+			logInfo("Mallocating sz ", sz);
 		auto ptr = .malloc(sz + Allocator.alignment);
 		if (ptr is null) return null;
 		
@@ -25,13 +27,14 @@ nothrow:
 		return mem;
 	}
 
-	void[] realloc(void[] mem, size_t new_size)
+	void[] realloc(void[] mem, size_t new_size, bool must_zeroise = true)
 	{
 		size_t csz = min(mem.length, new_size);
 		auto p = extractUnalignedPointer(mem.ptr);
 		size_t oldmisalign = mem.ptr - p;
 		ubyte misalign;
 		auto pn = cast(ubyte*).realloc2(p, mem.length, new_size+Allocator.alignment);
+		if (must_zeroise) memset(pn + mem.length, 0, new_size - mem.length);
 		if (p == pn) return pn[oldmisalign .. new_size+oldmisalign];
 		
 		auto pna = cast(ubyte*)adjustPointerAlignment(pn, &misalign);
@@ -51,12 +54,12 @@ nothrow:
 		}
 		
 		auto mem2 = pna[0 .. new_size];
-		memset(mem2.ptr, 0, mem2.length);
 		return mem2;
 	}
 	
-	void free(void[] mem)
+	void free(void[] mem, bool must_zeroise = true)
 	{
+		if (must_zeroise) memset(mem.ptr, 0, mem.length);
 		.free2(extractUnalignedPointer(mem.ptr), mem.length);
 	}
 }

@@ -15,7 +15,6 @@ module memutils.unique;
 import memutils.allocators;
 import memutils.constants;
 import memutils.utils;
-import memutils.rbtree;
 
 import memutils.helpers;
 

@@ -112,6 +112,7 @@ nothrow:
 		// length
 		@property void length(size_t newLength)
 		{
+			logInfo("Set length: ", newLength);
 			if (length > 0 && length >= newLength)
 			{
 				// shorten
@@ -137,13 +138,13 @@ nothrow:
 				reserve(newLength);
 				_payload = _payload.ptr[0 .. newLength];
 				static if (!isImplicitlyConvertibleLegacy!(T, T)) {					
-					foreach (size_t i; startEmplace .. length) {
+					foreach (size_t i; startEmplace .. newLength) {
 						T t = T();
 						memmove(_payload.ptr + i, &t, TSize); 
 					}
 					
 				} else {
-					initializeAll(_payload.ptr[startEmplace .. length]);
+					initializeAll(_payload.ptr[startEmplace .. newLength]);
 				}
 			}
 		}
@@ -160,7 +161,7 @@ nothrow:
 			if (elements <= capacity) return;
 			// TODO: allow vector to become smaller?
 
-			logTrace("Reserve ", length, " => ", elements, " elements.");
+			logTrace("Reserve ", length, " => ", elements, " elements with capacity ", capacity);
 
 			if (_capacity > 0) {
 				size_t len = _payload.length;
@@ -571,7 +572,7 @@ nothrow:
 	/**
         Forwards to $(D pushBack(stuff)).
      */
-	pragma(inline, true) void opOpAssign(string op, Stuff)(auto ref Stuff stuff)
+	void opOpAssign(string op, Stuff)(auto ref Stuff stuff)
 		if (op == "~")
 	{
 		static if (is (Stuff == typeof(this))) {
@@ -608,13 +609,14 @@ nothrow:
 
         Postcondition: $(D length == newLength)
      */
-	pragma(inline, true) @property void length(size_t newLength)
+	@property void length(size_t newLength)
 	{
 		_data.length = newLength;
 	}
 	
-	pragma(inline, true) void resize(size_t newLength)
+	void resize(size_t newLength)
 	{
+		logInfo("Resize to ", newLength);
 		this.length = newLength;
 	}
 	
@@ -629,19 +631,19 @@ nothrow:
 			return 0;
 	}
 
-	pragma(inline, true) size_t pushBack(Stuff...)(Stuff stuff) 
+	size_t pushBack(Stuff...)(Stuff stuff) 
 		if (!isNumeric!Stuff || !is ( T == ubyte ))
 	{
 		return insertBack(stuff);
 	}
 	
-	pragma(inline, true) size_t pushBack(Stuff...)(Stuff stuff) 
+	size_t pushBack(Stuff...)(Stuff stuff) 
 		if (isNumeric!Stuff && is(T == ubyte))
 	{
 		return insertBack(cast(T) stuff);
 	}
 
-	pragma(inline, true) size_t insert(Stuff...)(Stuff stuff) {
+	size_t insert(Stuff...)(Stuff stuff) {
 		return insertBack(stuff);
 	}
 	
@@ -656,7 +658,7 @@ nothrow:
         Complexity: $(BIGOH m * log(n)), where $(D m) is the number of
         elements in $(D stuff)
     */
-	pragma(inline, true) size_t insertBack(Stuff)(auto ref Stuff stuff)
+	size_t insertBack(Stuff)(auto ref Stuff stuff)
 	{
 		static if (isImplicitlyConvertibleLegacy!(Stuff, T[]))
 			return _data.pushBack(cast(T[])stuff);

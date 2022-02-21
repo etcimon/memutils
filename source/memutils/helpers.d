@@ -282,16 +282,20 @@ void*   calloc(size_t nmemb, size_t size);
 void*   realloc2(void* ptr, size_t oldsize, size_t size);
 ///
 void    free2(void* ptr, size_t size);
+
 ///
 int   memcmp(scope const void* s1, scope const void* s2, size_t n) pure;
-///
-void* memcpy(return void* s1, scope const void* s2, size_t n) pure;
-version (Windows)
-{
-    ///
-    int memicmp(scope const char* s1, scope const char* s2, size_t n);
+
+version(LDC) {
+	import ldc.intrinsics;
+	alias memcpy = llvm_memcpy;
+	alias memmove = llvm_memmove;
+	alias memset = llvm_memset;
+} else {
+	///
+	void* memcpy(return void* s1, scope const void* s2, size_t n) pure;
+	///
+	void* memmove(return void* s1, scope const void* s2, size_t n) pure;
+	///
+	void* memset(return void* s, int c, size_t n) pure;
 }
-///
-void* memmove(return void* s1, scope const void* s2, size_t n) pure;
-///
-void* memset(return void* s, int c, size_t n) pure;

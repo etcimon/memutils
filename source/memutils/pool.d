@@ -11,6 +11,7 @@ module memutils.pool;
 import memutils.allocators;
 import memutils.vector;
 import memutils.helpers;
+import memutils.constants;
 
 struct PoolAllocator(Base)
 {
@@ -30,14 +31,21 @@ nothrow:
 	public size_t m_poolSize = 64*1024;
 	this(size_t pool_size)
 	{
-		if (pool_size > 0)
+		if (pool_size > 0) {
+			logTrace("PoolAllocator.this() with ", pool_size);
 			m_poolSize = pool_size;
+		}
+		
 	}
 
 	void[] alloc(size_t sz)
 	{
-		if (!m_baseAllocator)
+		if (!m_baseAllocator) {
+			logInfo("Loading pool allocator with base ", Base.stringof);
 			m_baseAllocator = getAllocator!Base();
+			if (m_poolSize == 0) m_poolSize = 64*1024;
+		}
+		
 		auto aligned_sz = alignedSize(sz);
 
 		Pool* pprev = null;
@@ -52,6 +60,7 @@ nothrow:
 		if( !p || p.remaining.length == 0 || p.remaining.length < aligned_sz ) {
 			auto pmem = m_baseAllocator.alloc(AllocSize!Pool);
 			p = cast(Pool*)pmem;
+			logInfo("Allocating m_poolSize ", m_poolSize);
 			p.data = m_baseAllocator.alloc(max(aligned_sz, m_poolSize));
 			p.remaining = p.data;
 			p.next = cast(Pool*)m_freePools;
@@ -77,7 +86,7 @@ nothrow:
 		return ret[0 .. sz];
 	}
 	
-	void[] realloc(void[] arr, size_t newsize)
+	void[] realloc(void[] arr, size_t newsize, bool must_zeroise = true)
 	{
 		auto aligned_sz = alignedSize(arr.length);
 		auto aligned_newsz = alignedSize(newsize);
@@ -90,22 +99,23 @@ nothrow:
 			pool.remaining = pool.remaining[aligned_newsz-aligned_sz .. $];
 			arr = arr.ptr[0 .. aligned_newsz];
 			assert(arr.ptr+arr.length == pool.remaining.ptr, "Last block does not align with the remaining space!?");
-			memset(arr.ptr, 0, newsize);
+			
 			return arr[0 .. newsize];
 		} else {
 			auto ret = alloc(newsize);
 			assert(ret.ptr >= arr.ptr+aligned_sz || ret.ptr+ret.length <= arr.ptr, "New block overlaps old one!?");
 			ret[0 .. min(arr.length, newsize)] = arr[0 .. min(arr.length, newsize)];
+			if (must_zeroise) memset(arr.ptr, 0, arr.length);
 			return ret;
 		}
 	}
 	
-	void free(void[] mem)
+	void free(void[] mem, bool must_zeroise = true)
 	{
-		
+		if (must_zeroise) memset(mem.ptr, 0, mem.length);
 	}
 	
-	void freeAll()
+	void freeAll(bool must_zeroise = true)
 	{
 		logDebug("Calling ", m_destructors.length, " dtors, Destroy pools: ", m_pools);
 		// destroy all initialized objects
@@ -124,6 +134,8 @@ nothrow:
 		size_t i;
 		// put all full Pools into the free pools list
 		for (Pool* p = cast(Pool*)m_fullPools, pnext; p && i < m_pools; (p = pnext), i++) {
+			// zeroise full pools, maybe redundant for Vector and Hashmap
+			if (must_zeroise && p.data.length > 0) memset(p.data.ptr, 0, p.data.length);
 			pnext = p.next;
 			p.next = cast(Pool*)m_freePools;
 			m_freePools = cast(Pool*)p;
@@ -135,15 +147,15 @@ nothrow:
 		}
 	}
 	
-	void reset()
+	void reset(bool must_zeroise = true)
 	{
 		//logDebug("Reset()");
-		freeAll();
+		freeAll(must_zeroise);
 		Pool* pnext;
 		size_t i;
 		for (auto p = cast(Pool*)m_freePools; p && i < m_pools; (p = pnext), i++) {
 			pnext = p.next;
-			m_baseAllocator.free(p.data);
+			m_baseAllocator.free(p.data, false);
 			m_baseAllocator.free((cast(void*)p)[0 .. AllocSize!Pool]);
 		}
 		m_freePools = null;
