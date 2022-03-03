@@ -19,7 +19,7 @@ nothrow:
 	void[] alloc(size_t sz)
 	{
 			logInfo("Mallocating sz ", sz);
-		auto ptr = .malloc(sz + Allocator.alignment);
+		auto ptr = wasm_malloc(sz + Allocator.alignment);
 		if (ptr is null) return null;
 		
 		auto mem = adjustPointerAlignment(ptr)[0 .. sz];
@@ -33,7 +33,7 @@ nothrow:
 		auto p = extractUnalignedPointer(mem.ptr);
 		size_t oldmisalign = mem.ptr - p;
 		ubyte misalign;
-		auto pn = cast(ubyte*).realloc2(p, mem.length, new_size+Allocator.alignment);
+		auto pn = cast(ubyte*)wasm_realloc(p, mem.length, new_size+Allocator.alignment);
 		if (must_zeroise) memset(pn + mem.length, 0, new_size - mem.length);
 		if (p == pn) return pn[oldmisalign .. new_size+oldmisalign];
 		
@@ -60,6 +60,6 @@ nothrow:
 	void free(void[] mem, bool must_zeroise = true)
 	{
 		if (must_zeroise) memset(mem.ptr, 0, mem.length);
-		.free2(extractUnalignedPointer(mem.ptr), mem.length);
+		wasm_free(extractUnalignedPointer(mem.ptr), mem.length);
 	}
 }
