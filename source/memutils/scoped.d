@@ -117,14 +117,14 @@ nothrow:
 		return m_tstack.top;
 	}
 	void push(ManagedPool pool) {
-		logTrace("Push ManagedPool ThreadStack");
+		//logTrace("Push ManagedPool ThreadStack");
 		m_tstack.push(pool);
 	}
 	/// creates a new pool as the fiber stack top or the thread stack top
 	void push(size_t max_mem = 0) {
 		//logTrace("Pushing PoolStack");
 		
-		logTrace("Push ThreadStack");
+		//logTrace("Push ThreadStack");
 		m_tstack.push(max_mem);
 		//logTrace("Pushed ThreadStack");
 	}
@@ -137,12 +137,12 @@ nothrow:
 		// else
 		//auto top = m_tstack.top;
 		//assert(top, "Can't find a pool to pop");
-		logTrace("Pop ThreadStack");
+		//logTrace("Pop ThreadStack");
 		if (m_tstack.hasTop)
 			return m_tstack.pop();
-		logTrace("Doesn't have top?");
+		//logTrace("Doesn't have top?");
 		//else
-		logTrace("Destroying");
+		//logTrace("Destroying");
 
 	}
 
@@ -156,7 +156,7 @@ nothrow:
 
 	// returns number of pools frozen
 	size_t freeze(size_t n = 1) {
-		logTrace("Freeze");
+		//logTrace("Freeze");
 		auto tsz = min(m_tstack.length, n);
 		if (tsz > 0) {
 			auto frozen = m_tstack.freeze(tsz);
@@ -167,7 +167,7 @@ nothrow:
 
 	// returns number of pools unfrozen
 	size_t unfreeze(size_t n = 1) {
-		logTrace("Unfreeze");
+		//logTrace("Unfreeze");
 		auto tsz = min(m_tfreezer.length, n);
 		if (tsz > 0) {
 			auto frozen = m_tfreezer.pop(tsz);
@@ -200,7 +200,7 @@ nothrow:
 
 	void push(ref Vector!(ManagedPool, ThreadMem) pools)
 	{
-		logTrace("Push Thread Freezer of ", m_pools.length);
+		//logTrace("Push Thread Freezer of ", m_pools.length);
 		// insert sorted
 		foreach(ref item; pools[]) {
 			bool found;
@@ -213,17 +213,17 @@ nothrow:
 			}
 			if (!found) m_pools ~= item;
 		}
-		logTrace("Pushed Thread Freezer now ", m_pools.length);
+		//logTrace("Pushed Thread Freezer now ", m_pools.length);
 	}
 
 	Vector!(ManagedPool, ThreadMem) pop(size_t n) {
 		assert(!empty);
-		logTrace("Pop Thread Freezer of ", m_pools.length, " id ", m_pools.back.id);
+		//logTrace("Pop Thread Freezer of ", m_pools.length, " id ", m_pools.back.id);
 		// already sorted
 		auto pools = Vector!(ManagedPool, ThreadMem)( m_pools[$-n .. $] );
 		m_pools.length = (m_pools.length - n);
-		logTrace("Popped Thread Freezer returning ", pools.length, " expecting ", n);
-		logTrace("Returning ID ", pools.back.id);
+		//logTrace("Popped Thread Freezer returning ", pools.length, " expecting ", n);
+		//logTrace("Returning ID ", pools.back.id);
 		return pools.move;
 	}
 	
@@ -248,9 +248,10 @@ nothrow:
 
 	@property ManagedPool top() 
 	{
-		logTrace("Front Thread Pool of ", length);
+		//logTrace("Front Thread Pool of ", length);
 		if (empty) {
-			logTrace("Empty");
+			logError("Empty PoolStack");
+			//logTrace("Empty");
 			return ManagedPool(0);
 		}
 		return m_pools.back;
@@ -258,13 +259,13 @@ nothrow:
 
 	void pop()
 	{
-		assert(!empty);
-		logTrace("Pop Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
-		auto pool = m_pools.back;
-		assert(pool.id == cnt);
+		//assert(!empty);
+		//logTrace("Pop Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//auto pool = m_pools.back;
+		//assert(pool.id == cnt);
 		--cnt;
 		m_pools.removeBack();
-		logTrace("Popped Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.length > 0 ? charFromInt[m_pools.back.id] : '?');
+		//logTrace("Popped Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.length > 0 ? charFromInt[m_pools.back.id] : '?');
 	}
 
 	void push(ManagedPool pool) {
@@ -273,28 +274,28 @@ nothrow:
 	}
 	
 	void push(size_t max_mem = 0) {
-		if (!m_pools.empty) logTrace("Push Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
-		else logTrace("Push Thread Pool of ", length, " top: ", cnt);
+		//if (!m_pools.empty) logTrace("Push Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//else logTrace("Push Thread Pool of ", length, " top: ", cnt);
 		ManagedPool pool = ManagedPool(max_mem);
 		pool.id = ++cnt;
 		m_pools.pushBack(pool);
-		logTrace("Pushed Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//logTrace("Pushed Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 	}
 
 	Vector!(ManagedPool, ThreadMem) freeze(size_t n) {
-		assert(!empty);
-		if (!m_pools.empty) logTrace("Freeze ", n, " in Thread Pool of ", length, " top: ", cnt);
-		else logTrace("Freeze ", n, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
-		assert(n <= length);
+		//assert(!empty);
+		//if (!m_pools.empty) logTrace("Freeze ", n, " in Thread Pool of ", length, " top: ", cnt);
+		//else logTrace("Freeze ", n, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//assert(n <= length);
 		Vector!(ManagedPool, ThreadMem) ret = Vector!(ManagedPool, ThreadMem)( m_pools[$-n .. $] );
 		m_pools.length = (m_pools.length - n);
-		logTrace("Returning ", ret.length);
-		logTrace("Freezeed ", n, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.length > 0 ? charFromInt[m_pools.back.id] : '?');
+		//logTrace("Returning ", ret.length);
+		//logTrace("Freezeed ", n, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.length > 0 ? charFromInt[m_pools.back.id] : '?');
 		return ret.move;
 	}
 
 	void unfreeze(ref Vector!(ManagedPool, ThreadMem) pools) {
-		logTrace("Unfreeze ", pools.length, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.length > 0 ? charFromInt[m_pools.back.id] : '?');
+		//logTrace("Unfreeze ", pools.length, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.length > 0 ? charFromInt[m_pools.back.id] : '?');
 		// insert sorted
 		foreach(ref item; pools[]) {
 			bool found;

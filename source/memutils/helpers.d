@@ -64,7 +64,7 @@ mixin template Embed(alias OBJ, alias OWNED)
 	{
 		static if (__traits(hasMember, typeof(this), "defaultInit")) {
 			defaultInit();
-			checkInvariants();
+			//checkInvariants();
 		}
 		static if (is(TR == T*)) return *OBJ;
 		else return OBJ;
@@ -82,7 +82,7 @@ mixin template Embed(alias OBJ, alias OWNED)
 	@property TR release() {
 		static if (__traits(hasMember, typeof(this), "defaultInit")) {
 			defaultInit();
-			checkInvariants();
+			//checkInvariants();
 		}
 		TR ret = OBJ;
 		OBJ = null;

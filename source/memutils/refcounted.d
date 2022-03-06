@@ -21,7 +21,7 @@ nothrow:
 	pragma(inline)
 	static RefCounted opCall(ARGS...)(auto ref ARGS args) nothrow
 	{
-		logTrace("RefCounted opCall");
+		//logTrace("RefCounted opCall");
 		//try { 
 			RefCounted!(T, ALLOC) ret;
 			if (!ret.m_object)
@@ -39,7 +39,7 @@ nothrow:
 	}
 	
 	static void dtor(U)(U* ctxt) {
-		logTrace("Call dtor ", U.stringof, " for ", typeof(this).stringof);
+		//logTrace("Call dtor ", U.stringof, " for ", typeof(this).stringof);
 		static if (!is (U == typeof(this))) {
 			ThisType* this_ = cast(ThisType*)ctxt;
 			this_.m_object = cast(TR) ctxt.m_object;
@@ -53,7 +53,7 @@ nothrow:
 	
 	this(this)
 	{
-		logTrace("this(this)");
+		//logTrace("this(this)");
 		(cast(RefCounted*)&this).copyctor();
 	}
 	
@@ -62,11 +62,11 @@ nothrow:
 		
 		if (!m_object) {
 			defaultInit(); 
-			checkInvariants();
+			//checkInvariants();
 		}
 
 		if (m_object) {
-			logTrace("copyctr ++", *m_refCount);
+			//logTrace("copyctr ++", *m_refCount);
 			(*m_refCount)++;
 		} 	
 	}
@@ -99,15 +99,15 @@ nothrow:
 			m_free = other.m_free;
 		if( m_object ) {
 			(*m_refCount)++;
-			logTrace("Incr: ", U.stringof, " = ", *m_refCount);
+			//logTrace("Incr: ", U.stringof, " = ", *m_refCount);
 		}
 	}
 	
 	private void _clear()
 	{
 		
-		logTrace("Clear: ", T.stringof, " = ", m_object ? *m_refCount : 9);
-		checkInvariants();
+		//logTrace("Clear: ", T.stringof, " = ", m_object ? *m_refCount : 9);
+		//checkInvariants();
 		if( m_object ){
 			if( --(*m_refCount) == 0 ){
 				if (m_free)
@@ -150,7 +150,7 @@ nothrow:
 		else ret.m_free = m_free;
 		
 		ret.m_refCount = cast(ulong*)this.m_refCount;
-		logTrace("OpCast++ ", *ret.m_refCount);
+		//logTrace("OpCast++ ", *ret.m_refCount);
 		(*ret.m_refCount) += 1;
 		return ret;
 	}
@@ -175,7 +175,7 @@ nothrow:
 	}
 
 	private void _deinit() {
-		logTrace("_deinit");
+		//logTrace("_deinit");
 		TR obj_ptr = m_object;
 		//static if (!isPointer!T) // call destructors but not for indirections...
 		//	.destroy(m_object);
@@ -192,7 +192,7 @@ nothrow:
 	private void defaultInit(ARGS...)(ARGS args) const {
 		
 		if (!m_object) {
-			logTrace("DefaultInit1");
+			//logTrace("DefaultInit1");
 			auto newObj = this.opCall(args);
 			(cast(RefCounted*)&this).m_object = newObj.m_object;
 			(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
@@ -205,7 +205,7 @@ nothrow:
 	private void defaultInit() const {
 		
 		if (!m_object) {
-			logTrace("DefaultInit2");
+			//logTrace("DefaultInit2");
 			auto newObj = this.opCall();
 			(cast(RefCounted*)&this).m_object = newObj.m_object;
 			(cast(RefCounted*)&this).m_refCount = newObj.m_refCount;
@@ -217,7 +217,7 @@ nothrow:
 	pragma(inline)
 	private void checkInvariants()
 	const {
-		logTrace("Check invariants, m_object ", m_object ? '1' : '0', " refcount ", refCount);
+		//logTrace("Check invariants, m_object ", m_object ? '1' : '0', " refcount ", refCount);
 		assert(!m_object || refCount > 0);
 	}
 }
