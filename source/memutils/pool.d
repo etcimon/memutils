@@ -12,6 +12,7 @@ import memutils.allocators;
 import memutils.vector;
 import memutils.helpers;
 import memutils.constants;
+import memutils.utils;
 
 struct PoolAllocator(Base)
 {
@@ -25,7 +26,7 @@ nothrow:
 		Base* m_baseAllocator;
 		Pool* m_freePools;
 		Pool* m_fullPools;
-		Vector!(void delegate() nothrow @trusted) m_destructors;
+		Vector!(void delegate() nothrow @trusted, ThreadMem) m_destructors;
 		int m_pools;
 	}
 	public size_t m_poolSize = 64*1024;
@@ -38,7 +39,7 @@ nothrow:
 		
 	}
 
-	void[] alloc(size_t sz)
+	void[] alloc(size_t sz, bool must_zeroise = true)
 	{
 		if (!m_baseAllocator) {
 			logInfo("Loading pool allocator with base ", Base.stringof);
@@ -82,7 +83,7 @@ nothrow:
 			m_fullPools = p;
 		}
 		//logDebug("PoolAllocator ", id, " allocated ", sz, " with ", totalSize());
-		
+		if (must_zeroise) memset(ret.ptr, 0, ret.length);
 		return ret[0 .. sz];
 	}
 	
@@ -99,7 +100,7 @@ nothrow:
 			pool.remaining = pool.remaining[aligned_newsz-aligned_sz .. $];
 			arr = arr.ptr[0 .. aligned_newsz];
 			assert(arr.ptr+arr.length == pool.remaining.ptr, "Last block does not align with the remaining space!?");
-			
+			if (must_zeroise) memset(arr.ptr + arr.length, 0, newsize - arr.length);
 			return arr[0 .. newsize];
 		} else {
 			auto ret = alloc(newsize);
@@ -110,12 +111,12 @@ nothrow:
 		}
 	}
 	
-	void free(void[] mem, bool must_zeroise = true)
+	void free(void[] mem, bool must_zeroise = false)
 	{
 		if (must_zeroise) memset(mem.ptr, 0, mem.length);
 	}
 	
-	void freeAll(bool must_zeroise = true)
+	void freeAll(bool must_zeroise = false)
 	{
 		logDebug("Calling ", m_destructors.length, " dtors, Destroy pools: ", m_pools);
 		// destroy all initialized objects
@@ -147,7 +148,7 @@ nothrow:
 		}
 	}
 	
-	void reset(bool must_zeroise = true)
+	void reset(bool must_zeroise = false)
 	{
 		//logDebug("Reset()");
 		freeAll(must_zeroise);
@@ -155,8 +156,8 @@ nothrow:
 		size_t i;
 		for (auto p = cast(Pool*)m_freePools; p && i < m_pools; (p = pnext), i++) {
 			pnext = p.next;
-			m_baseAllocator.free(p.data, false);
-			m_baseAllocator.free((cast(void*)p)[0 .. AllocSize!Pool]);
+			m_baseAllocator.free(p.data, must_zeroise);
+			m_baseAllocator.free((cast(void*)p)[0 .. AllocSize!Pool], must_zeroise);
 		}
 		m_freePools = null;
 		

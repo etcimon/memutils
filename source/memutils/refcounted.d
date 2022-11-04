@@ -3,12 +3,14 @@
 import memutils.allocators;
 import memutils.helpers;
 import memutils.utils;
+import std.traits : hasMember;
 
 struct RefCounted(T, ALLOC = ThreadMem)
 {
 	
 nothrow:
 @trusted:
+	static assert(hasMember!(ALLOC, "ident"));
 	mixin Embed!(m_object, false);
 	enum NOGC = true;
 	enum isRefCounted = true;
@@ -25,8 +27,8 @@ nothrow:
 		//try { 
 			RefCounted!(T, ALLOC) ret;
 			if (!ret.m_object)
-				ret.m_object = ObjectAllocator!(T, ALLOC).alloc(args);
-			ret.m_refCount = ObjectAllocator!(ulong, ALLOC).alloc();
+				ret.m_object = ObjectAllocator!(T, ALLOC)().alloc(args);
+			ret.m_refCount = ObjectAllocator!(ulong, ALLOC)().alloc();
 			(*ret.m_refCount) = 1;
 			return ret;
 		//} catch (Throwable e) { assert(false, "RefCounted.opCall(args) Throw: " ~ e.toString()); }
@@ -181,9 +183,9 @@ nothrow:
 		//	.destroy(m_object);
 		
 		if (obj_ptr !is null)
-			ObjectAllocator!(T, ALLOC).free(obj_ptr);
+			ObjectAllocator!(T, ALLOC)().free(obj_ptr);
 		
-		ObjectAllocator!(ulong, ALLOC).free(m_refCount);
+		ObjectAllocator!(ulong, ALLOC)().free(m_refCount);
 		m_refCount = null;
 		m_object = null;
 	}

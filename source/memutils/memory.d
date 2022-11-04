@@ -16,9 +16,9 @@ import memutils.constants;
 struct MallocAllocator {
 nothrow:
 @trusted:
-	void[] alloc(size_t sz)
+	void[] alloc(size_t sz, bool must_zeroise = true)
 	{
-			logInfo("Mallocating sz ", sz);
+		logInfo("Mallocating sz ", sz);
 		auto ptr = wasm_malloc(sz + Allocator.alignment);
 		if (ptr is null) return null;
 		

@@ -22,7 +22,7 @@ template isImplicitlyConvertibleLegacy(From, To)
 }
 
 
-template Array(T, ALLOC = ThreadMem) 
+template Array(T, ALLOC = void) 
 {
 	alias Array = RefCounted!(Vector!(T, ALLOC), ALLOC);
 }
@@ -30,7 +30,7 @@ template Array(T, ALLOC = ThreadMem)
 // TODO: Remove implicit string casting for Vector!ubyte! Encourage use of Vector!char [].idup instead.
 
 /// An array that uses a custom allocator.
-struct Vector(T, ALLOC = ThreadMem)
+struct Vector(T, ALLOC = void)
 {	
 nothrow:
 	enum NOGC = true;
@@ -314,9 +314,9 @@ nothrow:
 	}
 	
 	/// ditto
-	@property RefCounted!(Vector!(T, ALLOC), ALLOC) dupr() const
+	@property RefCounted!(Vector!(T, ALLOC), ThreadMem) dupr() const
 	{
-		return RefCounted!(Vector!(T, ALLOC), ALLOC)(cast(T[])_data._payload);
+		return RefCounted!(Vector!(T, ALLOC), ThreadMem)(cast(T[])_data._payload);
 	}
 	
 	void swap(ref Vector!(T, ALLOC) other) {

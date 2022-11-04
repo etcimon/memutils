@@ -32,10 +32,10 @@ void destructRecurse(E, size_t n)(ref E[n] arr)
 void destructRecurse(S)(ref S s)
     if (is(S == struct))
 {
-    static if (__traits(hasMember, S, "__xdtor") &&
+    static if (__traits(hasMember, S, "__dtor") &&
             // Bugzilla 14746: Check that it's the exact member of S.
-            __traits(isSame, S, __traits(parent, s.__xdtor)))
-        s.__xdtor();
+            __traits(isSame, S, __traits(parent, s.__dtor)))
+        s.__dtor();
 }
 
 /// TODO: Imitate Unique! for all objects (assume dtor) with release()
@@ -180,22 +180,22 @@ mixin template Embed(alias OBJ, alias OWNED)
 
 /// ditto
 T min(T, U)(T a, U b)
-if (is(T == U) && is(typeof(a < b)))
+if (is(typeof(a < b)))
 {
    /* Handle the common case without all the template expansions
     * of the general case
     */
-    return b < a ? b : a;
+    return cast(T) (b < a ? b : a);
 }
 
 /// ditto
 T max(T, U)(T a, U b)
-if (is(T == U) && is(typeof(a < b)))
+if (is(typeof(a < b)))
 {
    /* Handle the common case without all the template expansions
     * of the general case
     */
-    return a < b ? b : a;
+    return cast(T) (a < b ? b : a);
 }
 
 T* addressOf(T)(ref T val) { return &val; }
