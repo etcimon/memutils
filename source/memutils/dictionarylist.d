@@ -45,6 +45,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 		if (m_extendedFields) {
 			auto sz = m_extendedFields.length;
 			freeArray!(Field, ALLOC)(m_extendedFields.ptr[0 .. m_extendedFieldCount], sz);
+			m_extendedFields = null;
 		}
 	}
 	

@@ -22,7 +22,7 @@ mixin template Embed(alias OBJ, alias OWNED)
 
 	import std.traits : isSomeFunction;
 	static if (!isSomeFunction!OBJ)
-	@property ref const(T) fallthrough() const
+	@property ref const(T) fallthrough() const return
 	{
 		static if (__traits(hasMember, typeof(this), "defaultInit")) {
 			(cast(typeof(this)*)&this).defaultInit();
@@ -32,7 +32,7 @@ mixin template Embed(alias OBJ, alias OWNED)
 		else return OBJ;
 	}
 
-	@property ref T fallthrough()
+	@property ref T fallthrough() return
 	{
 		static if (__traits(hasMember, typeof(this), "defaultInit")) {
 			defaultInit();

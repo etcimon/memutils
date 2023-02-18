@@ -38,7 +38,7 @@ void vectorArrayTest(ALLOC)() {
 		assert(data[] == "Hello there");
 
 		Vector!(Array!(ubyte, ALLOC), ALLOC) arr;
-		arr ~= data.dupr;
+		arr ~= data.cloneToRef;
 		assert(arr[0] == data && arr[0][] == "Hello there");
 		assert(arr[0] == data);
 		assert(arr[0][] == "Hello there");
@@ -69,7 +69,7 @@ void hashmapComplexTest(ALLOC)() {
 		hm["hey"] = array("you"d);
 		hm["hello"] = hm["hey"];
 		assert(*hm["hello"] is *hm["hey"]);
-		hm["hello"] = hm["hey"].dupr;
+		hm["hello"] = hm["hey"].cloneToRef;
 		assert(*hm["hello"] !is *hm["hey"]);
 		auto vec = hm["hey"].dup;
 		assert(vec[] == hm["hey"][]);

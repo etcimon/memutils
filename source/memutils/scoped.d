@@ -55,8 +55,8 @@ T alloc(T, ARGS...)(auto ref ARGS args)
 		ret = ObjectAllocator!(T, PoolStack).alloc(args);
 		
 		// Add destructor to pool
-		static if (hasElaborateDestructor!T || __traits(hasMember, T, "__dtor") ) 
-			PoolStack.top().onDestroy(&ret.__dtor);
+		static if (hasElaborateDestructor!T || __traits(hasMember, T, "__xdtor") ) 
+			PoolStack.top().onDestroy(&ret.__xdtor);
 	}
 	else {
 		ret = new T(args);
@@ -74,8 +74,8 @@ T* alloc(T, ARGS...)(auto ref ARGS args)
 		ret = ObjectAllocator!(T, PoolStack).alloc(args);
 		
 		// Add destructor to pool
-		static if (hasElaborateDestructor!T || __traits(hasMember, T, "__dtor") ) 
-			PoolStack.top.onDestroy(&ret.__dtor);
+		static if (hasElaborateDestructor!T || __traits(hasMember, T, "__xdtor") ) 
+			PoolStack.top.onDestroy(&ret.__xdtor);
 		
 	}
 	else {
@@ -319,7 +319,7 @@ struct FiberPoolFreezer
 			return;
 		}
 		//else
-		m_pools[f] = pools.dupr;
+		m_pools[f] = pools.cloneToRef;
 		//logTrace("Pushed Fiber Freezer of ", length);
 	}
 
@@ -546,22 +546,22 @@ package:
 private void registerPoolArray(T)(ref T arr) {
 	import std.range : ElementType;
 	// Add destructors to fiber pool
-	static if (is(T == struct) && (hasElaborateDestructor!(ElementType!T) || __traits(hasMember, ElementType!T, "__dtor") )) {
+	static if (is(T == struct) && (hasElaborateDestructor!(ElementType!T) || __traits(hasMember, ElementType!T, "__xdtor") )) {
 		foreach (ref el; arr)
-			PoolStack.top.onDestroy(&el.__dtor);
+			PoolStack.top.onDestroy(&el.__xdtor);
 	}
 }
 
 private void reregisterPoolArray(T)(ref T arr, ref T arr2) {
 	import std.range : ElementType;
 	// Add destructors to fiber pool
-	static if (is(T == struct) && (hasElaborateDestructor!(ElementType!T) || __traits(hasMember, ElementType!T, "__dtor") )) {
+	static if (is(T == struct) && (hasElaborateDestructor!(ElementType!T) || __traits(hasMember, ElementType!T, "__xdtor") )) {
 		if (arr.ptr is arr2.ptr && arr2.length > arr.length) {
 			foreach (ref el; arr2[arr.length - 1 .. $])
-				PoolStack.top.onDestroy(&el.__dtor);
+				PoolStack.top.onDestroy(&el.__xdtor);
 		}
 		else {
-			PoolStack.top.removeArrayDtors(&arr.back.__dtor, arr.length);
+			PoolStack.top.removeArrayDtors(&arr.back.__xdtor, arr.length);
 			registerPoolArray(arr2);
 		}
 	}

@@ -735,7 +735,7 @@ struct RBNode(V, ALLOC, bool NOGC_ = false)
 	{
 		assert(_left !is null);
 	}
-	body
+	do
 	{
 		// sets _left._parent also
 		if(isLeftNode)
@@ -778,7 +778,7 @@ struct RBNode(V, ALLOC, bool NOGC_ = false)
 	{
 		assert(_right !is null);
 	}
-	body
+	do
 	{
 		// sets _right._parent also
 		if(isLeftNode)
@@ -807,7 +807,7 @@ struct RBNode(V, ALLOC, bool NOGC_ = false)
 	{
 		assert(_parent !is null);
 	}
-	body
+	do
 	{
 		return _parent._left is &this;
 	}
@@ -1166,18 +1166,20 @@ struct RBNode(V, ALLOC, bool NOGC_ = false)
 			return n.left.rightmost;
 	}
 	
-	@property Node dup() const
+	@property Node clone() const
 	{
 		Node copy = ObjectAllocator!(RBNode!(V, ALLOC, NOGC_), ALLOC).alloc();
 		logTrace("Allocating node ", cast(void*)copy);
 		copy.value = cast(V)value;
 		copy.color = color;
 		if(_left !is null)
-			copy.left = _left.dup();
+			copy.left = _left.clone();
 		if(_right !is null)
-			copy.right = _right.dup();
+			copy.right = _right.clone();
 		return copy;
 	}
+
+	@disable @property Node dup() const;
 }
 
 /**

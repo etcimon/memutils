@@ -114,9 +114,9 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 		size_t sz;
 		synchronized(this) {
 			sz = m_blocks.get(cast(const size_t)mem.ptr, size_t.max);
-
-			assert(sz != size_t.max, "free() called with non-allocated object. "~ mem.ptr.to!string ~ " (" ~ mem.length.to!string ~" B) m_blocks len: "~ m_blocks.length.to!string);
-			assert(sz == mem.length, "free() called with block of wrong size: got " ~ mem.length.to!string ~ "B but should be " ~ sz.to!string ~ "B");
+			if (sz == size_t.max || sz != mem.length) logError("Debug Info: ", mem.ptr, " (", mem.length, " B) m_blocks len: ", m_blocks.length, " sz ", sz);
+			assert(sz != size_t.max, "free() called with non-allocated object.");
+			assert(sz == mem.length, "free() called with block of wrong size.");
 
 		}
 

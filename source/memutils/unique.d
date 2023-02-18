@@ -147,6 +147,7 @@ public:
 				}
 
 				ObjectAllocator!(T, ALLOC).free(m_object);
+				m_object = null;
 
 				//static if (HasDebugAllocations && DebugUnique)
 				//	debug memset(ptr, 0, AllocSize!T);
@@ -169,6 +170,7 @@ public:
 
 					static if (is(TR == T*)) .destroy(*m_object);
 					else .destroy(m_object);
+					m_object = null;
 				}
 			}
 		}

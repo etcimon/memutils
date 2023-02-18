@@ -85,8 +85,14 @@ struct Vector(T, ALLOC = ThreadMem)
 					return;
 				T[] data = cast(T[]) _payload.ptr[0 .. _capacity];
 				freeArray!(T, ALLOC)(data, _payload.length); // calls destructors and frees memory
+				(cast()this)._payload = null;
+				(cast()this)._capacity = 0;
 			} 
-			catch (Throwable e) { assert(false, "Vector.~this Exception: " ~ e.toString()); }
+			catch (Throwable e) { 
+				try { 
+					logError(e.msg); 
+				} catch (Throwable e2) {}
+			}
 		}
 		
 		void opAssign(Payload rhs)
@@ -95,7 +101,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		}
 		
 		// Duplicate data
-		// @property Payload dup()
+		// @property Payload clone()
 		// {
 		//     Payload result;
 		//     result._payload = _payload.dup;
@@ -284,20 +290,40 @@ struct Vector(T, ALLOC = ThreadMem)
 			other.swap(ini);
 		}
 	}
-
+	@disable @property Vector!(T, ALLOC) dup() const;
 	/**
         Duplicates the container. The elements themselves are not transitively
         duplicated.
 
         Complexity: $(BIGOH n).
      */
-	@property Vector!(T, ALLOC) dup() const
+	@property Vector!(T, ALLOC) clone() const
 	{
 		static if (__traits(compiles, { T a; T b; a = b; } ())) {
 			auto ret = Vector!(T, ALLOC)(cast(T[])_data._payload);
 			return ret.move;
 		}
-		else static if (__traits(hasMember, T, "dup")) // Element is @disable this(this) but has dup()
+		else static if (__traits(hasMember, T, "move")) // Element is @disable this(this) but has move()
+		{
+			Vector!(T, ALLOC) vec = Vector!(T, ALLOC)(length);
+			// swap each element with a duplicate
+			foreach (size_t i, ref el; _data._payload) {
+				T t = el.move;
+				memmove(vec._data._payload.ptr + i, &t, T.sizeof);
+				memset(&t, 0, T.sizeof);
+			}
+			return vec.move();
+		} else static if (__traits(hasMember, T, "clone")) // Element is @disable this(this), doesn't have move() but has clone
+		{
+			Vector!(T, ALLOC) vec = Vector!(T, ALLOC)(length);
+			// swap each element with a duplicate
+			foreach (size_t i, ref el; _data._payload) {
+				T t = el.clone;
+				memmove(vec._data._payload.ptr + i, &t, T.sizeof);
+				memset(&t, 0, T.sizeof);
+			}
+			return vec.move();
+		} else static if (__traits(hasMember, T, "dup")) // Element is @disable this(this), can only be duplicated in the GC
 		{
 			Vector!(T, ALLOC) vec = Vector!(T, ALLOC)(length);
 			// swap each element with a duplicate
@@ -307,11 +333,13 @@ struct Vector(T, ALLOC = ThreadMem)
 				memset(&t, 0, T.sizeof);
 			}
 			return vec.move();
-		} else static assert(false, "Cannot dup() the element: " ~ T.stringof);
+		} else static assert(false, "Cannot clone() the element: " ~ T.stringof);
 	}
 	
+	@disable @property RefCounted!(Vector!(T, ALLOC), ALLOC) dupr() const;
+
 	/// ditto
-	@property RefCounted!(Vector!(T, ALLOC), ALLOC) dupr() const
+	@property RefCounted!(Vector!(T, ALLOC), ALLOC) cloneToRef() const
 	{
 		return RefCounted!(Vector!(T, ALLOC), ALLOC)(cast(T[])_data._payload);
 	}
