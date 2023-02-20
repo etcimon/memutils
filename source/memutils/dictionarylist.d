@@ -15,6 +15,7 @@ import memutils.utils;
 import memutils.vector;
 import std.conv : to;
 import std.exception : enforce;
+import std.algorithm: swap;
 
 alias DictionaryListRef(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true, size_t NUM_STATIC_FIELDS = 8) = RefCounted!(DictionaryList!(KEY, VALUE, ALLOC, case_sensitive, NUM_STATIC_FIELDS), ALLOC);
 
@@ -53,6 +54,30 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	alias ValueType = VALUE;
 	
 	struct FieldTuple { KeyType key; ValueType value; }
+
+	@property DictionaryList clone() const {
+		auto ret = DictionaryList!(KEY, VALUE, ALLOC, case_sensitive, NUM_STATIC_FIELDS)();
+		
+		ret.m_fields = (cast()this).m_fields;
+		ret.m_fieldCount = (cast()this).m_fieldCount;
+		
+		if (m_extendedFieldCount > 0) {
+			ret.m_extendedFields = allocArray!(Field, ALLOC)(m_extendedFieldCount);
+			memcpy(ret.m_extendedFields.ptr, m_extendedFields.ptr, (m_extendedFieldCount)*Field.sizeof);
+			ret.m_extendedFieldCount = (cast()this).m_extendedFieldCount;
+		}
+		return ret;
+	}
+
+	DictionaryList move() {
+		import std.algorithm : swap;
+		auto ret = DictionaryList!(KEY, VALUE, ALLOC, case_sensitive, NUM_STATIC_FIELDS)();
+		.swap(m_fields, ret.m_fields);
+		.swap(m_fieldCount, ret.m_fieldCount);
+		.swap(m_extendedFields, ret.m_extendedFields);
+		.swap(m_extendedFieldCount, ret.m_extendedFieldCount);
+		return ret;
+	}
 
 	@property bool empty() const { return length == 0; }
 

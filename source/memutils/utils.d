@@ -52,8 +52,13 @@ template ObjectAllocator(T, ALLOC)
 			auto allocator_ = getAllocator!(ALLOC.ident)(false);
 			auto mem = allocator_.alloc(ElemSize);
 		}
-		else
+		else {
+			import memutils.scoped : PoolStack;
+			if (PoolStack.empty()) {
+				return new T(args);
+			}
 			auto mem = m_getAlloc().alloc(ElemSize);
+		}
 		static if ( ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) 
 		{
 			static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
@@ -82,8 +87,13 @@ template ObjectAllocator(T, ALLOC)
 			if (auto a = getAllocator!(ALLOC.ident)(true))
 				a.free((cast(void*)obj)[0 .. ElemSize]);
 		}
-		else
+		else {
+			import memutils.scoped : PoolStack;
+			if (PoolStack.empty()) {
+				return;
+			}
 			m_getAlloc().free((cast(void*)obj)[0 .. ElemSize]);
+		}
 
 	}
 }
@@ -92,7 +102,13 @@ template ObjectAllocator(T, ALLOC)
 T[] allocArray(T, ALLOC = ThreadMem)(size_t n)
 {
 	import core.memory : GC;
+	static if (ALLOC.stringof == "PoolStack") {
+		import memutils.scoped : PoolStack;
+		if (PoolStack.empty())
+			return new T[n];
+	}
 	mixin(translateAllocator());
+	
 	auto allocator = thisAllocator();
 
 	auto mem = allocator.alloc(T.sizeof * n);
@@ -116,6 +132,16 @@ T[] allocArray(T, ALLOC = ThreadMem)(size_t n)
 T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	import core.memory : GC;
 	assert(n > array.length, "Cannot reallocate to smaller sizes");
+	static if (ALLOC.stringof == "PoolStack") {
+		import memutils.scoped : PoolStack;
+		if (PoolStack.empty()) {
+			UnConst!(T)[] ret;
+			ret.length = n;
+			ret[0 .. array.length] = array[];
+			array = null;
+			return cast(T[])ret;
+		}
+	}
 	mixin(translateAllocator());
 	auto allocator = thisAllocator();
 	// logTrace("realloc before ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
@@ -145,8 +171,27 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = size_t.max, size_t offset = 0)
 {
 	import core.memory : GC;
+
 	mixin(translateAllocator());
-	auto allocator = thisAllocator(true); // freeing. Avoid allocating in a dtor
+	static if (hasElaborateDestructor!T) { // calls destructors, but not for indirections...
+		size_t i;
+		foreach (ref e; array) {
+			if (i < offset) { i++; continue; }
+			if (i + offset == max_destroy) break;
+			static if (is(T == struct) && !isPointer!T) .destroy(e);
+			i++;
+		}
+	}	
+	static if (ALLOC.stringof != "PoolStack")
+		auto allocator = thisAllocator(true); // freeing. Avoid allocating in a dtor
+	else {
+		import memutils.scoped : PoolStack;
+		if (PoolStack.empty()) {
+			array = null;
+			return;
+		}
+		auto allocator = thisAllocator();
+	}
 	if (!allocator) return;
 
 	// logTrace("free ", ALLOC.stringof, ": ", cast(void*)array.ptr, ":", array.length);
@@ -157,15 +202,6 @@ void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = si
 		GC.removeRange(array.ptr);
 	}
 
-	static if (hasElaborateDestructor!T) { // calls destructors, but not for indirections...
-		size_t i;
-		foreach (ref e; array) {
-			if (i < offset) { i++; continue; }
-			if (i + offset == max_destroy) break;
-			static if (is(T == struct) && !isPointer!T) .destroy(e);
-			i++;
-		}
-	}
 	allocator.free((cast(void*)array.ptr)[0 .. array.length * T.sizeof]);
 	array = null;
 }

@@ -649,6 +649,8 @@ struct Vector(T, ALLOC = ThreadMem)
 			return 0;
 	}
 
+	alias put = pushBack;
+
 	pragma(inline, true) size_t pushBack(Stuff...)(Stuff stuff) 
 		if (!isNumeric!Stuff || !is ( T == ubyte ))
 	{

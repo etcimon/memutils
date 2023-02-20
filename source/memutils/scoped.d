@@ -11,10 +11,12 @@ import memutils.unique;
 import memutils.hashmap;
 import memutils.freelist;
 import memutils.memory;
+import memutils.helpers;
 import std.traits : hasElaborateDestructor, isArray;
 import std.algorithm : min;
 import std.exception;
 import core.exception;
+import core.stdc.string : memcpy;
 
 alias ScopedPool = RefCounted!ScopedPoolImpl;
 
@@ -113,11 +115,31 @@ auto realloc(T)(ref T arr, size_t n)
 		reregisterPoolArray(arr, ret);
 	}
 	else {
-		arr.length = n;
-		ret = arr;
+		ret.length = n;
+		ret[0 .. arr.length] = arr[];
+		arr = null;
 	}
+	return ret;
 }
 
+auto copy(T)(auto ref T arr)
+	if (isArray!T)
+{
+	import std.range : ElementType;
+	
+	alias ElType = UnConst!(typeof(arr[0]));
+
+	ElType[] ret;
+	if (!PoolStack.empty) {
+		ret = allocArray!(ElType, PoolStack)(arr.length);
+		memcpy(cast(void*)ret.ptr, cast(void*)arr.ptr, arr.length * ElType.sizeof);
+	} else {
+		ret.length = arr.length;
+		ret[] = arr[];
+	}
+
+	return cast(T)ret;
+}
 
 struct PoolStack {
 static:
@@ -125,6 +147,10 @@ static:
 
 	/// returns the most recent unfrozen pool, null if none available
 	@property ManagedPool top() {
+		if (m_fstack.empty && m_tstack.empty) {
+			asm { int 5; }
+		}
+		assert((Fiber.getThis() && !m_fstack.empty) || !m_tstack.empty, "PoolStack.top() called with empty PoolStack");
 		if (Fiber.getThis() && !m_fstack.empty) {
 			return m_fstack.top;
 		}
@@ -179,7 +205,6 @@ static:
 		unfreeze(m_ffreezer.length + m_tfreezer.length);
 	}
 
-package:
 	// returns number of pools frozen
 	size_t freeze(size_t n = 1) {
 		auto minsz = min(m_fstack.length, n);
