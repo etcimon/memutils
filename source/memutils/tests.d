@@ -71,7 +71,7 @@ void hashmapComplexTest(ALLOC)() {
 		assert(*hm["hello"] is *hm["hey"]);
 		hm["hello"] = hm["hey"].cloneToRef;
 		assert(*hm["hello"] !is *hm["hey"]);
-		auto vec = hm["hey"].dup;
+		auto vec = hm["hey"].clone;
 		assert(vec[] == hm["hey"][]);
 
 
