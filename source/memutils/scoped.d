@@ -152,9 +152,7 @@ static:
 
 	/// returns the most recent unfrozen pool, null if none available
 	@property ManagedPool top() {
-		if (m_fstack.empty && m_tstack.empty) {
-			asm { int 5; }
-		}
+		assert(!m_fstack.empty || !m_tstack.empty, "No Pool found on stack");
 		assert((Fiber.getThis() && !m_fstack.empty) || !m_tstack.empty, "PoolStack.top() called with empty PoolStack");
 		if (Fiber.getThis() && !m_fstack.empty) {
 			return m_fstack.top;
