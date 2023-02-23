@@ -295,7 +295,7 @@ void scopedTest() {
 		PoolStack.freeze(1);
 		//logDebug("Frozen");
 		assert(PoolStack.empty, "Stack is not empty");
-		PoolStack.pop();
+		PoolStack.unfreeze(1); PoolStack.pop();
 		assert(num.a == 0, "Dtor not called");
 	}
 	{
