@@ -1,4 +1,5 @@
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/etcimon/memutils?branch=master&svg=true)](https://ci.appveyor.com/project/etcimon/memutils)
+[![CI](https://github.com/etcimon/memutils/actions/workflows/ci.yml/badge.svg)](https://github.com/etcimon/memutils/actions/workflows/ci.yml)
  
 The `memutils` library provides a set of 4 enhanced allocators tweaked for better performance depending on the scope.
 A new allocation syntax comes with many benefits, including the easy replacement of allocators.
