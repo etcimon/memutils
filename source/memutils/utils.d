@@ -162,7 +162,7 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
         else
                 GC.addRange(mem.ptr, mem.length);
 		// Zero out unused capacity to prevent gc from seeing false pointers
-		memset(mem.ptr + (array.length * T.sizeof), 0, (n - array.length) * T.sizeof);
+		memset(cast(void*)(mem.ptr + (array.length * T.sizeof)), 0, (n - array.length) * T.sizeof);
 	}
 	
 	return ret;
@@ -243,7 +243,7 @@ static:
 	{
 		alias ElType = UnConst!(typeof(arr[0]));
 		auto arr_copy = allocArray!(ElType, THIS)(arr.length);
-		memcpy(arr_copy.ptr, arr.ptr, arr.length * ElType.sizeof);
+		memcpy(cast(void*)arr_copy.ptr, cast(void*)arr.ptr, arr.length * ElType.sizeof);
 
 		return cast(T)arr_copy;
 	}

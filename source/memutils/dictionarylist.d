@@ -63,7 +63,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 		
 		if (m_extendedFieldCount > 0) {
 			ret.m_extendedFields = allocArray!(Field, ALLOC)(m_extendedFieldCount);
-			memcpy(ret.m_extendedFields.ptr, m_extendedFields.ptr, (m_extendedFieldCount)*Field.sizeof);
+			memcpy(cast(void*)ret.m_extendedFields.ptr, cast(void*)m_extendedFields.ptr, (m_extendedFieldCount)*Field.sizeof);
 			ret.m_extendedFieldCount = (cast()this).m_extendedFieldCount;
 		}
 		return ret;
@@ -311,12 +311,12 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 			m_extendedFields = m_extendedFields.ptr[0 .. m_extendedFieldCount];
 			m_extendedFieldCount = (m_extendedFieldCount + n)*3/2;
 			m_extendedFields = reallocArray!(Field, ALLOC)(m_extendedFields, m_extendedFieldCount)[0 .. oldsz + n];
-			memset(m_extendedFields.ptr + oldsz, 0, (m_extendedFieldCount-oldsz)*Field.sizeof);
+			memset(cast(void*)(m_extendedFields.ptr + oldsz), 0, (m_extendedFieldCount-oldsz)*Field.sizeof);
 		}
 		else {
 			m_extendedFieldCount = 16;
 			m_extendedFields = allocArray!(Field, ALLOC)(16).ptr[0 .. n];
-			memset(m_extendedFields.ptr, 0, m_extendedFieldCount*Field.sizeof);
+			memset(cast(void*)m_extendedFields.ptr, 0, m_extendedFieldCount*Field.sizeof);
 		}
 	}
 

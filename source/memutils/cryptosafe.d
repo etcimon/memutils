@@ -82,8 +82,8 @@ public:
 				void[] p = ms_zeroise.alloc(n);
 				if (!p) 
 					p = m_secondary.alloc(n);
-				memmove(p.ptr, mem.ptr, mem.length);
-				memset(mem.ptr, 0, mem.length);
+				memmove(cast(void*)p.ptr, cast(void*)mem.ptr, mem.length);
+				memset(cast(void*)mem.ptr, 0, mem.length);
 				ms_zeroise.free(mem);
 				return p;
 			}
@@ -116,7 +116,7 @@ public:
 			}
 		}
 		if (!skip_zero)
-			memset(mem.ptr, 0, mem.length);
+			memset(cast(void*)mem.ptr, 0, mem.length);
 		static if (HasSecurePool)
 			if (ms_deinit || ms_zeroise.free(mem))
 				return;

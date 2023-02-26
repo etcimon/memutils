@@ -73,7 +73,7 @@ struct Vector(T, ALLOC = ThreadMem)
 			}
 			else
 			{
-				memmove(_payload.ptr, p.ptr, T.sizeof*p.length);
+				memmove(cast(void*)_payload.ptr, p.ptr, T.sizeof*p.length);
 			}
 		}
 		
@@ -131,7 +131,7 @@ struct Vector(T, ALLOC = ThreadMem)
 					// Zero out unused capacity to prevent gc from seeing
 					// false pointers
 					static if (hasIndirections!T)
-						memset(_payload.ptr + newLength, 0, (_payload.length - newLength) * T.sizeof);
+						memset(cast(void*)(_payload.ptr + newLength), 0, (_payload.length - newLength) * T.sizeof);
 				}
 				_payload = _payload.ptr[0 .. newLength];
 				return;
@@ -145,7 +145,7 @@ struct Vector(T, ALLOC = ThreadMem)
 				static if (!isImplicitlyConvertibleLegacy!(T, T)) {
 					T t = T();
 					foreach (size_t i; startEmplace .. length) 
-						memmove(_payload.ptr + i, &t, T.sizeof); 
+						memmove(cast(void*)(_payload.ptr + i), cast(void*)&t, T.sizeof); 
 					
 				} else
 					initializeAll(_payload.ptr[startEmplace .. length]);
@@ -188,7 +188,7 @@ struct Vector(T, ALLOC = ThreadMem)
 			}
 			assert(capacity >= length + stuff.length && _payload.ptr);
 						
-			memmove(_payload.ptr + _payload.length, stuff.ptr, stuff.length);
+			memmove(cast(void*)(_payload.ptr + _payload.length), stuff.ptr, stuff.length);
 			_payload = _payload.ptr[0 .. _payload.length + stuff.length];
 			
 			return 1;
@@ -206,8 +206,8 @@ struct Vector(T, ALLOC = ThreadMem)
 			
 			T* t = &stuff;
 			
-			memmove(_payload.ptr + _payload.length, t, T.sizeof);
-			memset(t, 0, T.sizeof);
+			memmove(cast(void*)(_payload.ptr + _payload.length), cast(void*)t, T.sizeof);
+			memset(cast(void*)t, 0, T.sizeof);
 			_payload = _payload.ptr[0 .. _payload.length + 1];
 			
 			return 1;
@@ -309,8 +309,8 @@ struct Vector(T, ALLOC = ThreadMem)
 			// swap each element with a duplicate
 			foreach (size_t i, ref el; _data._payload) {
 				T t = el.move;
-				memmove(vec._data._payload.ptr + i, &t, T.sizeof);
-				memset(&t, 0, T.sizeof);
+				memmove(cast(void*)(vec._data._payload.ptr + i), cast(void*)&t, T.sizeof);
+				memset(cast(void*)&t, 0, T.sizeof);
 			}
 			return vec.move();
 		} else static if (__traits(hasMember, T, "clone")) // Element is @disable this(this), doesn't have move() but has clone
@@ -319,8 +319,8 @@ struct Vector(T, ALLOC = ThreadMem)
 			// swap each element with a duplicate
 			foreach (size_t i, ref el; _data._payload) {
 				T t = el.clone;
-				memmove(vec._data._payload.ptr + i, &t, T.sizeof);
-				memset(&t, 0, T.sizeof);
+				memmove(cast(void*)(vec._data._payload.ptr + i), cast(void*)&t, T.sizeof);
+				memset(cast(void*)&t, 0, T.sizeof);
 			}
 			return vec.move();
 		} else static if (__traits(hasMember, T, "dup")) // Element is @disable this(this), can only be duplicated in the GC
@@ -329,8 +329,8 @@ struct Vector(T, ALLOC = ThreadMem)
 			// swap each element with a duplicate
 			foreach (size_t i, ref el; _data._payload) {
 				T t = el.dup;
-				memmove(vec._data._payload.ptr + i, &t, T.sizeof);
-				memset(&t, 0, T.sizeof);
+				memmove(cast(void*)(vec._data._payload.ptr + i), cast(void*)&t, T.sizeof);
+				memset(cast(void*)&t, 0, T.sizeof);
 			}
 			return vec.move();
 		} else static assert(false, "Cannot clone() the element: " ~ T.stringof);
@@ -482,8 +482,8 @@ struct Vector(T, ALLOC = ThreadMem)
 		static if (__traits(compiles, {_data._payload[i] = cast(T) val; }()))
 			_data._payload[i] = cast(T) val;
 		else { // swap
-			memmove(_data._payload.ptr + i, &val, U.sizeof);
-			memset(&val, 0, U.sizeof);
+			memmove(cast(void*)(_data._payload.ptr + i), cast(void*)&val, U.sizeof);
+			memset(cast(void*)&val, 0, U.sizeof);
 		}
 	}
 	/**
@@ -720,8 +720,8 @@ struct Vector(T, ALLOC = ThreadMem)
 		static if (hasElaborateDestructor!T)
 			.destroy(_data._payload[0]);
 		if (_data._payload.length > 1) {
-			memmove(_data._payload.ptr, _data._payload.ptr + 1, T.sizeof * (_data._payload.length - 1));
-			memset(_data._payload.ptr + _data._payload.length - 1, 0, T.sizeof);
+			memmove(cast(void*)_data._payload.ptr, cast(void*)(_data._payload.ptr + 1), T.sizeof * (_data._payload.length - 1));
+			memset(cast(void*)(_data._payload.ptr + _data._payload.length - 1), 0, T.sizeof);
 		}
 		_data._payload.length -= 1;	
 	}
@@ -764,8 +764,8 @@ struct Vector(T, ALLOC = ThreadMem)
 		reserve(length + 1);
 
 		// Move elements over by one slot
-		memmove(_data._payload.ptr + i + 1,
-				_data._payload.ptr + i,
+		memmove(cast(void*)(_data._payload.ptr + i + 1),
+				cast(void*)(_data._payload.ptr + i),
 				T.sizeof * (length - i));
 		emplace(_data._payload.ptr + i, stuff);
 		_data._payload = _data._payload.ptr[0 .. _data._payload.length + 1];
@@ -783,8 +783,8 @@ struct Vector(T, ALLOC = ThreadMem)
 			if (!extra) return 0;
 			reserve(length + extra);
 			// Move elements over by extra slots
-			memmove(_data._payload.ptr + i + extra,
-				_data._payload.ptr + i,
+			memmove(cast(void*)(_data._payload.ptr + i + extra),
+				cast(void*)(_data._payload.ptr + i),
 				T.sizeof * (length - i));
 			foreach (p; _data._payload.ptr + i ..
 				_data._payload.ptr + i + extra)

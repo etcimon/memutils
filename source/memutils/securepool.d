@@ -215,11 +215,11 @@ package:
 			m_pool_unaligned = pool_ptr[0 .. pool_size];
 
 			import core.stdc.string : memset;
-			memset(m_pool_unaligned.ptr, 0, m_pool_unaligned.length);
+			memset(cast(void*)m_pool_unaligned.ptr, 0, m_pool_unaligned.length);
 			
-			if (mlock(m_pool_unaligned.ptr, m_pool_unaligned.length) != 0)
+			if (mlock(cast(void*)m_pool_unaligned.ptr, m_pool_unaligned.length) != 0)
 			{
-				munmap(m_pool_unaligned.ptr, m_pool_unaligned.length);
+				munmap(cast(void*)m_pool_unaligned.ptr, m_pool_unaligned.length);
 				m_pool_unaligned = null;
 				import core.stdc.errno;
 				logError("Could not mlock " ~ to!string(pool_size) ~ " bytes: " ~ errno().to!string);
@@ -239,9 +239,9 @@ package:
 		if (m_pool)
 		{
 			import core.stdc.string : memset;
-			memset(m_pool_unaligned.ptr, 0, m_pool_unaligned.length);
-			munlock(m_pool_unaligned.ptr, m_pool_unaligned.length);
-			munmap(m_pool_unaligned.ptr, m_pool_unaligned.length);
+			memset(cast(void*)m_pool_unaligned.ptr, 0, m_pool_unaligned.length);
+			munlock(cast(void*)m_pool_unaligned.ptr, m_pool_unaligned.length);
+			munmap(cast(void*)m_pool_unaligned.ptr, m_pool_unaligned.length);
 			m_pool = null;
 			m_pool_unaligned = null;
 		}
