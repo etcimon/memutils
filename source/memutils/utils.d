@@ -199,7 +199,7 @@ void freeArray(T, ALLOC = ThreadMem)(auto ref T[] array, size_t max_destroy = si
 	else enum NOGC = false;
 	
 	static if (ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
-		GC.removeRange(array.ptr);
+		GC.removeRange(cast(void*)array.ptr);
 	}
 
 	allocator.free((cast(void*)array.ptr)[0 .. array.length * T.sizeof]);
