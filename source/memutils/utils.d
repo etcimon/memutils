@@ -156,7 +156,7 @@ T[] reallocArray(T, ALLOC = ThreadMem)(T[] array, size_t n) {
 	else enum NOGC = false;
 	
 	static if (ALLOC.stringof != "AppMem" && hasIndirections!T && !NOGC) {
-		GC.removeRange(array.ptr);
+		GC.removeRange(cast(void*)array.ptr);
 		static if (__traits(compiles, { GC.addRange(null, 0, typeid(string)); }()))
                 GC.addRange(mem.ptr, mem.length, typeid(T));
         else
