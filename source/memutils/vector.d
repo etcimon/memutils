@@ -300,7 +300,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	@property Vector!(T, ALLOC) clone() const
 	{
 		static if (__traits(compiles, { T a; T b; a = b; } ())) {
-			auto ret = Vector!(T, ALLOC)(cast(T[])_data._payload);
+			auto ret = Vector!(T, ALLOC)(cast(T[])(cast()this)._data._payload);
 			return ret.move;
 		}
 		else static if (__traits(hasMember, T, "move")) // Element is @disable this(this) but has move()
