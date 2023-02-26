@@ -41,5 +41,5 @@ jobs:
       - id: build
         name: Test building
         run: |
-          dub build --build=unittest --arch=$ARCH --build=unittest-cov
+          dub test --arch=$ARCH
         shell: bash
