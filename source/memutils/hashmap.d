@@ -140,15 +140,16 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 					return ret;
 		return 0;
 	}
-	
-	int opApply(int delegate(Value) del) {
+
+	int opApply(int delegate(ref Value) del)
+	{
 		foreach (i; 0 .. m_table.length)
 			if (!Traits.equals(m_table[i].key, Traits.clearValue))
 				if (auto ret = del(m_table[i].value))
 					return ret;
 		return 0;
 	}
-		
+			
 	int opApply(int delegate(in ref Key, in ref Value) del)
 	const {
 		foreach (i; 0 .. m_table.length)
@@ -158,7 +159,16 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		return 0;
 	}
 		
-	int opApply(int delegate(Key, Value) del)
+	int opApply(int delegate(in ref Key, in ref Value) del)
+	{
+		foreach (i; 0 .. m_table.length)
+			if (!Traits.equals(m_table[i].key, Traits.clearValue))
+				if (auto ret = del(m_table[i].key, m_table[i].value))
+					return ret;
+		return 0;
+	}
+
+	int opApply(int delegate(in ref Key, ref Value) del)
 	{
 		foreach (i; 0 .. m_table.length)
 			if (!Traits.equals(m_table[i].key, Traits.clearValue))
