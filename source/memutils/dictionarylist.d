@@ -163,7 +163,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	const {
 		import std.array;
 		auto ret = Vector!(ValueType, ALLOC)(0);
-		this.opApply( (k, const ref v) {
+		this.opApply( (const ref k, const ref v) {
 				// static if (is(ValueType == string)) logTrace("Checking field: ", v);
 				//logTrace("Looping ", k, " => ", v);
 				if (matches(key, k)) {
@@ -269,7 +269,8 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	{
 		return this.opApply((KeyType key, ref ValueType val) { return del(val); });
 	}
-		
+	
+	
 	/// ditto
 	int opApply(int delegate(ref const(ValueType) val) del) const
 	{
