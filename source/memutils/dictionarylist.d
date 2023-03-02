@@ -269,13 +269,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 	{
 		return this.opApply((KeyType key, ref ValueType val) { return del(val); });
 	}
-	
-	/// ditto
-	int opApply(int delegate(KeyType key, ref const(ValueType) val) del) const
-	{
-		return (cast() this).opApply(cast(int delegate(KeyType, ref ValueType)) del);
-	}
-	
+		
 	/// ditto
 	int opApply(int delegate(ref const(ValueType) val) del) const
 	{
