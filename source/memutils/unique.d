@@ -16,8 +16,8 @@ import memutils.allocators;
 import memutils.constants;
 import memutils.utils;
 import memutils.rbtree;
-
-	import memutils.helpers;
+import core.sync.mutex;
+import memutils.helpers;
 import std.conv : to;
 
 static if (__VERSION__ >= 2071) {

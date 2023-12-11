@@ -10,14 +10,16 @@ import std.conv : emplace, to;
 */
 final class DebugAllocator(Base : Allocator) : Allocator {
 	private {
-		static if (HasDictionaryDebugger) DictionaryListRef!(size_t, size_t, Malloc) m_blocks;
-		else HashMap!(size_t, size_t, Malloc) m_blocks;
 		size_t m_bytes;
 		size_t m_maxBytes;
 		void function(size_t) m_allocSizeCallback;
 		void function(size_t) m_freeSizeCallback;
 	}
-	package Base m_baseAlloc;
+	package {
+		Base m_baseAlloc;
+		static if (HasDictionaryDebugger) DictionaryListRef!(size_t, size_t, Malloc) m_blocks;
+		else HashMap!(size_t, size_t, Malloc) m_blocks;
+	}
 	
 	this()
 	{

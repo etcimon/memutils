@@ -11,13 +11,14 @@
 */
 module memutils.securepool;
 import memutils.constants;
+
+version(TLSGC){} else import core.sync.mutex;
 static if (HasSecurePool):
 
 package:
 
 import memutils.rbtree;
 import std.algorithm;
-import core.sync.mutex;
 import std.conv : to;
 import memutils.allocators;
 import memutils.utils : Malloc;
@@ -83,67 +84,72 @@ final class SecurePool
 public:
 	void[] alloc(size_t n)
 	{
-		synchronized(m_mtx) {
-			if (!m_pool)
-				return null;
-			
-			if (n > m_pool.length || n > SecurePool_MLock_Max)
-				return null;
-			
-			void[]* best_fit_ref;
-			void[] best_fit;
-			size_t i;
-			foreach (ref slot; m_freelist[])
-			{
-				// If we have a perfect fit, use it immediately
-				if (slot.length == n && (cast(size_t)slot.ptr % alignment) == 0)
-				{
-					m_freelist.remove(slot);					
-					assert(cast(size_t)(slot.ptr - m_pool.ptr) % alignment == 0, "Returning correctly aligned pointer");
-					
-					return slot;
-				}
-				
-				if (slot.length >= (n + padding_for_alignment(cast(size_t)slot.ptr, alignment) ) &&
-					( !best_fit_ref || (best_fit.length > slot.length) ) )
-				{
-					best_fit_ref = &slot;
-					best_fit = slot;
-				}
-				i++;
-			}
-			
-			if (best_fit_ref)
-			{
-				const size_t alignment_padding = padding_for_alignment(cast(size_t)best_fit.ptr, alignment);
-				
-				// absorb misalignment
-				void[] remainder = (best_fit.ptr + n + alignment_padding)[0 .. best_fit.length - (n + alignment_padding)];
-				if (remainder.length > 0) {
-					*best_fit_ref = remainder;
-				} else {
-					m_freelist.remove(best_fit);
-				}
-
-				size_t offset = best_fit.ptr - m_pool.ptr;
-				
-				assert((cast(size_t)(m_pool.ptr) + offset + alignment_padding) % alignment == 0, "Returning correctly aligned pointer");
-				
-				return (best_fit.ptr + alignment_padding)[0 .. n];
-			}
-			
-			return null;
+		
+		version(TLSGC) { } else {
+			m_mtx.lock_nothrow();
+			scope(exit) m_mtx.unlock_nothrow();
 		}
+		if (!m_pool)
+			return null;
+		
+		if (n > m_pool.length || n > SecurePool_MLock_Max)
+			return null;
+		
+		void[]* best_fit_ref;
+		void[] best_fit;
+		size_t i;
+		foreach (ref slot; m_freelist[])
+		{
+			// If we have a perfect fit, use it immediately
+			if (slot.length == n && (cast(size_t)slot.ptr % alignment) == 0)
+			{
+				m_freelist.remove(slot);					
+				assert(cast(size_t)(slot.ptr - m_pool.ptr) % alignment == 0, "Returning correctly aligned pointer");
+				
+				return slot;
+			}
+			
+			if (slot.length >= (n + padding_for_alignment(cast(size_t)slot.ptr, alignment) ) &&
+				( !best_fit_ref || (best_fit.length > slot.length) ) )
+			{
+				best_fit_ref = &slot;
+				best_fit = slot;
+			}
+			i++;
+		}
+		
+		if (best_fit_ref)
+		{
+			const size_t alignment_padding = padding_for_alignment(cast(size_t)best_fit.ptr, alignment);
+			
+			// absorb misalignment
+			void[] remainder = (best_fit.ptr + n + alignment_padding)[0 .. best_fit.length - (n + alignment_padding)];
+			if (remainder.length > 0) {
+				*best_fit_ref = remainder;
+			} else {
+				m_freelist.remove(best_fit);
+			}
+
+			size_t offset = best_fit.ptr - m_pool.ptr;
+			
+			assert((cast(size_t)(m_pool.ptr) + offset + alignment_padding) % alignment == 0, "Returning correctly aligned pointer");
+			
+			return (best_fit.ptr + alignment_padding)[0 .. n];
+		}
+		
+		return null;
 	}
 
 	bool has(void[] mem) {
-		synchronized(m_mtx) {
-			if (!m_pool)
-				return false;
-			
-			if (!ptr_in_pool(m_pool, mem.ptr, mem.length))
-				return false;
+		version(TLSGC) { } else {
+			m_mtx.lock_nothrow();
+			scope(exit) m_mtx.unlock_nothrow();
 		}
+		if (!m_pool)
+			return false;
+		
+		if (!ptr_in_pool(m_pool, mem.ptr, mem.length))
+			return false;
 		return true;
 	}
 
@@ -151,52 +157,57 @@ public:
 	{
 		if (!has(mem)) return false;
 
-		synchronized(m_mtx) {
-			import std.range : front, empty;
-
-
-			bool is_merged;
-			void[] combined;
-			
-			auto upper_range = m_freelist.upperBoundRange(mem);
-			if (!upper_range.empty && upper_range.front().ptr > (mem.ptr + mem.length) && (upper_range.front().ptr - alignment) < (mem.ptr + mem.length))
-			{
-				//import std.stdio : writeln;
-				logTrace("Pool item (>): ", upper_range.front().ptr, " .. ", upper_range.front().ptr + upper_range.front().length, " <==> ", mem.ptr, " .. ", mem.ptr + mem.length);
-				
-				// we can merge with the next block
-				void[] upper_elem = upper_range.front();
-				size_t alignment_padding = upper_elem.ptr - (mem.ptr + mem.length);
-				assert(alignment_padding < alignment, "Alignment padding error on upper bound");
-				combined = mem.ptr[0 .. mem.length + alignment_padding + upper_elem.length];
-				
-				m_freelist.remove(upper_elem);
-				mem = combined;
-			}
-			
-			auto lower_range = m_freelist.lowerBoundRange(mem);
-			if (!lower_range.empty && (lower_range.back().ptr + lower_range.back().length) < mem.ptr && (lower_range.back().ptr + lower_range.back().length + alignment) > mem.ptr)
-			{
-				// import std.stdio : writeln;
-				logTrace("Pool item (<): ", lower_range.back().ptr, " .. ", lower_range.back().ptr + lower_range.back().length, " <==> ", mem.ptr, " .. ", mem.ptr + mem.length);
-				// we can merge with the next block
-				void[] lower_elem = lower_range.back();
-				size_t alignment_padding = mem.ptr - ( lower_range.back().ptr + lower_range.back().length );
-				assert(alignment_padding < alignment, "Alignment padding error on lower bound " ~ mem.ptr.to!string ~ ": " ~ alignment_padding.to!string ~ "/" ~ alignment.to!string);
-				combined = lower_elem.ptr[0 .. lower_elem.length + alignment_padding + mem.length];
-				m_freelist.remove(lower_elem);
-				mem = combined;
-			}
-			m_freelist.insert(mem);
-			return true;
+		version(TLSGC) { } else {
+			m_mtx.lock_nothrow();
+			scope(exit) m_mtx.unlock_nothrow();
 		}
+		import std.range : front, empty;
+
+
+		bool is_merged;
+		void[] combined;
+		
+		auto upper_range = m_freelist.upperBoundRange(mem);
+		if (!upper_range.empty && upper_range.front().ptr > (mem.ptr + mem.length) && (upper_range.front().ptr - alignment) < (mem.ptr + mem.length))
+		{
+			//import std.stdio : writeln;
+			logTrace("Pool item (>): ", upper_range.front().ptr, " .. ", upper_range.front().ptr + upper_range.front().length, " <==> ", mem.ptr, " .. ", mem.ptr + mem.length);
+			
+			// we can merge with the next block
+			void[] upper_elem = upper_range.front();
+			size_t alignment_padding = upper_elem.ptr - (mem.ptr + mem.length);
+			assert(alignment_padding < alignment, "Alignment padding error on upper bound");
+			combined = mem.ptr[0 .. mem.length + alignment_padding + upper_elem.length];
+			
+			m_freelist.remove(upper_elem);
+			mem = combined;
+		}
+		
+		auto lower_range = m_freelist.lowerBoundRange(mem);
+		if (!lower_range.empty && (lower_range.back().ptr + lower_range.back().length) < mem.ptr && (lower_range.back().ptr + lower_range.back().length + alignment) > mem.ptr)
+		{
+			// import std.stdio : writeln;
+			logTrace("Pool item (<): ", lower_range.back().ptr, " .. ", lower_range.back().ptr + lower_range.back().length, " <==> ", mem.ptr, " .. ", mem.ptr + mem.length);
+			// we can merge with the next block
+			void[] lower_elem = lower_range.back();
+			size_t alignment_padding = mem.ptr - ( lower_range.back().ptr + lower_range.back().length );
+			assert(alignment_padding < alignment, "Alignment padding error on lower bound " ~ mem.ptr.to!string ~ ": " ~ alignment_padding.to!string ~ "/" ~ alignment.to!string);
+			combined = lower_elem.ptr[0 .. lower_elem.length + alignment_padding + mem.length];
+			m_freelist.remove(lower_elem);
+			mem = combined;
+		}
+		m_freelist.insert(mem);
+		return true;
+	
 	}
 package:
 	this()
 	{
 		logTrace("Loading SecurePool instance ...");
-		m_mtx = new Mutex;
 		
+		version(TLSGC) { } else {
+			m_mtx = new Mutex;
+		}
 		auto pool_size = mlock_limit();
 		
 		if (pool_size)
@@ -248,7 +259,7 @@ package:
 	}
 	
 private:
-	__gshared Mutex m_mtx;
+	version(TLSGC){} else __gshared Mutex m_mtx;
 	RBTree!(void[], "a.ptr < b.ptr", false, Malloc) m_freelist;
 	void[] m_pool;
 	void[] m_pool_unaligned;

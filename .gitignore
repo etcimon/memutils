@@ -1,0 +1,4 @@
+.dub
+*.exe
+*.lib
+*.pdb

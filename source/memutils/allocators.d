@@ -33,6 +33,27 @@ static if (HasDebugAllocations) {
 	static if (HasCryptoSafe)
 		alias CryptoSafeAllocator = DebugAllocator!(SecureAllocator!(AutoFreeListAllocator!(MallocAllocator)));
 	alias ProxyGCAllocator = DebugAllocator!GCAllocator;
+	version(TLSGC) {
+		static ~this() {
+			debug { import std.stdio : writefln; try { 
+				writefln("Closing with %d bytes in LocklessAllocator", getAllocator!(LocklessAllocator)().bytesAllocated() ); 
+				writefln("Closing with %d bytes in CryptoSafeAllocator", getAllocator!(CryptoSafeAllocator)().bytesAllocated() ); 
+			} catch (Exception) {} }
+			assert(getAllocator!(LocklessAllocator)().bytesAllocated() == 0);
+			assert(getAllocator!(CryptoSafeAllocator)().bytesAllocated() == 0);
+		}
+	} else {
+		shared static ~this() {
+			debug { import std.stdio : writefln; try { 
+				writefln("Closing with %d bytes in LocklessAllocator", getAllocator!(LocklessAllocator)().bytesAllocated() ); 
+				writefln("Closing with %d bytes in CryptoSafeAllocator", getAllocator!(CryptoSafeAllocator)().bytesAllocated() ); 
+			} catch (Exception) {} }
+			assert(getAllocator!(LocklessAllocator)().bytesAllocated() == 0);
+			assert(getAllocator!(CryptoSafeAllocator)().bytesAllocated() == 0);
+			
+		}
+
+	}
 
 }
 else {
