@@ -35,18 +35,30 @@ static if (HasDebugAllocations) {
 	alias ProxyGCAllocator = DebugAllocator!GCAllocator;
 	version(TLSGC) {
 		static ~this() {
-			debug { import std.stdio : writefln; try { 
-				writefln("Closing with %d bytes in LocklessAllocator", getAllocator!(LocklessAllocator)().bytesAllocated() ); 
+			debug { import std.stdio : writefln; try { 			
+				writefln("Closing with %d bytes in LocklessAllocator", getAllocator!(LocklessAllocator)().bytesAllocated() );
+				version(LogAllocations) if (getAllocator!(LocklessAllocator)().bytesAllocated() > 0) {
+					getAllocator!(LocklessAllocator)().printMap();
+				}
 				writefln("Closing with %d bytes in CryptoSafeAllocator", getAllocator!(CryptoSafeAllocator)().bytesAllocated() ); 
+				version(LogAllocations) if (getAllocator!(CryptoSafeAllocator)().bytesAllocated() > 0) {
+					getAllocator!(CryptoSafeAllocator)().printMap();
+				}
 			} catch (Exception) {} }
 			assert(getAllocator!(LocklessAllocator)().bytesAllocated() == 0);
 			assert(getAllocator!(CryptoSafeAllocator)().bytesAllocated() == 0);
 		}
 	} else {
 		shared static ~this() {
-			debug { import std.stdio : writefln; try { 
-				writefln("Closing with %d bytes in LocklessAllocator", getAllocator!(LocklessAllocator)().bytesAllocated() ); 
+			debug { import std.stdio : writefln, writeln; try { 
+				writefln("Closing with %d bytes in LocklessAllocator", getAllocator!(LocklessAllocator)().bytesAllocated() );
+				version(LogAllocations) if (getAllocator!(LocklessAllocator)().bytesAllocated() > 0) {
+					getAllocator!(LocklessAllocator)().printMap();
+				}
 				writefln("Closing with %d bytes in CryptoSafeAllocator", getAllocator!(CryptoSafeAllocator)().bytesAllocated() ); 
+				version(LogAllocations) if (getAllocator!(CryptoSafeAllocator)().bytesAllocated() > 0) {
+					getAllocator!(CryptoSafeAllocator)().printMap();
+				}
 			} catch (Exception) {} }
 			assert(getAllocator!(LocklessAllocator)().bytesAllocated() == 0);
 			assert(getAllocator!(CryptoSafeAllocator)().bytesAllocated() == 0);

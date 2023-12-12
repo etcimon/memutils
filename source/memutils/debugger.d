@@ -5,6 +5,17 @@ import memutils.dictionarylist;
 import memutils.utils : Malloc;
 import std.conv : emplace, to;
 
+
+version(LogAllocations) static if (HasDebugAllocations) {
+	import std.logger;
+	import std.logger.core : LogLevel;
+
+	static __gshared FileLogger sharedLog;
+	static this() {
+		sharedLog = new FileLogger("allocations.log", LogLevel.trace);
+	}
+}
+
 /**
 * Another proxy allocator used to aggregate statistics and to enforce correct usage.
 */
@@ -70,7 +81,13 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 			}
 		}
 		//logDebug("Alloc ptr: ", ret.ptr, " sz: ", ret.length);
-		
+		version(LogAllocations)  static if (HasDebugAllocations) {
+			try {
+				assert(false);
+			} catch (Throwable t) {
+				sharedLog.tracef("%X %s", ret.ptr, t.toString());
+			}
+		}
 		return ret;
 	}
 	
@@ -101,6 +118,14 @@ final class DebugAllocator(Base : Allocator) : Allocator {
 				m_freeSizeCallback(sz);
 			if (m_allocSizeCallback)
 				m_allocSizeCallback(new_size);
+		}
+		version(LogAllocations) static if (HasDebugAllocations) {
+			try {
+				assert(false);
+			} catch (Throwable t) {
+				sharedLog.tracef("%X %s", ret.ptr, t.toString());
+
+			}
 		}
 		return ret;
 	}
