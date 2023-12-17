@@ -66,9 +66,7 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		if (!m_object) {
 			defaultInit(); 
 			checkInvariants();
-		}
-
-		if (m_object) (*m_refCount)++;		
+		} else (*m_refCount)++;		
 	}
 	
 	void opAssign(U : RefCounted)(in U other) const nothrow

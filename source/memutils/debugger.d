@@ -12,7 +12,7 @@ version(LogAllocations) static if (HasDebugAllocations) {
 
 	static __gshared FileLogger sharedLog;
 	static this() {
-		sharedLog = new FileLogger("allocations.log", LogLevel.trace);
+		sharedLog = new FileLogger("../allocations.log", LogLevel.trace);
 	}
 }
 

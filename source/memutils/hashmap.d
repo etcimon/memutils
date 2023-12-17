@@ -76,7 +76,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		auto idx = this.findIndex(key);
 		if (idx == size_t.max) return default_value;
 		const Value ret = m_table[idx].value;
-		return cast()ret;
+		return cast(Value)ret;
 	}
 	/*	
 	static if (!is(typeof({ Value v; const(Value) vc; v = vc; }))) {
