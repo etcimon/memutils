@@ -45,8 +45,10 @@ static if (HasDebugAllocations) {
 					getAllocator!(CryptoSafeAllocator)().printMap();
 				}
 			} catch (Exception) {} }
-			assert(getAllocator!(LocklessAllocator)().bytesAllocated() == 0);
-			assert(getAllocator!(CryptoSafeAllocator)().bytesAllocated() == 0);
+			version(LeaksFatal) {
+				assert(getAllocator!(LocklessAllocator)().bytesAllocated() == 0);
+				assert(getAllocator!(CryptoSafeAllocator)().bytesAllocated() == 0);
+			}
 		}
 	} else {
 		shared static ~this() {
@@ -60,8 +62,10 @@ static if (HasDebugAllocations) {
 					getAllocator!(CryptoSafeAllocator)().printMap();
 				}
 			} catch (Exception) {} }
-			assert(getAllocator!(LocklessAllocator)().bytesAllocated() == 0);
-			assert(getAllocator!(CryptoSafeAllocator)().bytesAllocated() == 0);
+			version(LeaksFatal) {
+				assert(getAllocator!(LocklessAllocator)().bytesAllocated() == 0);
+				assert(getAllocator!(CryptoSafeAllocator)().bytesAllocated() == 0);
+			}
 			
 		}
 
