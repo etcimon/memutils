@@ -491,8 +491,10 @@ struct FiberPoolStack
 		assert(arr.back.id == cnt[Fiber.getThis()]-1);
 		arr.removeBack();
 		cnt[Fiber.getThis()] = cnt[Fiber.getThis()] - 1;
-		if (arr.empty) 
+		if (arr.empty) {
 			m_pools.remove(f);
+			cnt.remove(f);
+		}
 		if (!empty) logTrace("popped in Fiber Pool of ", length, " top: ", cnt[Fiber.getThis()], " id: ", m_pools[f].back.id);
 	}
 

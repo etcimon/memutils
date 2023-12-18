@@ -13,6 +13,14 @@ template UnConst(T) {
 /// TODO: implement @override on underlying type T, and check for shadowed members.
 mixin template Embed(alias OBJ, alias OWNED)
 {
+	import std.traits : isSomeFunction;
+	static if (!isSomeFunction!OBJ && OWNED.stringof != "false") {
+		~this() {
+			if (OWNED && OBJ) {
+				OBJ.destroy();
+			}
+		}
+	}
 	import std.traits : hasMember;
 	alias TR = typeof(OBJ);
 	static if (is(typeof(*OBJ) == struct))
@@ -20,7 +28,6 @@ mixin template Embed(alias OBJ, alias OWNED)
 	else
 		alias T = TR;
 
-	import std.traits : isSomeFunction;
 	static if (!isSomeFunction!OBJ)
 	@property ref const(T) fallthrough() const return
 	{
