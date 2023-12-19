@@ -30,8 +30,7 @@ import core.thread : thread_isMainThread;
 static if (HasDebugAllocations) {
 	pragma(msg, "Memory debugger enabled");
 	alias LocklessAllocator = DebugAllocator!(AutoFreeListAllocator!(MallocAllocator));
-	static if (HasCryptoSafe)
-		alias CryptoSafeAllocator = DebugAllocator!(SecureAllocator!(AutoFreeListAllocator!(MallocAllocator)));
+	alias CryptoSafeAllocator = DebugAllocator!(SecureAllocator!(AutoFreeListAllocator!(MallocAllocator)));
 	alias ProxyGCAllocator = DebugAllocator!GCAllocator;
 	version(TLSGC) {
 		static ~this() {
@@ -74,8 +73,7 @@ static if (HasDebugAllocations) {
 }
 else {
 	alias LocklessAllocator = AutoFreeListAllocator!(MallocAllocator);
-	static if (HasCryptoSafe)
-		alias CryptoSafeAllocator = SecureAllocator!LocklessAllocator;
+	alias CryptoSafeAllocator = SecureAllocator!LocklessAllocator;
 	alias ProxyGCAllocator = GCAllocator;
 }
 
@@ -114,7 +112,7 @@ pragma(inline, true)
 public auto getAllocator(int ALLOC)(bool is_freeing = false) {
 	static if (ALLOC == LocklessFreeList) alias R = LocklessAllocator;
 	else static if (ALLOC == NativeGC) alias R = ProxyGCAllocator;
-	else static if (HasCryptoSafe && ALLOC == CryptoSafe) alias R = CryptoSafeAllocator;
+	else static if (ALLOC == CryptoSafe) alias R = CryptoSafeAllocator;
 	else static if (ALLOC == Mallocator) alias R = MallocAllocator;
 	else static assert(false, "Invalid allocator specified");
 	return getAllocator!R(is_freeing);

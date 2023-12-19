@@ -11,9 +11,6 @@
 */
 module memutils.cryptosafe;
 import memutils.constants;
-static if (HasCryptoSafe):
-pragma(msg, "Enhanced memory security is enabled.");
-
 import memutils.allocators;
 import memutils.securepool;
 import memutils.debugger;

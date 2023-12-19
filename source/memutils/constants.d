@@ -11,8 +11,6 @@ enum { // overhead allocator definitions, lazily loaded
 enum Mallocator = 0x05; // For use by the DebugAllocator.
 
 const LogLevel = Error;
-version(CryptoSafe) 	const HasCryptoSafe = true;
-else					const HasCryptoSafe = false;
 
 /// uses a swap protected pool on top of CryptoSafeAllocator
 /// otherwise, uses a regular lockless freelist
@@ -28,11 +26,15 @@ else					const HasDictionaryDebugger = false;
 version(EnableDebugger) const HasDebuggerEnabled = true;
 else					  const HasDebuggerEnabled = false;
 version(DisableDebugger)   const DisableDebugAllocations = true;
-else version(VibeNoDebug) const DisableDebugAllocations = true;
 else					const DisableDebugAllocations = false;
+version(unittest) const IsUnittest = true;
+else			const IsUnittest = false;
+debug { const IsDebug = true; } else { const IsDebug = false; }
+
 public:
-static if (HasDebuggerEnabled && !DisableDebugAllocations ) const HasDebugAllocations = true;
-else static if (!DisableDebugAllocations) const HasDebugAllocations = true;
+static if (IsUnittest) 	const HasDebugAllocations = true;
+else static if (HasDebuggerEnabled && !DisableDebugAllocations ) const HasDebugAllocations = true;
+else static if (IsDebug && !DisableDebugAllocations) const HasDebugAllocations = true;
 else					  const HasDebugAllocations = false;
 package:
 version(SkipMemutilsTests) const SkipUnitTests = true;

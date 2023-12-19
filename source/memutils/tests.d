@@ -3,7 +3,7 @@ import memutils.all;
 import core.thread : Fiber;	
 import std.conv : to;
 
-version(MemutilsTests):
+version(unittest):
 static if (!SkipUnitTests && !DisableDebugAllocations):
 
 // Test hashmap, freelists
