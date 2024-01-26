@@ -132,7 +132,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		return &m_table[idx].value;
 	}
 	
-	int opApply(int delegate(in ref Value) del)
+	int opApply(int delegate(in Value) del)
 	const {
 		foreach (i; 0 .. m_table.length)
 			if (!Traits.equals(m_table[i].key, Traits.clearValue))
