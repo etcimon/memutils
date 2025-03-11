@@ -248,7 +248,7 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		}
 
 		if (oldtable) freeArray!(TableEntry, ALLOC)(oldtable, 0);
-		logTrace("Now have ", m_table.length);
+		//logTrace("Now have ", m_table.length);
 	}
 
 	void setupHasher() {
