@@ -273,10 +273,11 @@ void highLevelAllocTest() {
 }
 struct A {
 	int a;
+	bool* destroyed;
 	
 	~this() {
-		//logDebug("Dtor called");
-		a = 0;
+		logDebug("Dtor called a=" ~ a.to!string);
+		if (destroyed) *destroyed = true;
 	}
 }
 
@@ -288,19 +289,23 @@ void scopedTest() {
 	A* num;
 	{ 
 		PoolStack.push();
-		num = alloc!A(0);
+		bool destroyed;
+		num = alloc!A(0, &destroyed);
 		num.a = 2;
 		//logDebug("Freezing");
 		PoolStack.disable(); PoolStack.enable();
 		PoolStack.freeze(1);
 		//logDebug("Frozen");
 		assert(PoolStack.empty, "Stack is not empty");
-		PoolStack.unfreeze(1); PoolStack.pop();
-		assert(num.a == 0, "Dtor not called");
+		PoolStack.unfreeze(1); 
+		logDebug("Unfrozen a=" ~ num.a.to!string);
+		PoolStack.pop();
+		assert(destroyed, "Dtor not called");
 	}
 	{
+		bool destroyed;
 		auto pool1 = ScopedPool();
-		num = alloc!A(0);
+		num = alloc!A(0, &destroyed);
 	}
 
 

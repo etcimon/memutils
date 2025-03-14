@@ -29,6 +29,9 @@ import core.thread : thread_isMainThread;
 
 static if (HasDebugAllocations) {
 	pragma(msg, "Memory debugger enabled");
+	version(LogAllocations) {
+		pragma(msg, "Logging allocations enabled");
+	}
 	alias LocklessAllocator = DebugAllocator!(AutoFreeListAllocator!(MallocAllocator));
 	alias CryptoSafeAllocator = DebugAllocator!(SecureAllocator!(AutoFreeListAllocator!(MallocAllocator)));
 	alias ProxyGCAllocator = DebugAllocator!GCAllocator;

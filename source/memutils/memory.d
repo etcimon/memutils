@@ -59,7 +59,8 @@ final class MallocAllocator : Allocator {
 
 	void[] alloc(size_t sz)
 	{
-		static err = new immutable OutOfMemoryError;
+		import core.exception : AssertError;
+		__gshared AssertError err = new AssertError("Out of memory");
 		auto ptr = .malloc(sz + Allocator.alignment);
 		if (ptr is null) throw err;
 		return adjustPointerAlignment(ptr)[0 .. sz];

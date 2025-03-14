@@ -413,8 +413,8 @@ struct ThreadPoolStack
 	void pop()
 	{
 		assert(!empty);
-		//logTrace("Pop Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
-		auto pool = m_pools.back;
+		logTrace("Pop Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
+		//auto pool = m_pools.back;
 		//assert(pool.id == cnt-1);
 		//--cnt;
 		m_pools.removeBack();
@@ -444,7 +444,7 @@ struct ThreadPoolStack
 		//if (!m_pools.empty) logTrace("Freeze ", n, " in Thread Pool of ", length, " top: ", cnt);
 		//else logTrace("Freeze ", n, " in Thread Pool of ", length, " top: ", cnt, " back id: ", m_pools.back.id);
 		assert(n <= length);
-		auto ret = Array!(ManagedPool, Malloc)(n);
+		auto ret = Vector!(ManagedPool, Malloc)(n);
 		ret[] = m_pools[$-n .. $];
 		m_pools.removeBack(n);
 		//logTrace("Returning ", ret.length);
@@ -629,7 +629,7 @@ struct FiberPoolStack
 		// logDebug("Unfrozen in Fiber Pool of ", length, " top: ", cnt[f], " id: ", m_pools[f].back.id);
 	}
 package:
-	HashMap!(Fiber, int) cnt;
+	HashMap!(Fiber, int, Malloc) cnt;
 	HashMap!(Fiber, Array!(ManagedPool, Malloc), Malloc) m_pools;
 }
 

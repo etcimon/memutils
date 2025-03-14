@@ -58,9 +58,9 @@ final class PoolAllocator(Base : Allocator)
 			m_pools++;
 			pprev = null;
 		}
-		logTrace("0 .. ", aligned_sz, " but remaining: ", p.remaining.length);
+		//logTrace("0 .. ", aligned_sz, " but remaining: ", p.remaining.length);
 		auto ret = p.remaining[0 .. aligned_sz];
-		logTrace("p.remaining: ", aligned_sz, " .. ", p.remaining.length);
+		//logTrace("p.remaining: ", aligned_sz, " .. ", p.remaining.length);
 		p.remaining = p.remaining[aligned_sz .. $];
 		if( !p.remaining.length ){
 			if( pprev ) {
@@ -80,7 +80,7 @@ final class PoolAllocator(Base : Allocator)
 	{
 		auto aligned_sz = alignedSize(arr.length);
 		auto aligned_newsz = alignedSize(newsize);
-		logTrace("realloc: ", arr.ptr, " sz ", arr.length, " aligned: ", aligned_sz, " => ", newsize, " aligned: ", aligned_newsz);
+		//logTrace("realloc: ", arr.ptr, " sz ", arr.length, " aligned: ", aligned_sz, " => ", newsize, " aligned: ", aligned_newsz);
 		if( aligned_newsz <= aligned_sz ) return arr.ptr[0 .. newsize];
 		
 		auto pool = m_freePools;
@@ -107,8 +107,10 @@ final class PoolAllocator(Base : Allocator)
 	{
 		//logDebug("Destroying ", totalSize(), " of data, allocated: ", allocatedSize());
 		// destroy all initialized objects
-		foreach_reverse (ref dtor; m_destructors[])
+		foreach_reverse (ref dtor; m_destructors[]) {
+			logDebug("Calling destructor");
 			dtor();
+		}
 
 		destroy(m_destructors);
 
@@ -129,9 +131,12 @@ final class PoolAllocator(Base : Allocator)
 	void reset()
 	{
 		//logDebug("Reset()");
+		//logDebug("Freeing ", totalSize(), " bytes of data, allocated: ", allocatedSize());
 		freeAll();
 		Pool* pnext;
 		size_t i;
+		//logDebug("Destroying ", totalSize(), " bytes of data, allocated: ", allocatedSize());
+		//logDebug("BaseAllocator: ", Base.stringof);
 		for (auto p = cast(Pool*)m_freePools; p && i < m_pools; (p = pnext), i++) {
 			pnext = p.next;
 			m_baseAllocator.free(p.data);
