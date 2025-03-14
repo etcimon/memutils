@@ -32,7 +32,7 @@ mixin template Embed(alias OBJ, alias OWNED)
 	@property ref const(T) fallthrough() const return
 	{
 		static if (__traits(hasMember, typeof(this), "defaultInit")) {
-			(cast(typeof(this)*)&this).defaultInit();
+			() @trusted {(cast(typeof(this)*)&this).defaultInit();}();
 			checkInvariants();
 		}
 		static if (is(TR == T*)) return *OBJ;
@@ -42,7 +42,7 @@ mixin template Embed(alias OBJ, alias OWNED)
 	@property ref T fallthrough() return
 	{
 		static if (__traits(hasMember, typeof(this), "defaultInit")) {
-			defaultInit();
+			() @trusted { defaultInit(); } ();
 			checkInvariants();
 		}
 		static if (is(TR == T*)) return *OBJ;
