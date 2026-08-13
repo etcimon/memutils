@@ -639,7 +639,7 @@ struct Vector(T, ALLOC = ThreadMem)
 	
 	import std.traits : isNumeric;
 	
-	int opCmp(Alloc)(auto const ref Vector!(T, Alloc) other) const 
+	int opCmp(Alloc)(const auto ref Vector!(T, Alloc) other) const 
 	{
 		if (this[] == other[])
 			return 0;
@@ -820,7 +820,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		return result;
 	}
 
-	bool opEquals()(auto const ref RefCounted!(Vector!(T, ALLOC), ALLOC) other_) const {
+	bool opEquals()(const auto ref RefCounted!(Vector!(T, ALLOC), ALLOC) other_) const {
 		import memutils.constants : logTrace;
 		if (other_.empty && empty())
 			return true;
@@ -832,7 +832,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		return _data._payload[0 .. length] == other_._data._payload[0 .. length];
 	}
 
-	bool opEquals()(auto const ref Vector!(T, ALLOC) other_) const {
+	bool opEquals()(const auto ref Vector!(T, ALLOC) other_) const {
 		if (other_.empty && empty())
 			return true;
 		else if (other_.empty)
@@ -843,7 +843,7 @@ struct Vector(T, ALLOC = ThreadMem)
 		return _data._payload[0 .. length] == other_._data._payload[0 .. length];
 	}
 
-	bool opEquals()(auto const ref T[] other) {
+	bool opEquals()(const auto ref T[] other) {
 		logTrace("other: ", other, " this: ", _data._payload);
 		return other == _data._payload;
 	}

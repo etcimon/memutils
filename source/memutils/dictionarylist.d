@@ -128,7 +128,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
         have the same key, possibly resulting in duplicates. Use opIndexAssign
         if you want to avoid duplicates.
     */
-	void insert()(auto const ref KeyType key, ValueType value)
+	void insert()(const auto ref KeyType key, ValueType value)
 	{
 		auto keysum = computeCheckSumI(key);
 		if (m_fieldCount < m_fields.length) {
@@ -159,7 +159,7 @@ struct DictionaryList(KEY, VALUE, ALLOC = ThreadMem, bool case_sensitive = true,
 
         Note that the version returning an array will allocate using the same allocator for each call.
     */
-	Vector!(ValueType, ALLOC) getValuesAt()(auto const ref KeyType key)
+	Vector!(ValueType, ALLOC) getValuesAt()(const auto ref KeyType key)
 	const {
 		import std.array;
 		auto ret = Vector!(ValueType, ALLOC)(0);

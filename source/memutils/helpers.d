@@ -76,8 +76,14 @@ mixin template Embed(alias OBJ, alias OWNED)
 
 	bool opEquals(U)(auto ref U other) const
 	{
-		defaultInit();
-		return fallthrough().opEquals(other);
+		static if (__traits(hasMember, typeof(this), "defaultInit")) {
+			() @trusted { (cast(typeof(this)*)&this).defaultInit(); }();
+		}
+		// Object.opEquals is mutable on modern D; const Embed (botan AA keys) must not call it raw.
+		static if (__traits(compiles, fallthrough().opEquals(other)))
+			return fallthrough().opEquals(other);
+		else
+			return (cast()fallthrough()).opEquals(cast()other);
 	}
 	
 	int opCmp(U)(auto ref U other) const
@@ -136,7 +142,7 @@ mixin template Embed(alias OBJ, alias OWNED)
 		return fallthrough().opBinary!op(args);
 	}
 	
-	void opIndexAssign(U, V)(auto const ref U arg1, auto const ref V arg2)
+	void opIndexAssign(U, V)(const auto ref U arg1, const auto ref V arg2)
 		if (__traits(hasMember, typeof(fallthrough()), "opIndexAssign"))
 	{		
 		defaultInit();
