@@ -56,7 +56,10 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		auto i = idx;
 		while (true) {
 			m_table[i].key = Traits.clearValue;
-			m_table[i].value = Value.init;
+			static if (is(Value == struct))
+				.destroy(m_table[i].value);
+			else
+				m_table[i].value = Value.init;
 			size_t j = i, r;
 			do {
 				if (++i >= m_table.length) i -= m_table.length;
@@ -93,7 +96,12 @@ struct HashMap(Key, Value, ALLOC = ThreadMem)
 		foreach (i; 0 .. m_table.length)
 			if (!Traits.equals(m_table[i].key, Traits.clearValue)) {
 				m_table[i].key = Traits.clearValue;
-				m_table[i].value = Value.init;
+				// Assigning Value.init through Embed/alias this can defaultInit a
+				// fresh RefCounted Vector and leak the old payload. Destroy structs.
+				static if (is(Value == struct))
+					.destroy(m_table[i].value);
+				else
+					m_table[i].value = Value.init;
 			}
 		m_length = 0;
 	}

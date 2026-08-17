@@ -1,6 +1,6 @@
 {
 	"name": "memutils",
-	"version": "1.0.12",
+	"version": "1.0.13",
 	"license": "MIT",
 	"description": "Overhead allocators, allocator-aware containers and lifetime management for D objects.",
 	"copyright": "Copyright © 2023, Etienne Cimon",
