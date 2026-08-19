@@ -1,9 +1,40 @@
 {
 	"name": "memutils",
-	"version": "1.0.13",
+	"version": "1.0.14",
 	"license": "MIT",
 	"description": "Overhead allocators, allocator-aware containers and lifetime management for D objects.",
 	"copyright": "Copyright © 2023, Etienne Cimon",
 	"authors": ["Etienne Cimon", "Sönke Ludwig", "others..."],
-	"targetType": "staticLibrary"
+	"targetType": "staticLibrary",
+	"configurations": [
+		{
+			"name": "library",
+			"targetType": "staticLibrary"
+		},
+		{
+			"name": "bench-unreadring",
+			"targetType": "executable",
+			"targetName": "bench-unreadring",
+			"targetPath": "build",
+			"mainSourceFile": "bench/unreadring.d",
+			"excludedSourceFiles": ["source/memutils/tests.d"]
+		},
+		{
+			"name": "bench-mt-alloc",
+			"targetType": "executable",
+			"targetName": "bench-mt-alloc",
+			"targetPath": "build",
+			"mainSourceFile": "bench/mt_alloc.d",
+			"excludedSourceFiles": ["source/memutils/tests.d"]
+		},
+		{
+			"name": "bench-mt-alloc-tlsgc",
+			"targetType": "executable",
+			"targetName": "bench-mt-alloc-tlsgc",
+			"targetPath": "build",
+			"mainSourceFile": "bench/mt_alloc.d",
+			"excludedSourceFiles": ["source/memutils/tests.d"],
+			"versions": ["TLSGC"]
+		}
+	]
 }

@@ -3,7 +3,7 @@
 The `memutils` library provides a set of 4 enhanced allocators tweaked for better performance depending on the scope.
 A new allocation syntax comes with many benefits, including the easy replacement of allocators.
 
-- `AppMem` : The AppMem Allocator pipes through the original garbage collection, but is integrated to support the new syntax and recommends manual management. If the `DebugAllocator` is disabled, automatic garbage collection works through this allocator but it will _not_ call any explicit destructors.
+- `AppMem` : The AppMem Allocator pipes through the original garbage collection, but is integrated to support the new syntax and recommends manual management. If the `DebugAllocator` is disabled, automatic garbage collection works through this allocator but it will _not_ call any explicit destructors. `DebugAllocator` is **off** for `dub build` (debug and release). `dub test` turns it on. Pass `-version=EnableDebugger` to turn it on in either `-b debug` or `-b release`. `-version=DisableDebugger` / `VibeNoDebug` force it off.
 - `ThreadMem`: This allocator is fine tuned for thread-local heap allocations and doesn't slow down due to locks or additional pressure on the GC.
 - `SecureMem`: When storing sensitive data such as private certificates, passwords or keys, the CryptoSafe allocator
   enhances safety by zeroising the memory after being freed, and optionally it can use a memory pool (SecurePool)
@@ -18,6 +18,7 @@ The allocator-friendly containers are:
 - `HashMapRef`: A `RefCounted` hashmap (allows containers to share ownership).
 - `RBTree`: A red black tree.
 - `DictionaryList`: Similar to a MultiMap in C++, but implemented as a linear search array
+- `UnreadRingMixin` / `UnreadRing` / `SecureUnreadRing`: power-of-two leftover ring (libasync TCP leftover + Botan TLS plaintext). Mix `UnreadRingMixin!ALLOC` into a host, or use `UnreadRing` (malloc) / `SecureUnreadRing`. `unreadDrainRecv` / `unreadOnTCP` handle libasync `TCPEvent.READ` leftover.
 
 The allocator-friendly lifetime management objects are:
 

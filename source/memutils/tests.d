@@ -201,6 +201,64 @@ void circularBufferTest(ALLOC)() {
 	assert(dst[0 .. 2] == [1, 2]);
 }
 
+/// UnreadRingImpl on AppMem / SecureMem / ThreadMem. The malloc
+/// `UnreadRing` kernel is covered by unreadring.d's own unittest.
+void unreadRingTest(ALLOC)() {
+	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0);
+	{
+		UnreadRingImpl!ALLOC r;
+		scope (exit) r.dispose();
+
+		ubyte[64] a = void;
+		ubyte[64] b = void;
+		foreach (i, ref x; a) x = cast(ubyte)(i * 3 + 1);
+
+		assert(r.take(b[]) == 0);
+		r.put(null);
+		assert(r.empty);
+
+		r.put(a[]);
+		assert(r.length == a.length);
+		assert(getAllocator!(ALLOC.ident)().bytesAllocated() > 0);
+		r.read(b[0 .. a.length]);
+		assert(b[0 .. a.length] == a[]);
+		assert(r.empty);
+
+		r.reserve(4096);
+		assert(r.capacity >= 4096);
+		auto d = r.peekDst();
+		assert(d.length >= 64);
+		d[0 .. 64] = a[];
+		r.putN(64);
+		assert(r.length == 64);
+		assert(r.peek().length == 64);
+		assert(r.take(b[]) == 64);
+		assert(b[] == a[]);
+		assert(r.empty);
+
+		// Wrap: leave 8 live bytes at the tail, then put 16.
+		enum size_t n = 4096;
+		r.reserve(n);
+		auto pad = new ubyte[](n);
+		foreach (i, ref x; pad) x = cast(ubyte)i;
+		r.put(pad[0 .. n - 8]);
+		assert(r.take(pad[0 .. n - 8]) == n - 8);
+		ubyte[16] seamIn = void;
+		ubyte[16] seamOut = void;
+		foreach (i, ref x; seamIn) x = cast(ubyte)(0xA0 + i);
+		r.put(seamIn[]);
+		assert(r.length == 16);
+		assert(r.take(seamOut[]) == 16);
+		assert(seamOut[] == seamIn[]);
+		assert(r.empty);
+
+		r.dispose();
+	}
+	scope (failure) getAllocator!(ALLOC.ident)().printMap();
+	assert(getAllocator!(ALLOC.ident)().bytesAllocated() == 0,
+		"unread ring leaked " ~ getAllocator!(ALLOC.ident)().bytesAllocated().to!string ~ " bytes");
+}
+
 void dictionaryListTest(ALLOC)()
 {
 	DictionaryList!(string, int, ALLOC) a;
@@ -358,6 +416,7 @@ unittest {
 	propagateTests!uniqueTest();
 	propagateTests!refCountedCastTest();
 	propagateTests!circularBufferTest();
+	propagateTests!unreadRingTest();
 	propagateTests!dictionaryListTest();
 	propagateTests!rbTreeTestTwo();
 
