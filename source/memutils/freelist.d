@@ -24,13 +24,12 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 		else
 			FreeListAlloc!Base[freeListCount] m_freeLists;
 		Base m_baseAlloc;
+		// Not a GC Mutex: see memutilsSpinLock in allocators.d.
+		version (TLSGC) { } else align(64) shared int m_lock;
 	}
 	
 	this()
 	{
-		version(TLSGC) { } else {
-			if (!mtx) mtx = new Mutex;
-		}
 		m_baseAlloc = getAllocator!Base();
 		foreach (i; iotaTuple!freeListCount) {
 			static if (is(Base == MallocAllocator) && __VERSION__ >= 2072)
@@ -44,14 +43,64 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 		foreach(fl; m_freeLists)
 			destroy(fl);
 	}
-	
+
+	version (TLSGC) { } else {
+		pragma(inline, true)
+		void lockAlloc() nothrow @nogc { memutilsSpinLock(m_lock); }
+		pragma(inline, true)
+		void unlockAlloc() nothrow @nogc { memutilsSpinUnlock(m_lock); }
+		pragma(inline, true)
+		bool tryLockAlloc() nothrow @nogc { return memutilsSpinTryLock(m_lock); }
+	}
+
 	void[] alloc(size_t sz)
 	{
-
-		version(TLSGC) { } else {
-			mtx.lock_nothrow();
-			scope(exit) mtx.unlock_nothrow();
+		version (TLSGC) { } else {
+			lockAlloc();
+			scope(exit) unlockAlloc();
 		}
+		return allocUnlocked(sz);
+	}
+
+	void[] realloc(void[] data, size_t sz)
+	{
+		version (TLSGC) { } else {
+			lockAlloc();
+			scope(exit) unlockAlloc();
+		}
+		return reallocUnlocked(data, sz);
+	}
+
+	void free(void[] data)
+	{
+		// TLSGC: this instance is the calling thread's allocator. A GC
+		// finalizer runs on an arbitrary thread and would splice the block
+		// into the wrong freelist. Skip (leak) rather than corrupt.
+		// Shared lock: a finalizer that blocked here while the mutator that
+		// triggered GC held the lock would deadlock stop-the-world. Try-lock
+		// and leak if the mutator already holds it.
+		static if (HasGCCheck) {
+			if (gc_inFinalizer()) {
+				version (TLSGC)
+					return;
+				else {
+					if (!tryLockAlloc())
+						return;
+					scope(exit) unlockAlloc();
+					freeUnlocked(data);
+					return;
+				}
+			}
+		}
+		version (TLSGC) { } else {
+			lockAlloc();
+			scope(exit) unlockAlloc();
+		}
+		freeUnlocked(data);
+	}
+
+	private void[] allocUnlocked(size_t sz)
+	{
 		//logTrace("AFL alloc ", sz);
 		foreach (i; iotaTuple!freeListCount)
 			if (sz <= nthFreeListSize!(i))
@@ -60,24 +109,20 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 		assert(false);
 	}
 
-	void[] realloc(void[] data, size_t sz)
+	private void[] reallocUnlocked(void[] data, size_t sz)
 	{
-		version(TLSGC) { } else {
-			mtx.lock_nothrow();
-			scope(exit) mtx.unlock_nothrow();
-		}
 		foreach (fl; m_freeLists) {
 			if (data.length <= fl.elementSize) {
 				// just grow the slice if it still fits into the free list slot
 				if (sz <= fl.elementSize)
 					return data.ptr[0 .. sz];
 				
-				// otherwise re-allocate
-				auto newd = alloc(sz);
+				// otherwise re-allocate (already holding the lock; do not reenter alloc/free)
+				auto newd = allocUnlocked(sz);
 				assert(newd.ptr+sz <= data.ptr || newd.ptr >= data.ptr+data.length, "New block overlaps old one!?");
 				auto len = min(data.length, sz);
 				newd[0 .. len] = data[0 .. len];
-				free(data);
+				freeUnlocked(data);
 				return newd;
 			}
 		}
@@ -85,12 +130,8 @@ final class AutoFreeListAllocator(Base : Allocator) : Allocator {
 		return m_baseAlloc.realloc(data, sz);
 	}
 
-	void free(void[] data)
+	private void freeUnlocked(void[] data)
 	{
-		version(TLSGC) { } else {
-			mtx.lock_nothrow();
-			scope(exit) mtx.unlock_nothrow();
-		}
 		//logTrace("AFL free ", data.length);
 		foreach(i; iotaTuple!freeListCount) {
 			if (data.length <= nthFreeListSize!i) {

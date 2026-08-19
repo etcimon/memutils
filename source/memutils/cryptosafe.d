@@ -34,9 +34,6 @@ private:
 
 public:	
 	this() {
-		version(TLSGC) { } else {
-			if (!mtx) mtx = new Mutex;
-		}
 		static if (HasSecurePool) {
 			if (!ms_zeroise) ms_zeroise = new SecurePool();
 		}
@@ -45,10 +42,9 @@ public:
 	
 	void[] alloc(size_t n)
 	{
-		version(TLSGC) { } else {
-			mtx.lock_nothrow();
-			scope(exit) mtx.unlock_nothrow();
-		}
+		// No extra lock: m_secondary (AutoFreeList) serialises the hot path;
+		// SecurePool has its own mutex when compiled in. Nested locking of the
+		// old process-wide Mutex was recursive-on-Windows / deadlock-on-POSIX.
 		static if (HasSecurePool) {
 			//logDebug("CryptoSafe alloc ", n);
 			if (void[] p = ms_zeroise.alloc(n)) {
@@ -65,10 +61,6 @@ public:
 
 	void[] realloc(void[] mem, size_t n)
 	{
-		version(TLSGC) { } else {
-			mtx.lock_nothrow();
-			scope(exit) mtx.unlock_nothrow();
-		}
 		//logTrace("realloc P: ", mem.length, " & ", mem.ptr);
 		if (n <= mem.length)
 			return mem;
@@ -91,10 +83,6 @@ public:
 
 	void free(void[] mem)
 	{
-		version(TLSGC) { } else {
-			mtx.lock_nothrow();
-			scope(exit) mtx.unlock_nothrow();
-		}
 		//logTrace("free P: ", mem.length, " & ", mem.ptr);
 		import core.stdc.string : memset;
 		bool skip_zero;

@@ -1,6 +1,7 @@
 ﻿module memutils.refcounted;
 
 import memutils.allocators;
+import memutils.constants;
 import memutils.helpers;
 import std.conv;
 import std.traits;
@@ -169,6 +170,14 @@ struct RefCounted(T, ALLOC = ThreadMem)
 		TR obj_ptr = m_object;
 		//static if (!isPointer!T) // call destructors but not for indirections...
 		//	.destroy(m_object);
+
+		// Same GC rule as Unique: do not take the allocator lock / TLS freelist
+		// from a finalizer. Leak the payload rather than deadlock STW.
+		static if (HasGCCheck) if (gc_inFinalizer()) {
+			m_refCount = null;
+			m_object = null;
+			return;
+		}
 		
 		if (obj_ptr !is null)
 			ObjectAllocator!(T, ALLOC).free(obj_ptr);

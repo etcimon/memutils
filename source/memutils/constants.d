@@ -25,15 +25,27 @@ version(Have_botan) 	const HasBotan = true;
 else			const HasBotan = false;
 version(DictionaryDebugger) const HasDictionaryDebugger = true;
 else					const HasDictionaryDebugger = false;
-version(EnableDebugger) const HasDebuggerEnabled = true;
-else					  const HasDebuggerEnabled = false;
-version(DisableDebugger)   const DisableDebugAllocations = true;
-else version(VibeNoDebug) const DisableDebugAllocations = true;
-else					const DisableDebugAllocations = false;
+// Opt-in via -version=EnableDebugger (works for DUB -b debug and -b release).
+// Unit tests turn it on automatically. DisableDebugger / VibeNoDebug win.
+version (EnableDebugger)     const HasDebuggerEnabled = true;
+else version (unittest)      const HasDebuggerEnabled = true;
+else                         const HasDebuggerEnabled = false;
+version (DisableDebugger)    const DisableDebugAllocations = true;
+else version (VibeNoDebug)   const DisableDebugAllocations = true;
+else                         const DisableDebugAllocations = false;
 public:
-static if (HasDebuggerEnabled && !DisableDebugAllocations ) const HasDebugAllocations = true;
-else static if (!DisableDebugAllocations) const HasDebugAllocations = true;
-else					  const HasDebugAllocations = false;
+enum bool HasDebugAllocations = HasDebuggerEnabled && !DisableDebugAllocations;
+
+// Same gate Unique!(T,void) already used: D 2.071+ exposes gc_inFinalizer.
+// Allocator locks / TLSGC freelists must not run from a GC finalizer (see allocators.d).
+static if (__VERSION__ >= 2071) {
+	extern (C) bool gc_inFinalizer() nothrow @nogc;
+	enum HasGCCheck = true;
+} else version (GCCheck) {
+	extern (C) bool gc_inFinalizer() nothrow @nogc;
+	enum HasGCCheck = true;
+} else enum HasGCCheck = false;
+
 package:
 version(SkipMemutilsTests) const SkipUnitTests = true;
 else					   const SkipUnitTests = false;

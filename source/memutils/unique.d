@@ -20,14 +20,6 @@ import core.sync.mutex;
 import memutils.helpers;
 import std.conv : to;
 
-static if (__VERSION__ >= 2071) {
-	extern (C) bool gc_inFinalizer();
-	enum HasGCCheck = true;
-}
-else version(GCCheck) {
-	extern(C) bool gc_inFinalizer();
-	enum HasGCCheck = true;
-} else enum HasGCCheck = false;
 enum DebugUnique = true;
 
 // TODO: Move release() into Embed!, and add a releaseCheck() for refCounted (cannot release > 1 reference) 
@@ -138,6 +130,14 @@ public:
 		static if (ALLOC.stringof != "void") {
 			if (m_object) {
 				//logTrace("ptr in ptree: ", ptr in ptree);
+
+				// ThreadMem/SecureMem Unique must not run ObjectAllocator.free
+				// from a GC finalizer: TLSGC would splice into the GC thread's
+				// freelist; the shared spinlock could deadlock stop-the-world.
+				static if (HasGCCheck) if (gc_inFinalizer()) {
+					m_object = null;
+					return;
+				}
 
 				static if (HasDebugAllocations && DebugUnique) {
 					mtx.lock(); scope(exit) mtx.unlock();

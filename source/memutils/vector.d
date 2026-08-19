@@ -636,6 +636,23 @@ struct Vector(T, ALLOC = ThreadMem)
 	{
 		this.length = newLength;
 	}
+
+	/// Grow without constructing new elements. POD write-path only.
+	pragma(inline, true) void expandUninitialized(size_t newLength)
+	{
+		static if (hasElaborateDestructor!T)
+		{
+			this.length = newLength;
+			return;
+		}
+		if (newLength <= this.length)
+		{
+			this.length = newLength;
+			return;
+		}
+		_data.reserve(newLength);
+		_data._payload = _data._payload.ptr[0 .. newLength];
+	}
 	
 	import std.traits : isNumeric;
 	

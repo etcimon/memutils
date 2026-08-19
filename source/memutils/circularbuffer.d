@@ -173,11 +173,12 @@ struct CircularBuffer(T, size_t N = 0, ALLOC = ThreadMem) {
 	private size_t mod(size_t n)
 	const {
 		static if( N == 0 ){
-			/*static if(PotOnly){
-            return x & (m_buffer.length-1);
-            } else {*/
-			return n % m_buffer.length;
-			//}
+			auto len = m_buffer.length;
+			// Dynamic buffers are usually grown by doubling (POT). `%` is
+			// a full integer divide; mask when the length is a power of two.
+			if (len && (len & (len - 1)) == 0)
+				return n & (len - 1);
+			return n % len;
 		} else static if( ((N - 1) & N) == 0 ){
 			return n & (N - 1);
 		} else return n % N;

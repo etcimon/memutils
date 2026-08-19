@@ -9,11 +9,11 @@
 module memutils.allocators;
 
 public import memutils.constants;
-import core.thread : Fiber;
+import core.thread : Fiber, Thread;
 import core.exception : OutOfMemoryError;
 import core.stdc.stdlib;
 import core.memory;
-import core.sync.mutex;
+import core.atomic;
 import std.conv;
 import std.traits;
 import std.algorithm;
@@ -106,9 +106,85 @@ interface Allocator {
 
 package:
 
-version(TLSGC) { } else {
-	public import core.sync.mutex : Mutex;
-	__gshared Mutex mtx;
+/*
+ * Process-wide allocator lock when TLSGC is off.
+ *
+ * TLSGC already solves contention by making getAllocator thread-local so the
+ * freelist is never shared. The remaining cost on a single-OS-thread vibe /
+ * libasync loop (the ECDSA HS bench) was uncontended pthread_mutex_lock/unlock
+ * on every Vector reserve/free: core.sync.mutex.Mutex is a GC class wrapping a
+ * futex, paid even when nobody else waits.
+ *
+ * This word is NOT a GC object (no `new Mutex`). Holders must not:
+ *   - allocate GC memory (`new`, GC.malloc, append to a GC array)
+ *   - Fiber.yield
+ *   - run long work that can trigger stop-the-world
+ * The AutoFreeList / Secure / Debug hot paths only malloc + list splice, which
+ * does not run the D GC. A waiter spins a short TAS then Thread.yield so a
+ * stop-the-world collection can suspend this thread instead of burning a core
+ * in a pause loop.
+ *
+ * Finalizers: Unique!(T,void) already skips .destroy when gc_inFinalizer().
+ * Unique!(T, ALLOC) / RefCounted and AutoFreeListAllocator.free do the same
+ * (try-lock then leak) so a finalizer cannot wait on a lock held by the
+ * mutator that triggered GC. TLSGC must not free from a finalizer at all:
+ * getAllocator would touch the GC thread's freelist, not the allocating
+ * thread's.
+ */
+version (TLSGC) { } else {
+	enum memutilsAllocSpinLimit = 64;
+
+	pragma(inline, true)
+	void memutilsCpuPause() nothrow @nogc
+	{
+		import memutils.cpuid : MemutilsCpuid;
+		if (!MemutilsCpuid.hasPause())
+			return;
+		version (LDC) {
+			version (X86_64)
+				asm nothrow @nogc { "pause" : : : "memory"; }
+			else version (X86)
+				asm nothrow @nogc { "pause" : : : "memory"; }
+		} else version (D_InlineAsm_X86_64) {
+			asm nothrow @nogc { pause; }
+		} else version (D_InlineAsm_X86) {
+			asm nothrow @nogc { pause; }
+		}
+	}
+
+	pragma(inline, true)
+	bool memutilsSpinTryLock(ref shared int lock) nothrow @nogc
+	{
+		return cas(&lock, 0, 1);
+	}
+
+	pragma(inline, true)
+	void memutilsSpinLock(ref shared int lock) nothrow @nogc
+	{
+		if (memutilsSpinTryLock(lock))
+			return;
+		memutilsSpinLockSlow(lock);
+	}
+
+	void memutilsSpinLockSlow(ref shared int lock) nothrow @nogc
+	{
+		uint spins;
+		for (;;) {
+			if (atomicLoad!(MemoryOrder.raw)(lock) == 0 && memutilsSpinTryLock(lock))
+				return;
+			memutilsCpuPause();
+			if (++spins >= memutilsAllocSpinLimit) {
+				spins = 0;
+				Thread.yield();
+			}
+		}
+	}
+
+	pragma(inline, true)
+	void memutilsSpinUnlock(ref shared int lock) nothrow @nogc
+	{
+		atomicStore!(MemoryOrder.rel)(lock, 0);
+	}
 }
 
 pragma(inline, true)
